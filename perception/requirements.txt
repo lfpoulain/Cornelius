@@ -12,3 +12,10 @@ packaging==26.3
 protobuf==7.36.1
 sympy==1.14.0
 pyreadline3==3.5.6; sys_platform == "win32"
+# macOS : cv2-enumerate-cameras liste les caméras avec AVFoundation (PyObjC).
+pyobjc-core==12.2.2; sys_platform == "darwin"
+pyobjc-framework-Cocoa==12.2.2; sys_platform == "darwin"
+pyobjc-framework-CoreAudio==12.2.2; sys_platform == "darwin"
+pyobjc-framework-CoreMedia==12.2.2; sys_platform == "darwin"
+pyobjc-framework-Quartz==12.2.2; sys_platform == "darwin"
+pyobjc-framework-AVFoundation==12.2.2; sys_platform == "darwin"

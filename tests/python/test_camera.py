@@ -6,7 +6,7 @@ from unittest.mock import patch
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "perception"))
-from camera import Camera, DEFAULT_MODE, valid_mode
+from camera import Camera, DEFAULT_MODE, camera_backend, valid_mode
 
 
 class Capture:
@@ -87,6 +87,12 @@ class CameraTests(unittest.TestCase):
             self.assertEqual([capture.index for capture in Capture.opened], [2])
             self.assertEqual(status["mode"], {"width": 640, "height": 480, "fps": 15})
             camera.disable()
+
+    def test_backend_follows_the_operating_system(self):
+        import cv2
+        self.assertEqual(camera_backend("win32"), cv2.CAP_DSHOW)
+        self.assertEqual(camera_backend("darwin"), cv2.CAP_AVFOUNDATION)
+        self.assertEqual(camera_backend("linux"), cv2.CAP_V4L2)
 
 
 if __name__ == "__main__":

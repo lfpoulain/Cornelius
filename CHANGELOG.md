@@ -6,6 +6,18 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-10-21 : macOS
+
+**Ajouté**
+
+- Installation sur Mac à puce Apple : `scripts/install-macos.sh` (Homebrew, Python 3.12, modèles, services launchd avec `--launchd`) et sa page [Installer sous macOS](docs/installation/macos.md).
+- Perception : caméras lues avec AVFoundation sous macOS, listées grâce à PyObjC (installé seulement sur Mac).
+
+**Modifié**
+
+- `scripts/start.sh`, `stop.sh`, `restart.sh` et `dev.sh` fonctionnent aussi sous macOS (`stat` BSD).
+- Génération d’images sous macOS : PyTorch vient de PyPI et utilise le GPU de la puce Apple (MPS).
+
 ### 2026-10-20 : contrat des modules 0.2.0
 
 Cornelius passe en 0.2.0. Ces ajouts restent compatibles `apiVersion: 1` ; un module qui s’en sert déclare `minCoreVersion: '0.2.0'`.

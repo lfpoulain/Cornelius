@@ -124,9 +124,10 @@ def select_backend(requested=None):
     return "cpu"
 
 
-def torch_install_command(python, backend, windows=None, version=None, index=None):
+def torch_install_command(python, backend, windows=None, version=None, index=None, macos=None):
     """Commande pip qui installe la variante de PyTorch du backend, sans toucher au reste."""
     windows = os.name == "nt" if windows is None else windows
+    macos = sys.platform == "darwin" if macos is None else macos
     version = version or os.getenv("CORNELIUS_TORCH_VERSION") or TORCH_VERSION
     index = index or os.getenv("CORNELIUS_TORCH_INDEX_URL")
     base = [str(python), "-m", "pip", "install", "--disable-pip-version-check", "--force-reinstall"]
@@ -145,6 +146,9 @@ def torch_install_command(python, backend, windows=None, version=None, index=Non
             "torch==" + version,
             "--find-links", "https://repo.radeon.com/rocm/manylinux/rocm-rel-" + ROCM_RELEASE + "/",
         ]
+    if backend == "cpu" and macos and not index:
+        # Sous macOS, la roue de PyPI est la bonne : elle utilise le GPU Apple (MPS) s’il existe.
+        return base + ["torch==" + version]
     default = "https://download.pytorch.org/whl/" + ("cu130" if backend == "cuda" else "cpu")
     return base + ["torch==" + version, "--index-url", index or default]
 

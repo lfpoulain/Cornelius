@@ -9,7 +9,7 @@
 </p>
 
 <p>
-  <img alt="Linux et Windows" src="https://img.shields.io/badge/Linux%20%7C%20Windows-0b1312?style=flat-square&logo=linux&logoColor=white" />
+  <img alt="Linux, macOS et Windows" src="https://img.shields.io/badge/Linux%20%7C%20macOS%20%7C%20Windows-0b1312?style=flat-square&logo=linux&logoColor=white" />
   <img alt="Node.js 24" src="https://img.shields.io/badge/Node.js-24-3fb7a3?style=flat-square&logo=nodedotjs&logoColor=white" />
   <img alt="Python 3.12" src="https://img.shields.io/badge/Python-3.12-3fb7a3?style=flat-square&logo=python&logoColor=white" />
   <img alt="En français" src="https://img.shields.io/badge/langue-fran%C3%A7ais-3fb7a3?style=flat-square" />
@@ -82,7 +82,7 @@ La caméra, les visages et l’écoute du mot d’appel restent sur l’ordinate
 
 | | |
 |---|---|
-| 💻 **Ordinateur** | x86-64 sous Linux (Debian, Ubuntu, Arch ou une dérivée) ou Windows 10 et 11 |
+| 💻 **Ordinateur** | x86-64 sous Linux (Debian, Ubuntu, Arch ou une dérivée) ou Windows 10 et 11, ou un Mac à puce Apple (M1 ou plus récent) |
 | 🎥 **Matériel** | une webcam, un micro, des haut-parleurs et un écran (seul, ou derrière un miroir sans tain) |
 | 🛠️ **Logiciels** | Node.js 24 (24.2 ou plus récent), Python 3.12 et Git |
 | 🔑 **Clé OpenAI** | d’un compte payant : sans elle, Cornelius ne peut pas parler |
@@ -116,6 +116,19 @@ scripts/install-linux.sh --system-deps --systemd
 
 Sans l’option `--systemd`, démarrez ensuite avec `scripts/start.sh`. Toutes les options : [Installer sous Linux](docs/installation/linux.md).
 
+### 🍎 macOS
+
+Avec [Homebrew](https://brew.sh) installé, récupérez le code puis lancez l’installation. Elle installe git, Node.js 24 et Python 3.12 avec Homebrew, les dépendances, la perception et ses modèles, puis crée deux services launchd qui démarrent avec la session :
+
+```sh
+brew install git
+git clone https://github.com/lfpoulain/Cornelius.git
+cd Cornelius
+scripts/install-macos.sh --system-deps --launchd
+```
+
+Sans l’option `--launchd`, démarrez ensuite avec `scripts/start.sh`. Au premier démarrage, macOS demande l’accès à la caméra : acceptez-le. Toutes les options : [Installer sous macOS](docs/installation/macos.md).
+
 ### 🪟 Windows
 
 Il n’y a pas d’installateur : l’installation se fait en une dizaine de commandes PowerShell. Suivez [Installer sous Windows](docs/installation/windows.md).
@@ -129,9 +142,9 @@ Ouvrez l’administration et collez votre clé OpenAI dans **Mise en route → C
 
 ## ▶️ Lancer
 
-Avec les services systemd sous Linux, Cornelius démarre tout seul. Sinon, utilisez les scripts :
+Avec les services systemd sous Linux ou launchd sous macOS, Cornelius démarre tout seul. Sinon, utilisez les scripts (ceux de Linux servent aussi sous macOS) :
 
-| Action | Linux | Windows (PowerShell) |
+| Action | Linux et macOS | Windows (PowerShell) |
 |---|---|---|
 | Démarrer | `scripts/start.sh` | `powershell -ExecutionPolicy Bypass -File scripts\start.ps1` |
 | Arrêter | `scripts/stop.sh` | `powershell -ExecutionPolicy Bypass -File scripts\stop.ps1` |
@@ -165,7 +178,7 @@ Toute la documentation part de [l’index](docs/README.md).
 
 | | |
 |---|---|
-| **Installer** | [Linux](docs/installation/linux.md) · [Windows](docs/installation/windows.md) · [Carte graphique](docs/installation/gpu.md) |
+| **Installer** | [Linux](docs/installation/linux.md) · [macOS](docs/installation/macos.md) · [Windows](docs/installation/windows.md) · [Carte graphique](docs/installation/gpu.md) |
 | **Utiliser** | [Le miroir](docs/utilisation/miroir.md) · [L’administration](docs/utilisation/administration.md) · [Dépannage](docs/utilisation/depannage.md) |
 | **Fonctionnalités** | [Ouverture et présence](docs/fonctionnalites/ouverture-et-presence.md) · [Mot d’appel](docs/fonctionnalites/mot-d-appel.md) · [Mémoire](docs/fonctionnalites/memoire.md) · [Home Assistant](docs/fonctionnalites/home-assistant.md) · [Agents Hermes](docs/fonctionnalites/agents-hermes.md) · [Vision locale](docs/fonctionnalites/vision-locale.md) · [Images](docs/fonctionnalites/generation-d-images.md) |
 | **Modules** | [Les utiliser](docs/modules/README.md) · [Le contrat](docs/modules/reference.md) · [En créer un](https://github.com/lfpoulain/cornelius-modules/blob/main/docs/creer-un-module.md) (dépôt cornelius-modules) |

@@ -4,7 +4,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 
 ## Par où commencer
 
-1. Installer Cornelius : [sous Linux](installation/linux.md) ou [sous Windows](installation/windows.md).
+1. Installer Cornelius : [sous Linux](installation/linux.md), [sous macOS](installation/macos.md) ou [sous Windows](installation/windows.md).
 2. Suivre le [premier démarrage](installation/premier-demarrage.md), de la connexion à la première conversation.
 3. En cas de souci, ouvrir le [dépannage](utilisation/depannage.md).
 
@@ -12,7 +12,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 
 | Je veux… | Page |
 |---|---|
-| installer Cornelius | [Linux](installation/linux.md), [Windows](installation/windows.md), puis [carte graphique](installation/gpu.md) si besoin |
+| installer Cornelius | [Linux](installation/linux.md), [macOS](installation/macos.md), [Windows](installation/windows.md), puis [carte graphique](installation/gpu.md) si besoin |
 | réussir le premier lancement | [Premier démarrage](installation/premier-demarrage.md) |
 | choisir ce qui ouvre la conversation | [Ouverture et présence](fonctionnalites/ouverture-et-presence.md), [Mot d’appel](fonctionnalites/mot-d-appel.md) |
 | parler à Cornelius depuis une autre pièce | [Les satellites audio](fonctionnalites/satellites.md) |
@@ -25,6 +25,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 ## Installation
 
 - [Installer sous Linux](installation/linux.md) : le script d’installation, les services systemd, les mises à jour.
+- [Installer sous macOS](installation/macos.md) : `scripts/install-macos.sh`, les services launchd et l’accès à la caméra.
 - [Installer sous Windows](installation/windows.md) : l’installation manuelle dans PowerShell, le démarrage et l’arrêt.
 - [Premier démarrage](installation/premier-demarrage.md) : la rubrique « Mise en route », étape par étape.
 - [Carte graphique (GPU)](installation/gpu.md) : quel matériel convient à la vision et aux images, et comment l’installer.

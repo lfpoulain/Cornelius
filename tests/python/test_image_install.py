@@ -42,7 +42,7 @@ class CommandTest(unittest.TestCase):
 
     def test_each_backend_pins_the_same_torch_version(self):
         cuda = install.torch_install_command("py", "cuda", windows=False)
-        cpu = install.torch_install_command("py", "cpu", windows=True)
+        cpu = install.torch_install_command("py", "cpu", windows=True, macos=False)
         rocm = install.torch_install_command("py", "rocm", windows=False)
         for command in (cuda, cpu, rocm):
             self.assertIn("torch==" + install.TORCH_VERSION, command)
@@ -52,6 +52,13 @@ class CommandTest(unittest.TestCase):
         self.assertEqual(
             rocm[-2:], ["--find-links", "https://repo.radeon.com/rocm/manylinux/rocm-rel-7.2.1/"]
         )
+
+    def test_macos_cpu_uses_pypi_wheel_with_mps(self):
+        command = install.torch_install_command("py", "cpu", windows=False, macos=True)
+        self.assertEqual(command[-1], "torch==" + install.TORCH_VERSION)
+        self.assertNotIn("--index-url", command)
+        forced = install.torch_install_command("py", "cpu", windows=False, index="https://mirror/", macos=True)
+        self.assertEqual(forced[-2:], ["--index-url", "https://mirror/"])
 
     def test_windows_rocm_uses_amd_python_312_wheel(self):
         command = install.torch_install_command("py", "rocm", windows=True)

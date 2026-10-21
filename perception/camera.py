@@ -1,6 +1,6 @@
 """One capture shared by local recognition and the on-demand admin preview."""
 import hashlib
-import os
+import sys
 import threading
 import time
 import uuid
@@ -23,9 +23,18 @@ def valid_mode(mode):
     )
 
 
+def camera_backend(platform=sys.platform):
+    """API de capture d’OpenCV : DirectShow sous Windows, AVFoundation sous macOS, V4L2 sous Linux."""
+    if platform == "win32":
+        return cv2.CAP_DSHOW
+    if platform == "darwin":
+        return cv2.CAP_AVFOUNDATION
+    return cv2.CAP_V4L2
+
+
 class Camera:
     def __init__(self, index=0, enabled=True):
-        self.backend = cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_V4L2
+        self.backend = camera_backend()
         self.lock = threading.RLock()
         self.devices = {}
         self.selected_id = None

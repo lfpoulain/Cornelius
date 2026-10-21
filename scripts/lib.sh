@@ -1,4 +1,4 @@
-# Fonctions partagées par les scripts Linux de Cornelius (Debian, Ubuntu, Arch).
+# Fonctions partagées par les scripts Linux (Debian, Ubuntu, Arch) et macOS de Cornelius.
 # Ce fichier se charge avec : . "$(dirname "$0")/lib.sh"
 # shellcheck shell=bash
 
@@ -115,7 +115,12 @@ dependencies_ready() {
     [ -e "$ROOT/node_modules/$file" ] || return 1
   done
   [ ! -f "$ROOT/package-lock.json" ] ||
-    [ "$(stat -c %Y "$ROOT/package-lock.json")" -le "$(($(stat -c %Y "$ROOT/node_modules/.package-lock.json") + 10))" ]
+    [ "$(mtime "$ROOT/package-lock.json")" -le "$(($(mtime "$ROOT/node_modules/.package-lock.json") + 10))" ]
+}
+
+# Date de modification en secondes : stat GNU (Linux), sinon stat BSD (macOS).
+mtime() {
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1"
 }
 
 # Installe les dépendances exactes (npm ci) si elles manquent, sont incomplètes ou ont changé.
@@ -160,7 +165,7 @@ launch_perception() {
   local python
   python="$(perception_python)"
   if [ -z "$python" ]; then
-    echo "Python de perception introuvable (.venv). Lancez scripts/install-linux.sh." >&2
+    echo "Python de perception introuvable (.venv). Lancez scripts/install-linux.sh (scripts/install-macos.sh sous macOS)." >&2
   elif [ -n "$(worker_pids 'perception/worker.py')" ]; then
     echo "Perception déjà active (PID $(worker_pids 'perception/worker.py' | tr '\n' ' '))."
   else
