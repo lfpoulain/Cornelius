@@ -5,7 +5,7 @@ test.use({
   launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] },
 });
 
-test('browser camera requires a click, bounds frames until decode acknowledgement and releases capture', async ({
+test('browser camera starts automatically, bounds frames until decode acknowledgement and releases capture', async ({
   page,
 }) => {
   const snapshot = (await (await page.request.get('/api/state')).json()) as StateEvent;
@@ -64,3 +64,53 @@ test('browser camera requires a click, bounds frames until decode acknowledgemen
   events!.send(JSON.stringify({ ...config, source: 'server', enabled: false }));
   await expect(page.locator('video')).toHaveCount(0);
 });
+
+for (const failure of ['insecure', 'denied'] as const) {
+  test(`browser camera reports ${failure} capture failure to administration logs`, async ({
+    page,
+  }) => {
+    const snapshot = (await (await page.request.get('/api/state')).json()) as StateEvent;
+    await page.addInitScript((failure) => {
+      if (failure === 'insecure')
+        Object.defineProperty(window, 'isSecureContext', { value: false });
+      else
+        navigator.mediaDevices.getUserMedia = async () => {
+          throw new DOMException('Permission denied', 'NotAllowedError');
+        };
+    }, failure);
+    await page.routeWebSocket('**/events?role=kiosk', (route) => {
+      route.send(JSON.stringify(snapshot));
+      route.send(
+        JSON.stringify({
+          schemaVersion: 1,
+          type: 'camera_config',
+          source: 'browser',
+          enabled: true,
+          mode: { width: 640, height: 480, fps: 30 },
+        }),
+      );
+    });
+    const diagnostic = page.waitForRequest(
+      (request) =>
+        request.url().endsWith('/api/client-logs') &&
+        request
+          .postDataJSON()
+          .entries.some(
+            (entry: { stage: string }) => entry.stage === 'caméra du navigateur du miroir',
+          ),
+    );
+    await page.goto('/');
+    const entries = (await diagnostic).postDataJSON().entries;
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          event: 'error',
+          stage: 'caméra du navigateur du miroir',
+          message: expect.stringContaining(
+            failure === 'insecure' ? 'HTTPS' : 'Accès à la caméra refusé',
+          ),
+        }),
+      ]),
+    );
+  });
+}

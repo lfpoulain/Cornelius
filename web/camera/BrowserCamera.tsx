@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { reportDiagnostic } from '../diagnostics';
 import {
   BROWSER_CAMERA_MAX_BYTES,
   encodeBrowserCameraFrame,
@@ -116,13 +117,19 @@ export function BrowserCamera({
     };
     void (async () => {
       try {
-        if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia || !context) return;
+        if (!window.isSecureContext)
+          throw new Error(
+            'Caméra du miroir indisponible : ouvrez le miroir en HTTPS ou sur localhost.',
+          );
+        if (!navigator.mediaDevices?.getUserMedia)
+          throw new Error('Ce navigateur ne permet pas l’accès à la caméra.');
+        if (!context) throw new Error('Impossible de préparer les images de la caméra du miroir.');
         const captured = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: {
             width: { ideal: width },
             height: { ideal: height },
-            frameRate: { ideal: 15, max: 30 },
+            frameRate: { ideal: 10, max: 10 },
           },
         });
         if (disposed) return void captured.getTracks().forEach((track) => track.stop());
@@ -134,8 +141,17 @@ export function BrowserCamera({
           connect();
           tick();
         }
-      } catch {
-        if (!disposed) release();
+      } catch (error) {
+        if (!disposed) {
+          const message =
+            error instanceof Error && error.name === 'NotAllowedError'
+              ? new Error(
+                  'Accès à la caméra refusé : autorisez la caméra dans le navigateur du miroir.',
+                )
+              : error;
+          reportDiagnostic('error', 'caméra du navigateur du miroir', message);
+          release();
+        }
       }
     })();
     return () => {

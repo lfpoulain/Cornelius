@@ -226,6 +226,10 @@ class Worker:
     async def commands(self, socket):
         async for message in socket:
             if isinstance(message, bytes):
+                # Binary dispatch reserves 1024 bytes for VAD PCM and 2562 bytes
+                # starting with 0x57 for wake PCM. Camera packets start with 0x43;
+                # encodeBrowserCameraFrame inserts a JPEG comment to avoid both
+                # reserved lengths. Future binary messages must preserve this rule.
                 if (len(message) >= 9 and len(message) not in (1024, 2562)
                         and message[0] == 0x43 and message[5:7] == b"\xff\xd8"):
                     accepted = False

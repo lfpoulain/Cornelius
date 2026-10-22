@@ -168,6 +168,7 @@ export function Camera({
         {camera?.mode && (
           <CameraModeSettings
             mode={camera.mode}
+            browser={camera.source === 'browser'}
             actual={camera.actual ?? null}
             disabled={busy || !camera.selectedId}
             run={run}
@@ -229,11 +230,13 @@ export function Camera({
 /** Résolution et cadence : le conseil du jour sous chaque liste, et ce que la caméra a accepté. */
 function CameraModeSettings({
   mode,
+  browser,
   actual,
   disabled,
   run,
 }: {
   mode: CameraMode;
+  browser: boolean;
   actual: { width: number; height: number; fps: number | null } | null;
   disabled: boolean;
   run: RunAction;
@@ -254,7 +257,7 @@ function CameraModeSettings({
     actual &&
     (actual.width !== mode.width ||
       actual.height !== mode.height ||
-      (actual.fps !== null && actual.fps !== mode.fps));
+      (!browser && actual.fps !== null && actual.fps !== mode.fps));
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-3">
@@ -283,28 +286,34 @@ function CameraModeSettings({
             ))}
           </NativeSelect>
         </Field>
-        <Field
-          className="min-w-56 flex-1"
-          id="camera-fps"
-          label="Images par seconde"
-          help={rate.hint}
-        >
-          <NativeSelect
+        {browser ? (
+          <p className="text-sm text-muted-foreground">
+            Caméra du navigateur : 10 images par seconde au maximum.
+          </p>
+        ) : (
+          <Field
+            className="min-w-56 flex-1"
             id="camera-fps"
-            wrapperClassName="w-full"
-            className="w-full"
-            value={String(mode.fps)}
-            disabled={disabled}
-            onChange={(event) => apply({ ...mode, fps: Number(event.target.value) })}
+            label="Images par seconde"
+            help={rate.hint}
           >
-            {CAMERA_FRAME_RATES.map((item) => (
-              <NativeSelectOption key={item.fps} value={String(item.fps)}>
-                {item.label}
-                {item.fps === DEFAULT_CAMERA_MODE.fps ? ' (recommandée)' : ''}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
-        </Field>
+            <NativeSelect
+              id="camera-fps"
+              wrapperClassName="w-full"
+              className="w-full"
+              value={String(mode.fps)}
+              disabled={disabled}
+              onChange={(event) => apply({ ...mode, fps: Number(event.target.value) })}
+            >
+              {CAMERA_FRAME_RATES.map((item) => (
+                <NativeSelectOption key={item.fps} value={String(item.fps)}>
+                  {item.label}
+                  {item.fps === DEFAULT_CAMERA_MODE.fps ? ' (recommandée)' : ''}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+        )}
       </div>
       {actual && (
         <p className="text-xs text-muted-foreground" role="status">
