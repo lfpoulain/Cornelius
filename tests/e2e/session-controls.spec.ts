@@ -118,8 +118,8 @@ test('une configuration incomplète est dite telle quelle, avec le chemin vers l
   await expect(panel).toHaveAttribute('data-tone', 'warning');
   const start = panel.getByRole('button', { name: 'Démarrer la session', exact: true });
   await expect(start).toBeDisabled();
-  await expect(start).toHaveAccessibleDescription(/^Clé OpenAI absente/);
-  await expect(panel.getByRole('button', { name: 'Bloquer OpenAI' })).toHaveCount(0);
+  await expect(start).toHaveAccessibleDescription(/^Clé du fournisseur vocal absente/);
+  await expect(panel.getByRole('button', { name: 'Bloquer les services IA' })).toHaveCount(0);
   await panel.getByRole('link', { name: /^Voir la mise en route \(\d+\)$/ }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Mise en route' })).toBeVisible();
   // Sur « Mise en route », le panneau reste compact et ne répète pas les étapes.
@@ -133,7 +133,7 @@ test('une configuration incomplète est dite telle quelle, avec le chemin vers l
   const full = page.getByRole('region', { name: 'Conversation' });
   await expect(full).not.toHaveAttribute('data-compact', 'true');
   await expect(full.getByRole('heading')).toHaveCount(0);
-  await expect(full.getByRole('button', { name: 'Bloquer OpenAI', exact: true })).toBeVisible();
+  await expect(full.getByRole('button', { name: 'Bloquer les services IA', exact: true })).toBeVisible();
 });
 
 test('« Cornelius » pour tout le monde : la caméra est dite en veille', async ({ page }) => {

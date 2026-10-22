@@ -1,3 +1,4 @@
+import { isVoiceProvider, type VoiceProvider } from '../shared/voice-provider.js';
 import { ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
 import { DEFAULT_CARD_SETTINGS, type CardSettings } from '../shared/cards.js';
 import { DEFAULT_LIVE_VOICE, isLiveVoice, type LiveVoice } from '../shared/voices.js';
@@ -365,6 +366,11 @@ export const migrations: readonly string[] = [
   INSERT OR IGNORE INTO image_generation_provider (id) VALUES (1);`,
   // Satellites audio : micro et haut-parleur d’une autre pièce, associés dans l’administration.
   satellitesMigration,
+  `CREATE TABLE IF NOT EXISTS voice_provider_preferences (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    provider TEXT NOT NULL DEFAULT 'openai' CHECK (provider IN ('openai', 'mistral'))
+  ) STRICT;
+  INSERT OR IGNORE INTO voice_provider_preferences (id) VALUES (1);`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */
@@ -595,6 +601,17 @@ export class SessionPreferences {
         'UPDATE card_preferences SET max_cards = ?, compact_secondary = ?, lifetime_ms = ? WHERE id = 1',
       )
       .run(settings.maxCards, Number(settings.compactSecondary), settings.lifetimeMs);
+  }
+  getVoiceProvider(): VoiceProvider {
+    const value = this.db
+      .prepare('SELECT provider FROM voice_provider_preferences WHERE id = 1')
+      .get()?.provider;
+    return isVoiceProvider(value) ? value : 'openai';
+  }
+  setVoiceProvider(provider: VoiceProvider): void {
+    this.db
+      .prepare('UPDATE voice_provider_preferences SET provider = ? WHERE id = 1')
+      .run(provider);
   }
   getSpeechVoice(): LiveVoice {
     const voice = this.db.prepare('SELECT voice FROM voice_preferences WHERE id = 1').get()?.voice;

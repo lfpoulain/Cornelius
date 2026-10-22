@@ -451,8 +451,8 @@ export function Admin({
             <p className="admin-eyebrow">Où vont les données</p>
             <p>
               Visages et description de la scène : traités chez vous. Seule la conversation parlée
-              et son contexte passent par OpenAI. Les demandes confiées à un agent connecté lui sont
-              aussi transmises.
+              et son contexte passent par le fournisseur vocal choisi (OpenAI ou Mistral). Les
+              demandes confiées à un agent connecté lui sont aussi transmises.
             </p>
           </div>
         </aside>
@@ -562,13 +562,14 @@ export function Admin({
                       }
                       onAllowOpenAI={() =>
                         void run(
-                          'OpenAI autorisé. La conversation reprend automatiquement si le miroir est prêt.',
+                          'Services IA autorisés. La conversation reprend automatiquement si le miroir est prêt.',
                           () => api.blockOpenAI(false),
                         )
                       }
                     />
                   )}
                   {section === 'start' && <Secrets run={run} />}
+                  {section === 'start' && <VoiceSettings state={state} run={run} />}
                   {section === 'start' && devices && (
                     <AdminPasswordCard defaultPassword={devices.defaultPassword} run={run} />
                   )}
@@ -608,7 +609,6 @@ export function Admin({
                         initialProfileId={personalityProfile}
                         run={run}
                       />
-                      <VoiceSettings state={state} run={run} />
                       <OrbScaleSettings state={state} run={run} />
                     </div>
                   )}

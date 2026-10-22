@@ -264,6 +264,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(settings),
     }),
+  voiceProvider: (provider: string) =>
+    request<StateEvent>('/api/admin/voice-provider', {
+      method: 'PATCH',
+      body: JSON.stringify({ provider }),
+    }),
   speechVoice: (voice: string) =>
     request<StateEvent>('/api/admin/voice', {
       method: 'PATCH',

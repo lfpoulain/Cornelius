@@ -23,6 +23,8 @@ export interface LiveHandlers {
   failure(): void;
 }
 export interface LiveGateway {
+  provider?: 'openai' | 'mistral';
+  serverAudio?: boolean;
   hangup?(id: string): Promise<void>;
   /** Ouvre la connexion HTTPS que réutilisera la création de session, sans rien créer. */
   prewarm?(): Promise<void>;
@@ -33,7 +35,11 @@ export interface LiveGateway {
   ): Promise<LiveCreateResponse>;
   attach(id: string, handlers: LiveHandlers): LiveConnection;
   /** Démarre une session sur un WebSocket principal ; `open` suit l’envoi de session.start. */
-  connect?(session: SessionConfig, handlers: LiveHandlers): LiveAudioConnection;
+  connect?(
+    session: SessionConfig,
+    handlers: LiveHandlers,
+    welcomeMessage?: string,
+  ): LiveAudioConnection;
 }
 export function createLiveGateway(apiKey: string, logs?: DiagnosticLog): LiveGateway {
   const client = new OpenAI({ apiKey, timeout: 4000, maxRetries: 0 });

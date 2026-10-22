@@ -125,8 +125,8 @@ export function Profiles({
                 onChange={(event) => setMemory(event.target.checked)}
               />
               <span>
-                Laisser Cornelius retenir des souvenirs pour cette personne (extraits par OpenAI
-                après la conversation)
+                Laisser Cornelius retenir des souvenirs pour cette personne (extraits par le
+                fournisseur vocal choisi après la conversation)
                 <span className="block text-xs text-muted-foreground">
                   Modifiable à tout moment dans la rubrique Mémoire.
                 </span>
@@ -139,7 +139,7 @@ export function Profiles({
           </form>
           <p className="text-xs leading-relaxed text-muted-foreground">
             Le prénom est enregistré sur cet ordinateur. Quand Cornelius reconnaît la personne, il
-            le transmet à OpenAI pour l’appeler par son prénom.
+            le transmet au fournisseur vocal choisi pour l’appeler par son prénom.
           </p>
         </CardContent>
       </Card>

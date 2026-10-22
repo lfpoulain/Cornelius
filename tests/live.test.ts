@@ -746,11 +746,11 @@ test('le blocage persiste et refuse toute nouvelle offre OpenAI', (t) => {
 test('unavailableReason distingue le blocage administrateur de la clé OpenAI absente', () => {
   const logs = new DiagnosticLog();
   const blocked = new LiveTransport(null, () => true, logs);
-  assert.equal(blocked.unavailableReason(), 'Connexions OpenAI bloquées dans l’administration.');
+  assert.equal(blocked.unavailableReason(), 'Connexions IA bloquées dans l’administration.');
   const missing = new LiveTransport(null, () => false, logs);
   assert.equal(
     missing.unavailableReason(),
-    'Ajoutez la clé OpenAI dans l’administration (Mise en route, Clés et jetons).',
+    'Ajoutez la clé du fournisseur vocal choisi dans Mise en route → Clés et jetons.',
   );
 });
 

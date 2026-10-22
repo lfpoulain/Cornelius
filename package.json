@@ -28,6 +28,8 @@
     "format:check": "prettier --check \"{server,shared,web,tests,addons}/**/*.{ts,tsx,css,html}\" \"scripts/*.ts\" \"*.{ts,json}\""
   },
   "dependencies": {
+    "@mistralai/mistralai": "3.1.0",
+    "@livekit/rtc-node": "0.13.28",
     "@fastify/cookie": "11.1.2",
     "@fastify/rate-limit": "11.2.0",
     "@fastify/static": "10.1.3",
