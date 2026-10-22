@@ -14,8 +14,14 @@ test('un jeton de module se saisit dans Mise en route, compte aussitôt et s’e
   await login(page);
   const card = page.locator('#secrets');
   await expect(card.getByRole('heading', { name: 'Clés et jetons' })).toBeVisible();
-  await expect(card.getByRole('heading', { name: 'Clé OpenAI' })).toBeVisible();
-  const field = card.getByLabel('Jeton Météo Concept', { exact: true });
+  const providers = card.getByRole('region', { name: 'Fournisseurs IA' });
+  const modules = card.getByRole('region', { name: 'Modules' });
+  await expect(providers.getByRole('heading', { name: 'Clé OpenAI' })).toBeVisible();
+  await expect(modules.getByRole('heading', { name: 'Jeton Météo Concept' })).toBeVisible();
+  await expect(
+    modules.getByRole('heading', { name: 'Jeton PRIM d’Île-de-France Mobilités' }),
+  ).toBeVisible();
+  const field = modules.getByLabel('Jeton Météo Concept', { exact: true });
   await field.fill('meteo-e2e-token-0123456789wxyz');
   try {
     await field
