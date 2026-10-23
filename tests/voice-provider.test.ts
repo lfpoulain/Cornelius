@@ -293,16 +293,35 @@ test('context and provider safeguards survive profile updates while append histo
   assert.match(updates[1]!.config.instructions, /Les outils sont appelés directement par toi/);
   assert.equal(updates[0]!.toolsChanged, false);
   assert.equal(updates[1]!.toolsChanged, true);
-  const baseLength = updates[1]!.config.instructions.length;
+  live.send({
+    type: 'session.instructions.append',
+    content: 'PERSONALITY_RULE',
+    delegation_id: null,
+  });
+  live.send({
+    type: 'session.instructions.append',
+    content: 'HOME_AUTHORIZATION',
+    delegation_id: null,
+  });
+  await tick();
+  const baseLength = updates.at(-1)!.config.instructions.length;
   for (let i = 0; i < 40; i++)
     live.send({
-      type: 'session.instructions.append',
+      type: 'session.thinking.append',
       content: String(i) + 'x'.repeat(1000),
       delegation_id: null,
     });
   await tick();
   assert.ok(updates.at(-1)!.config.instructions.length <= baseLength + 16_000);
   assert.match(updates.at(-1)!.config.instructions, /39x/);
+  assert.match(updates.at(-1)!.config.instructions, /PERSONALITY_RULE/);
+  assert.match(updates.at(-1)!.config.instructions, /HOME_AUTHORIZATION/);
+  assert.doesNotMatch(updates.at(-1)!.config.instructions, /CAMERA_CONTEXT/);
+  assert.doesNotMatch(updates.at(-1)!.config.instructions, /\nx+/);
+  const beforeOversized = updates.at(-1)!.config.instructions;
+  live.send({ type: 'session.thinking.append', content: 'z'.repeat(16_001), delegation_id: null });
+  await tick();
+  assert.equal(updates.at(-1)!.config.instructions, beforeOversized);
   assert.match(updates.at(-1)!.config.instructions, /PROFILE_CONTEXT/);
   live.dispose();
 });
@@ -414,4 +433,44 @@ for (const mode of ['name', 'free', 'off'] as const) {
       await connection.close();
     },
   );
+}
+
+for (const failure of ['rejection', 'timeout', 'empty'] as const) {
+  test('Mistral starts with fallback when optional greeting returns ' + failure, async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    let init: any;
+    const adapter = createMistralVoiceAdapter('unused', {
+      chat: {
+        complete: async () => {
+          if (failure === 'rejection') throw new Error('Quota exhausted');
+          if (failure === 'timeout') return new Promise(() => {});
+          return { choices: [{ message: { content: ' ' } }] };
+        },
+      },
+      audio: {
+        sessions: {
+          init: async (config: any) => {
+            init = config;
+            return { id: 'fallback', on() {}, async connect() {}, async close() {} };
+          },
+        },
+      },
+    } as never);
+    const connecting = adapter.connect(
+      {
+        instructions: 'base',
+        tools: [],
+        webSearch: false,
+        welcomeMessage: 'Bonjour Alice.',
+        welcomeInstructions: 'Salue Alice librement',
+      },
+      () => {},
+    );
+    if (failure === 'timeout') {
+      t.mock.timers.tick(2_000);
+    }
+    const connection = await connecting;
+    assert.equal(init.welcomeMessage, 'Bonjour Alice.');
+    await connection.close();
+  });
 }

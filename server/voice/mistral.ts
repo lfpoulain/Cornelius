@@ -66,6 +66,7 @@ export function searchSources(result: string | null | undefined): { url: string;
 }
 
 export const MISTRAL_LLM_MODEL = 'mistral-small-2603';
+export const MISTRAL_GREETING_TIMEOUT_MS = 2_000;
 export const MISTRAL_MAX_SESSION_MS = 15 * 60_000;
 
 export const MISTRAL_STT_MODEL = 'voxtral-mini-transcribe-realtime-3';
@@ -115,16 +116,35 @@ export function createMistralVoiceAdapter(
       ];
       let welcomeMessage = configuration.welcomeMessage;
       if (configuration.welcomeInstructions) {
-        const greeting = await client.chat.complete({
-          model: MISTRAL_LLM_MODEL,
-          messages: [
-            { role: 'system', content: configuration.instructions },
-            { role: 'user', content: configuration.welcomeInstructions },
-          ],
-          maxTokens: 100,
-        });
-        const content = greeting.choices?.[0]?.message?.content;
-        if (typeof content === 'string') welcomeMessage = content.trim().slice(0, 500) || undefined;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          const greeting = await Promise.race([
+            client.chat.complete(
+              {
+                model: MISTRAL_LLM_MODEL,
+                messages: [
+                  { role: 'system', content: configuration.instructions },
+                  { role: 'user', content: configuration.welcomeInstructions },
+                ],
+                maxTokens: 100,
+              },
+              { timeoutMs: MISTRAL_GREETING_TIMEOUT_MS },
+            ),
+            new Promise<never>((_, reject) => {
+              timer = setTimeout(
+                () => reject(new Error('Greeting timed out')),
+                MISTRAL_GREETING_TIMEOUT_MS,
+              );
+            }),
+          ]);
+          const content = greeting.choices?.[0]?.message?.content;
+          if (typeof content === 'string')
+            welcomeMessage = content.trim().slice(0, 500) || welcomeMessage;
+        } catch {
+          // Greeting is optional: preserve the configured fallback or start silently.
+        } finally {
+          clearTimeout(timer);
+        }
       }
       const session = await client.audio.sessions.init({
         llm: { model: MISTRAL_LLM_MODEL },
