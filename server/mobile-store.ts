@@ -4,14 +4,27 @@ import type { MobileDevice } from '../shared/mobile.js';
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 export class MobileStore {
   readonly serverId: string;
-  private pending = new Map<string, { secretHash: string; name: string; code: string; expiresAt: number; invitation?: string; rejected?: boolean }>();
+  private pending = new Map<
+    string,
+    {
+      secretHash: string;
+      name: string;
+      code: string;
+      expiresAt: number;
+      invitation?: string;
+      rejected?: boolean;
+    }
+  >();
   private prunePending() {
-    for (const [id, value] of this.pending) if (value.expiresAt <= this.now()) this.pending.delete(id);
+    for (const [id, value] of this.pending)
+      if (value.expiresAt <= this.now()) this.pending.delete(id);
   }
   requestPairing(name: string) {
     this.prunePending();
-    if (!name.trim() || name.length > 80 || /[\x00-\x1f]/u.test(name) || this.pending.size >= 16) return null;
-    const id = randomUUID(), secret = randomBytes(32).toString('base64url');
+    if (!name.trim() || name.length > 80 || /[\x00-\x1f]/u.test(name) || this.pending.size >= 16)
+      return null;
+    const id = randomUUID(),
+      secret = randomBytes(32).toString('base64url');
     const code = randomBytes(4).toString('hex').toUpperCase();
     const expiresAt = this.now() + 300_000;
     this.pending.set(id, { secretHash: hash(secret), name: name.trim(), code, expiresAt });
@@ -19,7 +32,8 @@ export class MobileStore {
   }
   pendingRequests() {
     this.prunePending();
-    return [...this.pending].filter(([, value]) => !value.invitation && !value.rejected)
+    return [...this.pending]
+      .filter(([, value]) => !value.invitation && !value.rejected)
       .map(([id, { name, code, expiresAt }]) => ({ id, name, code, expiresAt }));
   }
   decidePairing(id: string, approve: boolean) {
@@ -34,7 +48,10 @@ export class MobileStore {
     this.prunePending();
     const value = this.pending.get(id);
     if (!value || secret.length > 128 || hash(secret) !== value.secretHash) return null;
-    if (value.rejected) { this.pending.delete(id); return { status: 'rejected' as const }; }
+    if (value.rejected) {
+      this.pending.delete(id);
+      return { status: 'rejected' as const };
+    }
     if (value.invitation) {
       this.pending.delete(id);
       return { status: 'approved' as const, invitation: value.invitation };

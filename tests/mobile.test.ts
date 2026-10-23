@@ -52,7 +52,7 @@ test('discovered pairing requires approval, expires, rejects wrong secrets and c
     assert.equal(store.list().length, 0);
     assert.equal(store.pairingStatus(pending.id, 'wrong'), null);
     assert.deepEqual(store.pairingStatus(pending.id, pending.secret), { status: 'pending' });
-    assert.equal(store.pendingRequests()[0].code, pending.code);
+    assert.equal(store.pendingRequests()[0]!.code, pending.code);
     assert.equal(JSON.stringify(store.pendingRequests()).includes(pending.secret), false);
     assert.equal(store.decidePairing(pending.id, true), true);
     assert.equal(store.decidePairing(pending.id, true), false);
@@ -73,26 +73,79 @@ test('discovered pairing requires approval, expires, rejects wrong secrets and c
     assert.equal(store.decidePairing(expired.id, true), false);
     assert.equal(store.pairingStatus(expired.id, expired.secret), null);
     assert.equal(store.pendingRequests().length, 0);
-  } finally { db.close(); }
+  } finally {
+    db.close();
+  }
 });
 
 test('discovered pairing endpoints require matching identity and admin approval', async (t) => {
   const f = await fixture(t);
   const admin = (await f.app.inject({ url: '/api/admin/mobile', headers: f.headers })).json();
-  assert.equal((await f.app.inject({ method: 'POST', url: '/mobile/requests', payload: { name: 'Phone', serverId: 'wrong' } })).statusCode, 400);
-  const pending = (await f.app.inject({ method: 'POST', url: '/mobile/requests', payload: { name: 'Phone', serverId: admin.serverId } })).json();
-  const poll = () => f.app.inject({ method: 'POST', url: '/mobile/requests/status', payload: { id: pending.id, secret: pending.secret } });
+  assert.equal(
+    (
+      await f.app.inject({
+        method: 'POST',
+        url: '/mobile/requests',
+        payload: { name: 'Phone', serverId: 'wrong' },
+      })
+    ).statusCode,
+    400,
+  );
+  const pending = (
+    await f.app.inject({
+      method: 'POST',
+      url: '/mobile/requests',
+      payload: { name: 'Phone', serverId: admin.serverId },
+    })
+  ).json();
+  const poll = () =>
+    f.app.inject({
+      method: 'POST',
+      url: '/mobile/requests/status',
+      payload: { id: pending.id, secret: pending.secret },
+    });
   assert.equal((await poll()).json().status, 'pending');
-  assert.equal((await f.app.inject({ method: 'POST', url: '/api/admin/mobile/requests/' + pending.id, payload: { approve: true } })).statusCode, 403);
+  assert.equal(
+    (
+      await f.app.inject({
+        method: 'POST',
+        url: '/api/admin/mobile/requests/' + pending.id,
+        payload: { approve: true },
+      })
+    ).statusCode,
+    403,
+  );
   assert.equal((await poll()).json().status, 'pending');
-  assert.equal((await f.app.inject({ method: 'POST', url: '/api/admin/mobile/requests/' + pending.id, headers: f.headers, payload: { approve: true } })).statusCode, 200);
+  assert.equal(
+    (
+      await f.app.inject({
+        method: 'POST',
+        url: '/api/admin/mobile/requests/' + pending.id,
+        headers: f.headers,
+        payload: { approve: true },
+      })
+    ).statusCode,
+    200,
+  );
   const approved = (await poll()).json();
   assert.equal(approved.serverId, admin.serverId);
   assert.equal(approved.status, 'approved');
   assert.equal((await poll()).statusCode, 404);
-  const paired = await f.app.inject({ method: 'POST', url: '/mobile/pair', payload: { name: 'Phone', invitation: approved.invitation } });
+  const paired = await f.app.inject({
+    method: 'POST',
+    url: '/mobile/pair',
+    payload: { name: 'Phone', invitation: approved.invitation },
+  });
   assert.equal(paired.statusCode, 200);
-  assert.equal((await f.app.inject({ url: '/mobile/info', headers: { authorization: 'Bearer ' + paired.json().token } })).statusCode, 200);
+  assert.equal(
+    (
+      await f.app.inject({
+        url: '/mobile/info',
+        headers: { authorization: 'Bearer ' + paired.json().token },
+      })
+    ).statusCode,
+    200,
+  );
 });
 
 test('proxy allowlist cannot expose admin, workers, web, traversal or prefix lookalikes', () => {
