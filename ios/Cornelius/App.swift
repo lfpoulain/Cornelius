@@ -39,6 +39,18 @@ struct PairingView: View {
     @State private var qr=false
     @State private var selected: Discovery.Server?
     @State private var attempted=false
+    @State private var pairingTask: Task<Void, Never>?
+    private func connect(_ server: Discovery.Server) {
+        pairingTask?.cancel()
+        selected=server
+        attempted=true
+        pairingTask=Task {
+            await client.pairDiscovered(server)
+            guard !Task.isCancelled else { return }
+            selected=nil
+            pairingTask=nil
+        }
+    }
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -58,10 +70,10 @@ struct PairingView: View {
                         } else {
                             Text(client.busy ? "Association en attente" : "Cornelius trouvé").font(.headline)
                             ForEach(discovery.candidates.keys.sorted(), id: \.self) { name in
-                                Button(name) { selected=discovery.candidates[name] }.disabled(client.busy)
+                                Button(name) { if let server=discovery.candidates[name] { connect(server) } }.disabled(client.busy)
                             }
                             if !client.busy && attempted {
-                                Button("Réessayer") { selected=discovery.candidates.values.first }
+                                Button("Réessayer") { if let server=discovery.candidates.values.first { connect(server) } }
                             }
                         }
                         Button { qr=true; selected=nil } label: { Label("Connexion par QR Code", systemImage: "qrcode").frame(minHeight: 44) }.buttonStyle(.bordered)
@@ -73,14 +85,13 @@ struct PairingView: View {
                 }.padding(28).frame(maxWidth: 650)
             }.frame(maxWidth: .infinity).background(.black)
             .sheet(isPresented: $scanner) { QRScanner { value in scanner=false; Task { await client.pair(value) } }.ignoresSafeArea() }
-            .task(id: selected) { if let selected { attempted=true; await client.pairDiscovered(selected); self.selected=nil } }
             .task(id: discovery.candidates.keys.sorted()) {
                 guard !qr, !attempted, discovery.candidates.count == 1 else { return }
                 try? await Task.sleep(for: .seconds(1))
                 guard !Task.isCancelled, discovery.candidates.count == 1 else { return }
-                selected=discovery.candidates.values.first
+                if let server=discovery.candidates.values.first { connect(server) }
             }
-            .onAppear { discovery.start() }.onDisappear { discovery.stop() }
+            .onAppear { discovery.start() }.onDisappear { pairingTask?.cancel(); discovery.stop() }
         }
     }
 }

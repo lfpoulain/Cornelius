@@ -2,6 +2,11 @@ import XCTest
 @testable import Cornelius
 
 final class ProtocolTests: XCTestCase {
+    func testPinnedHostComparisonAcceptsBonjourCapitalization() {
+        XCTAssertTrue(PinnedSession.hostMatches("tower.local", expected: "Tower.local"))
+        XCTAssertFalse(PinnedSession.hostMatches("other.local", expected: "Tower.local"))
+        XCTAssertFalse(PinnedSession.hostMatches("tower.local", expected: nil))
+    }
     func testInvitationRejectsExpiredAndUntrustedRemote() throws {
         let base: [String: Any] = ["protocol": 1, "serverId": UUID().uuidString, "keyFingerprint": String(repeating: "AB", count: 32), "endpoints": [["url": "https://mirror.local:3443", "trust": "pinned"]], "invitation": "example", "expiresAt": 301000]
         func link(_ value: [String: Any]) throws -> String { "cornelius://pair?data=" + (try JSONSerialization.data(withJSONObject: value)).base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "=", with: "") }

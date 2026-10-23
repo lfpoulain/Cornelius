@@ -101,6 +101,9 @@ import Combine
             }
             throw MirrorError.message("Demande expirée. Réessayez la connexion.")
         } catch is CancellationError { message = nil }
+        catch let error as URLError where error.code == .cancelled && !Task.isCancelled {
+            message = "Connexion sécurisée refusée. Vérifiez que l’identité annoncée correspond au certificat du serveur."
+        }
         catch { message = error.localizedDescription }
     }
     func activate() {

@@ -37,9 +37,15 @@ enum CertificatePin {
 final class PinnedSession: NSObject, URLSessionDelegate, URLSessionTaskDelegate {
     let endpoint: Endpoint; let fingerprint: String
     init(endpoint: Endpoint, fingerprint: String) { self.endpoint = endpoint; self.fingerprint = fingerprint }
+    static func hostMatches(_ received: String, expected: String?) -> Bool {
+        guard let expected else { return false }
+        return received.caseInsensitiveCompare(expected) == .orderedSame
+    }
     func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
         guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust, let trust = challenge.protectionSpace.serverTrust else { completionHandler(.performDefaultHandling, nil); return }
-        guard challenge.protectionSpace.host == endpoint.url.host else { completionHandler(.cancelAuthenticationChallenge, nil); return }
+        guard Self.hostMatches(challenge.protectionSpace.host, expected: endpoint.url.host) else {
+            completionHandler(.cancelAuthenticationChallenge, nil); return
+        }
         if endpoint.trust == "system" { completionHandler(.performDefaultHandling, nil); return }
         guard let chain = SecTrustCopyCertificateChain(trust) as? [SecCertificate], let certificate = chain.first,
               CertificatePin.matches(SecCertificateCopyData(certificate) as Data, fingerprint: fingerprint) else { completionHandler(.cancelAuthenticationChallenge, nil); return }
