@@ -3,9 +3,9 @@ import XCTest
 
 final class ProtocolTests: XCTestCase {
     func testPinnedHostComparisonAcceptsBonjourCapitalization() {
-        XCTAssertTrue(PinnedSession.hostMatches("tower.local", expected: "Tower.local"))
-        XCTAssertFalse(PinnedSession.hostMatches("other.local", expected: "Tower.local"))
-        XCTAssertFalse(PinnedSession.hostMatches("tower.local", expected: nil))
+        XCTAssertTrue(PinnedSession.hostMatches("cornelius.local", expected: "Cornelius.local"))
+        XCTAssertFalse(PinnedSession.hostMatches("other.local", expected: "Cornelius.local"))
+        XCTAssertFalse(PinnedSession.hostMatches("cornelius.local", expected: nil))
     }
     func testInvitationRejectsExpiredAndUntrustedRemote() throws {
         let base: [String: Any] = ["protocol": 1, "serverId": UUID().uuidString, "keyFingerprint": String(repeating: "AB", count: 32), "endpoints": [["url": "https://mirror.local:3443", "trust": "pinned"]], "invitation": "example", "expiresAt": 301000]
