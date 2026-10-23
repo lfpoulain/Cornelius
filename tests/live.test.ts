@@ -1738,3 +1738,13 @@ test('mode voix : le prénom reconnu au mot d’appel devient un contexte, sans 
   assert.ok(!f.sent.some((event) => event.type === 'session.commentary.append'));
   assert.equal(f.controller.snapshot().state.session.phase, 'ready');
 });
+
+
+test('OpenAI still sends close when its control channel opens after closure was requested', async (t) => {
+  const f = fixture(t);
+  await f.live.offer(f.scope, 'offer');
+  f.controller.close('Stop before control opens');
+  assert.equal(f.sent.some(event => event.type === 'session.close'), false);
+  f.openControl();
+  assert.equal(f.sent.filter(event => event.type === 'session.close').length, 1);
+});

@@ -5,6 +5,9 @@ import {
   upsamplePcm16,
   pcmDownsampler,
   MISTRAL_STT_MODEL,
+  MISTRAL_LLM_MODEL,
+  MISTRAL_MAX_SESSION_MS,
+  createMistralVoiceAdapter,
   MISTRAL_TTS_MODEL,
   MISTRAL_MAX_SESSION_MS,
   shouldForwardVoiceAudio,
@@ -261,3 +264,59 @@ test('a rejected optional session update does not close the active voice connect
   assert.equal(failures, 0);
   live.dispose();
 });
+
+
+test('context and provider safeguards survive profile updates while append history stays bounded', async () => {
+  const updates: { config: VoiceConfiguration; toolsChanged: boolean | undefined }[] = [];
+  const gateway = createVoiceGateway({ connect: async () => ({
+    audio() {}, result() {}, close: async () => {},
+    update: async (config, toolsChanged) => { updates.push({ config, toolsChanged }); },
+  }) });
+  const live = gateway.connect!(liveConfiguration(), { open() {}, event() {}, failure() {} });
+  live.send({ type: 'session.thinking.append', content: 'CAMERA_CONTEXT', event_id: 'camera', delegation_id: null });
+  live.send({ type: 'session.update', session: { delegation: { responses: { instructions: 'PROFILE_CONTEXT', tools: [] } } } } as never);
+  await tick();
+  assert.match(updates[1]!.config.instructions, /CAMERA_CONTEXT/);
+  assert.match(updates[1]!.config.instructions, /PROFILE_CONTEXT/);
+  assert.match(updates[1]!.config.instructions, /Les outils sont appelés directement par toi/);
+  assert.equal(updates[0]!.toolsChanged, false);
+  assert.equal(updates[1]!.toolsChanged, true);
+  const baseLength = updates[1]!.config.instructions.length;
+  for (let i = 0; i < 40; i++) live.send({ type: 'session.instructions.append', content: String(i) + 'x'.repeat(1000), delegation_id: null });
+  await tick();
+  assert.ok(updates.at(-1)!.config.instructions.length <= baseLength + 16_000);
+  assert.match(updates.at(-1)!.config.instructions, /39x/);
+  assert.match(updates.at(-1)!.config.instructions, /PROFILE_CONTEXT/);
+  live.dispose();
+});
+
+for (const cause of ['timeout', 'disconnect', 'explicit', 'close-error'] as const) {
+  test('Mistral closes once and releases tools on ' + cause, async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const listeners = new Map<string, (event?: any) => void>();
+    const events: VoiceEvent[] = [];
+    let remoteCloses = 0;
+    let init: any;
+    const remote = {
+      id: 'mock-session',
+      on(name: string, callback: (event?: any) => void) { listeners.set(name, callback); },
+      async connect() {},
+      async close() { remoteCloses++; listeners.get('disconnected')?.(); if (cause === 'close-error') throw new Error('cleanup failed'); },
+      async sendAudio() {}, async update() {},
+    };
+    const client = { audio: { sessions: { async init(config: unknown) { init = config; return remote; } } } };
+    const adapter = createMistralVoiceAdapter('unused', client as never);
+    const connection = await adapter.connect({ instructions: 'base', tools: [], webSearch: false }, event => events.push(event));
+    assert.equal(init.llm.model, MISTRAL_LLM_MODEL);
+    if (cause === 'timeout') t.mock.timers.tick(MISTRAL_MAX_SESSION_MS);
+    else if (cause === 'disconnect') listeners.get('disconnected')?.();
+    else await connection.close().catch(() => {});
+    await tick();
+    assert.equal(events.filter(event => event.type === 'closed').length, 1);
+    await connection.close().catch(() => {});
+    assert.equal(remoteCloses, 1);
+    const count = events.length;
+    listeners.get('transcript')?.({ role: 'user', content: 'late', final: true, id: 'late' });
+    assert.equal(events.length, count);
+  });
+}

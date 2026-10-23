@@ -1,5 +1,4 @@
 import { isVoiceProvider } from '../shared/voice-provider.js';
-import { createMistralVoiceAdapter } from './voice/mistral.js';
 import { createVoiceGateway } from './voice/live-bridge.js';
 import { createMistralMemoryExtractor } from './voice/memory-extractor.js';
 import { isCardSettings } from '../shared/cards.js';
@@ -273,7 +272,12 @@ export async function createApp(
     return !key
       ? null
       : preferences.getVoiceProvider() === 'mistral'
-        ? createVoiceGateway(createMistralVoiceAdapter(key))
+        ? createVoiceGateway({
+            async connect(config, emit) {
+              const { createMistralVoiceAdapter } = await import('./voice/mistral.js');
+              return createMistralVoiceAdapter(key).connect(config, emit);
+            },
+          })
         : createLiveGateway(key, logs);
   };
   const voiceMemoryExtractor = () => {

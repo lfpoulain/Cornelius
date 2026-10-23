@@ -65,16 +65,20 @@ export function searchSources(result: string | null | undefined): { url: string;
   return [...sources].map(([url, title]) => ({ url, title }));
 }
 
+export const MISTRAL_LLM_MODEL = 'mistral-small-2603';
+export const MISTRAL_MAX_SESSION_MS = 15 * 60_000;
+
 export const MISTRAL_STT_MODEL = 'voxtral-mini-transcribe-realtime-3';
 export const MISTRAL_TTS_MODEL = 'voxtral-mini-tts-3';
-export const MISTRAL_MAX_SESSION_MS = 15 * 60_000;
 
 export function shouldForwardVoiceAudio(state: string): boolean {
   return state === 'speaking';
 }
 
-export function createMistralVoiceAdapter(apiKey: string): VoiceProviderAdapter {
-  const client = new Mistral({ apiKey, timeoutMs: 15_000 });
+export function createMistralVoiceAdapter(
+  apiKey: string,
+  client = new Mistral({ apiKey, timeoutMs: 15_000 }),
+): VoiceProviderAdapter {
   return {
     async connect(configuration, emit) {
       let closed = false;
@@ -109,19 +113,50 @@ export function createMistralVoiceAdapter(apiKey: string): VoiceProviderAdapter 
         ...handlers(config),
         ...(config.webSearch ? [{ type: 'web_search' as const }] : []),
       ];
+      let welcomeMessage = configuration.welcomeMessage;
+      if (configuration.welcomeInstructions) {
+        const greeting = await client.chat.complete({
+          model: MISTRAL_LLM_MODEL,
+          messages: [
+            { role: 'system', content: configuration.instructions },
+            { role: 'user', content: configuration.welcomeInstructions },
+          ],
+          maxTokens: 100,
+        });
+        const content = greeting.choices?.[0]?.message?.content;
+        if (typeof content === 'string') welcomeMessage = content.trim().slice(0, 500) || undefined;
+      }
       const session = await client.audio.sessions.init({
-        llm: { model: 'mistral-small-latest' },
+        llm: { model: MISTRAL_LLM_MODEL },
         stt: { model: MISTRAL_STT_MODEL, language: 'fr' },
         tts: { model: MISTRAL_TTS_MODEL, voiceId: 'fr_marie_neutral' },
         turn: { allowInterruptions: true },
         instructions: configuration.instructions,
-        welcomeMessage: configuration.welcomeMessage,
+        welcomeMessage,
         tools: tools(configuration),
       });
       const downsample = pcmDownsampler();
       const started = Date.now();
       const transcripts = new Map<string, string>();
       let speaking = false;
+      let maximumDuration: ReturnType<typeof setTimeout> | undefined;
+      const queue: Uint8Array[] = [];
+      let closing: Promise<void> | undefined;
+      const close = (): Promise<void> => {
+        if (closing) return closing;
+        if (closed) return Promise.resolve();
+        closed = true;
+        clearTimeout(maximumDuration);
+        queue.length = 0;
+        for (const call of pending.values()) {
+          clearTimeout(call.timer);
+          call.resolve(JSON.stringify({ error: 'Session clôturée.' }));
+        }
+        pending.clear();
+        // Emit once independently of the data-event filter, even if remote cleanup fails.
+        closing = Promise.resolve().then(() => session.close()).finally(() => emit({ type: 'closed' }));
+        return closing;
+      };
       const notify = (event: VoiceEvent) => {
         if (!closed) emit(event);
       };
@@ -175,22 +210,18 @@ export function createMistralVoiceAdapter(apiKey: string): VoiceProviderAdapter 
             message: event.message,
           });
       });
-      session.on('disconnected', () => notify({ type: 'closed' }));
+      session.on('disconnected', () => { void close().catch(() => {}); });
       try {
         await session.connect();
       } catch (error) {
-        await session.close().catch(() => {});
+        await close().catch(() => {});
         throw error;
       }
+      if (closed) throw new Error('Session Mistral fermée pendant la connexion.');
       notify({ type: 'connected', id: session.id });
-      const maximumDuration = setTimeout(() => {
-        if (closed) return;
-        closed = true;
-        void session.close().finally(() => notify({ type: 'closed' }));
-      }, MISTRAL_MAX_SESSION_MS);
-      maximumDuration.unref?.();
+      maximumDuration = setTimeout(() => { void close().catch(() => {}); }, MISTRAL_MAX_SESSION_MS);
+      maximumDuration.unref();
       let sending = false;
-      const queue: Uint8Array[] = [];
       const pump = async () => {
         if (sending) return;
         sending = true;
@@ -219,22 +250,12 @@ export function createMistralVoiceAdapter(apiKey: string): VoiceProviderAdapter 
           pending.delete(id);
           call.resolve(output);
         },
-        async update(config) {
+        async update(config, toolsChanged = true) {
           if (!closed)
-            await session.update({ instructions: config.instructions, tools: tools(config) });
+            await session.update({ instructions: config.instructions, ...(toolsChanged ? { tools: tools(config) } : {}) });
         },
-        async close() {
-          if (closed) return;
-          closed = true;
-          clearTimeout(maximumDuration);
-          queue.length = 0;
-          for (const call of pending.values()) {
-            clearTimeout(call.timer);
-            call.resolve(JSON.stringify({ error: 'Session clôturée.' }));
-          }
-          pending.clear();
-          await session.close();
-        },
+        close,
+
       };
     },
   };

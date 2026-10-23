@@ -25,11 +25,12 @@ export interface VoiceConfiguration {
   tools: VoiceTool[];
   webSearch: boolean;
   welcomeMessage?: string;
+  welcomeInstructions?: string;
 }
 export interface VoiceConnection {
   audio(pcm: Buffer): void;
   result(id: string, output: string): void;
-  update(config: VoiceConfiguration): Promise<void>;
+  update(config: VoiceConfiguration, toolsChanged?: boolean): Promise<void>;
   close(): Promise<void>;
 }
 export interface VoiceProviderAdapter {

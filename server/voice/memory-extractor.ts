@@ -8,7 +8,7 @@ export function createMistralMemoryExtractor(apiKey: string): MemoryExtractor {
   return async (input, signal) => {
     const response = await client.chat.complete(
       {
-        model: 'mistral-small-latest',
+        model: 'mistral-small-2603',
         messages: [
           { role: 'system', content: memoryExtractionInstructions },
           { role: 'user', content: JSON.stringify(input) },

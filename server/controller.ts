@@ -733,15 +733,6 @@ export class SessionController {
     }
     if (
       people.length === 0 ||
-      // Une identité confirmée reste attachée au même suivi pendant la durée configurée. Une
-      // image floue, un mouvement pendant l’accueil ou un profil de visage moins favorable ne
-      // doit pas couper la conversation. Une autre identité reconnue n’entre pas dans cette grâce.
-      (this.profile !== null &&
-        this.profileSeenAt !== null &&
-        now - this.profileSeenAt < this.timings.identityHoldMs &&
-        people.length === 1 &&
-        people[0]!.trackId === this.profileTrackId &&
-        people[0]!.profileId === null) ||
       // Le visage suivi a été perdu et un visage encore inconnu apparaît : la reconnaissance
       // a le délai de départ pour le confirmer avant que le profil soit retiré. Le même
       // suivi sans identité signifie au contraire une contradiction ou un maintien expiré.

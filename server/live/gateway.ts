@@ -39,6 +39,7 @@ export interface LiveGateway {
     session: SessionConfig,
     handlers: LiveHandlers,
     welcomeMessage?: string,
+    welcomeInstructions?: string,
   ): LiveAudioConnection;
 }
 export function createLiveGateway(apiKey: string, logs?: DiagnosticLog): LiveGateway {
