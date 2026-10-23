@@ -6,42 +6,42 @@ struct MirrorView: View {
     @State private var settings = false
     var body: some View {
         TimelineView(.periodic(from: .now, by: 0.5)) { timeline in
-            let now = client.freshness.serverNow(timeline.date)
+            let now = ProcessInfo.processInfo.arguments.contains("-demo") ? client.snapshot?.sentAt ?? 0 : client.freshness.serverNow(timeline.date)
             let fresh = client.freshness.fresh(at: timeline.date) || ProcessInfo.processInfo.arguments.contains("-demo")
             GeometryReader { geometry in
                 let state = fresh && !client.interrupted ? client.snapshot?.state : nil
                 let divisions = regions(geometry, division: true)
                 let occlusions = regions(geometry, division: false)
                 let cut = divisions.first(where: { $0.intersects(CGRect(origin: .zero, size: geometry.size)) })
-                VStack(spacing: 12) {
-                    header(state, fresh: fresh)
-                    if let cut, cut.width > cut.height {
-                        VStack(spacing: max(16, cut.height + 16)) {
-                            orb(state, now: now).frame(maxWidth: .infinity, maxHeight: .infinity)
+                let full = CGRect(origin: .zero, size: geometry.size)
+                if let cut {
+                    let first = cut.width > cut.height ? CGRect(x: 0, y: 0, width: full.width, height: max(0, cut.minY - 10)) : CGRect(x: 0, y: 0, width: max(0, cut.minX - 10), height: full.height)
+                    let second = cut.width > cut.height ? CGRect(x: 0, y: min(full.height, cut.maxY + 10), width: full.width, height: max(0, full.height - cut.maxY - 10)) : CGRect(x: min(full.width, cut.maxX + 10), y: 0, width: max(0, full.width - cut.maxX - 10), height: full.height)
+                    let primary = avoiding(occlusions, in: first)
+                    let secondary = avoiding(occlusions, in: second)
+                    VStack(spacing: 8) { header(state, fresh: fresh); ambient(state, now: now); orb(state, now: now).frame(maxHeight: .infinity); footer(state, now: now) }
+                        .padding(16).frame(width: primary.width, height: primary.height).position(x: primary.midX, y: primary.midY)
+                    cards(state, now: now).padding(16).frame(width: secondary.width, height: secondary.height).position(x: secondary.midX, y: secondary.midY)
+                } else {
+                    let bounds = avoiding(occlusions, in: full)
+                    VStack(spacing: 12) {
+                        header(state, fresh: fresh)
+                        if bounds.width > 650 && bounds.width > bounds.height * 1.15 {
+                            HStack(spacing: 18) {
+                                cards(state, now: now, primaryOnly: true).frame(maxWidth: .infinity)
+                                VStack(spacing: 0) { ambient(state, now: now); orb(state, now: now) }.frame(maxWidth: .infinity)
+                                cards(state, now: now, secondaryOnly: true).frame(maxWidth: .infinity)
+                            }
+                        } else {
+                            ambient(state, now: now)
+                            orb(state, now: now).frame(minHeight: min(150, bounds.height * 0.35), maxHeight: bounds.height * 0.43)
                             cards(state, now: now).frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
-                    } else if cut != nil {
-                        HStack(spacing: max(20, cut!.width + 16)) {
-                            VStack { ambient(state, now: now); orb(state, now: now) }.frame(maxWidth: .infinity)
-                            cards(state, now: now).frame(maxWidth: .infinity)
-                        }
-                    } else if geometry.size.width > 650 && geometry.size.width > geometry.size.height * 1.15 {
-                        HStack(spacing: 18) {
-                            cards(state, now: now, primaryOnly: true).frame(maxWidth: .infinity)
-                            VStack(spacing: 0) { ambient(state, now: now); orb(state, now: now) }.frame(maxWidth: .infinity)
-                            cards(state, now: now, secondaryOnly: true).frame(maxWidth: .infinity)
-                        }
-                    } else {
-                        ambient(state, now: now)
-                        orb(state, now: now).frame(minHeight: 150, maxHeight: geometry.size.height * 0.43)
-                        cards(state, now: now).frame(maxWidth: .infinity, maxHeight: .infinity)
+                        footer(state, now: now)
                     }
-                    footer(state, now: now)
+                    .padding(.horizontal, 20).padding(.vertical, 12)
+                    .frame(width: bounds.width, height: bounds.height).position(x: bounds.midX, y: bounds.midY)
                 }
-                // Foreground stays within safe areas. Occlusions can extend inside that area on Duo.
-                .padding(.horizontal, 20)
-                .padding(.top, occlusions.filter { $0.minY < 60 }.map(\.maxY).max().map { max(0, $0 + 12) } ?? 12)
-                .padding(.bottom, 12)
             }
         }
         .background(Color.black.ignoresSafeArea()).foregroundStyle(.white.opacity(0.9))
@@ -51,6 +51,20 @@ struct MirrorView: View {
     private func regions(_ geometry: GeometryProxy, division: Bool) -> [CGRect] {
         if #available(iOS 27.1, *) { return geometry.reservedRegions(kind: division ? .division : .occlusion).filter(\.isActive).map(\.frame) }
         return []
+    }
+    /// Reserved-region frames use this GeometryReader's coordinates, including asymmetric folds.
+    private func avoiding(_ regions: [CGRect], in rect: CGRect) -> CGRect {
+        regions.reduce(rect) { available, obstruction in
+            let blocked = obstruction.insetBy(dx: -12, dy: -12).intersection(available)
+            guard !blocked.isNull, !blocked.isEmpty else { return available }
+            let candidates = [
+                CGRect(x: available.minX, y: available.minY, width: available.width, height: max(0, blocked.minY - available.minY)),
+                CGRect(x: available.minX, y: blocked.maxY, width: available.width, height: max(0, available.maxY - blocked.maxY)),
+                CGRect(x: available.minX, y: available.minY, width: max(0, blocked.minX - available.minX), height: available.height),
+                CGRect(x: blocked.maxX, y: available.minY, width: max(0, available.maxX - blocked.maxX), height: available.height)
+            ]
+            return candidates.max(by: { $0.width * $0.height < $1.width * $1.height }) ?? available
+        }
     }
     private func header(_ state: MirrorState?, fresh: Bool) -> some View {
         HStack(alignment: .top) {

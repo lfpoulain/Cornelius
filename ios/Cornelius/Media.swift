@@ -34,7 +34,7 @@ final class MirrorMedia: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
         let camera = await AVCaptureDevice.requestAccess(for: .video)
         guard camera else { throw MirrorError.message("Caméra refusée. Autorisez-la dans Réglages → Cornelius pour utiliser le miroir complet.") }
         let audioSession = AVAudioSession.sharedInstance()
-        try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
+        try audioSession.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothHFP])
         try audioSession.setPreferredSampleRate(48000)
         try audioSession.setPreferredIOBufferDuration(0.02)
         try audioSession.setActive(true)

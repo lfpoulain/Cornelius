@@ -65,7 +65,12 @@ import Combine
         interrupted = false; preparing = true
         connection = Task { [weak self] in
             guard let self else { return }
-            defer { self.connection = nil; self.preparing = false }
+            defer {
+                self.connection = nil; self.preparing = false
+                if Task.isCancelled && !self.background && !self.interrupted && self.credential != nil {
+                    Task { @MainActor [weak self] in self?.activate() }
+                }
+            }
             do { try await self.media.prepare(); self.audioReady = true }
             catch { self.message = error.localizedDescription; self.media.stop(); return }
             var delay: UInt64 = 1
@@ -76,6 +81,7 @@ import Combine
                     do { try await self.connect(endpoint, credential: credential) }
                     catch {
                         if Task.isCancelled { break }
+                        if self.background { self.deactivate(); break }
                         let code = self.events?.closeCode
                         if code == .policyViolation {
                             self.interrupted = true

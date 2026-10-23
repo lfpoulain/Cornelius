@@ -45,6 +45,7 @@ export function registerMobile(
     deviceId: string;
     generation: string;
     audio: WebSocket | null;
+    camera: WebSocket | null;
     preroll: Buffer[];
   } | null = null;
   const remoteEndpoint = (): MobileEndpoint[] => {
@@ -100,6 +101,7 @@ export function registerMobile(
     owner = null;
     if (!previous) return;
     previous.audio?.close(1008, 'Miroir remplacé.');
+    previous.camera?.close(1008, 'Miroir remplacé.');
     perception.endWakeStream(previous.generation);
     controller.setMobileMirror(null);
     perception.setMobileSource(null);
@@ -213,7 +215,7 @@ export function registerMobile(
     track(socket);
     release();
     const generation = randomUUID();
-    owner = { socket, deviceId: device.id, generation, audio: null, preroll: [] };
+    owner = { socket, deviceId: device.id, generation, audio: null, camera: null, preroll: [] };
     services.claim(socket, device.id);
     controller.setMobileMirror({ deviceId: device.id, generation, background: false });
     perception.setMobileSource(generation);
@@ -272,6 +274,9 @@ export function registerMobile(
         if (channel === 'audio') {
           active.audio?.close(1008, 'Audio remplacé.');
           active.audio = socket;
+        } else {
+          active.camera?.close(1008, 'Caméra remplacée.');
+          active.camera = socket;
         }
         let vad = Buffer.alloc(0),
           interaction: string | null = null,
@@ -286,6 +291,7 @@ export function registerMobile(
           if (!binary) return socket.close(1008, 'Trame binaire attendue.');
           const frame = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
           if (channel === 'camera') {
+            if (active.camera !== socket) return socket.close(1008, 'Caméra remplacée.');
             if (controller.mobileMirror()?.background) return;
             if (
               frame.length > MOBILE_FRAME_MAX ||
