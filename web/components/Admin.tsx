@@ -23,6 +23,7 @@ import { Diagnostics } from './admin/Diagnostics';
 import { AdminPasswordCard, RestartServerCard } from './admin/ServerControls';
 import { VoiceSettings } from './admin/VoiceSettings';
 import { OrbScaleSettings } from './admin/OrbScaleSettings';
+import { ScreensaverSettings } from './admin/ScreensaverSettings';
 import { Secrets } from './admin/Secrets';
 import { NetworkAccess } from './admin/NetworkAccess';
 import { Satellites } from './admin/Satellites';
@@ -92,6 +93,12 @@ const sections = [
     label: 'Personnaliser Cornelius',
     description:
       'Son caractère pour toute la maison, sa façon de parler à chacun et la taille de son orbe.',
+  },
+  {
+    id: 'screensaver',
+    group: 'Au quotidien',
+    label: 'Écran de veille',
+    description: 'Les peintures et les photos affichées quand personne n’est devant le miroir.',
   },
   {
     id: 'modules',
@@ -612,6 +619,7 @@ export function Admin({
                       <OrbScaleSettings state={state} run={run} />
                     </div>
                   )}
+                  {section === 'screensaver' && <ScreensaverSettings state={state} run={run} />}
                   {section === 'modules' && (
                     <Addons
                       state={state}

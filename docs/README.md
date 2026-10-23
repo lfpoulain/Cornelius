@@ -31,7 +31,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 
 ## Utilisation
 
-- [Le miroir](utilisation/miroir.md) : ce qu’on voit à l’écran, activer la voix, parler à Cornelius.
+- [Le miroir](utilisation/miroir.md) : ce qu’on voit à l’écran, l’écran de veille, activer la voix, parler à Cornelius.
 - [L’administration](utilisation/administration.md) : chaque rubrique, dans l’ordre de la barre latérale.
 - [Accès depuis le réseau local](utilisation/reseau-local.md) : ouvrir le miroir et l’administration depuis un autre appareil, le certificat, le pare-feu.
 - [Dépannage](utilisation/depannage.md) : symptômes courants, journal, mesure de la latence, demander de l’aide.

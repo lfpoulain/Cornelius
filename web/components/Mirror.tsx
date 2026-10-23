@@ -5,6 +5,8 @@ import type { DisplayCard, SessionPhase, VoiceActivity } from '../../shared/type
 import type { MirrorConnection } from '../useMirror';
 import { Orb } from './Orb';
 import { AmbientModules } from './AmbientModules';
+import { Screensaver, type ScreensaverScene } from './Screensaver';
+import { screensaverWoken } from './screensaver-wake';
 import { useVoice } from '../audio/useVoice';
 import {
   audioPreparation,
@@ -86,6 +88,20 @@ function useConnectionLost(fresh: boolean, interrupted: boolean) {
   return lost && !fresh && !interrupted;
 }
 
+/**
+ * Écran de veille : vrai après `delayMs` de conditions réunies sans interruption ; faux dès
+ * qu’elles cessent (une personne apparaît, une conversation s’ouvre).
+ */
+function useScreensaverActive(wanted: boolean, delayMs: number) {
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    if (!wanted) return void setActive(false);
+    const timer = setTimeout(() => setActive(true), delayMs);
+    return () => clearTimeout(timer);
+  }, [wanted, delayMs]);
+  return active && wanted;
+}
+
 export function Mirror({ connection }: { connection: MirrorConnection }) {
   const { state, fresh, now, interrupted, reconnect } = connection;
   const preparation = useSyncExternalStore(subscribeAudioPreparation, audioPreparation);
@@ -162,6 +178,26 @@ export function Mirror({ connection }: { connection: MirrorConnection }) {
       .map((person) => person.trackId),
   );
   const activationShown = (!preparation.ready || audioLocked) && fresh && !state?.openaiBlocked;
+  // Peintures tant que l’orbe n’a pas à s’éveiller (voir screensaverWoken) et que rien n’attend
+  // un regard (carte, image en cours). Le bouton « Activer la voix » ne sert qu’à une personne
+  // présente : sa venue le fait revenir.
+  const screensaver = state?.screensaver;
+  const [screensaverScene, setScreensaverScene] = useState<ScreensaverScene>('off');
+  const screensaverActive = useScreensaverActive(
+    !!screensaver?.enabled &&
+      screensaver.imageCount > 0 &&
+      // Un état brièvement ancien (resynchronisation) garde la peinture ; une coupure de plus
+      // de 5 s (connectionLost) la retire pour laisser voir la ligne d’état.
+      !!state &&
+      !screensaverWoken(state, phase) &&
+      !voiceOnlyActive &&
+      !satelliteName &&
+      !imageActivity &&
+      cards.length === 0 &&
+      !interrupted &&
+      !connectionLost,
+    screensaver?.returnDelayMs ?? 0,
+  );
   const mainCard = cards[0];
   const secondaryCards = cards.slice(1);
 
@@ -171,6 +207,7 @@ export function Mirror({ connection }: { connection: MirrorConnection }) {
       aria-label="Miroir Cornelius"
       // Taille de l’orbe choisie dans l’administration (100 % : taille d’origine).
       style={{ '--orb-user-scale': (state?.orbScale ?? 100) / 100 } as CSSProperties}
+      data-screensaver={screensaverScene}
     >
       <div className="mirror-top">
         <header className="mirror-header">
@@ -192,6 +229,18 @@ export function Mirror({ connection }: { connection: MirrorConnection }) {
         {fresh && state && <AmbientModules state={state} now={now} />}
       </div>
 
+      {/* Monté tant qu’il est activé ou encore visible : la sortie se joue jusqu’au bout. */}
+      {(screensaver?.enabled || screensaverScene !== 'off') && (
+        <Screensaver
+          active={screensaverActive}
+          revision={screensaver?.revision ?? ''}
+          intervalMs={screensaver?.intervalMs ?? 300_000}
+          transition={screensaver?.transition ?? 'vortex'}
+          durationMs={screensaver?.durationMs ?? 1_000}
+          fit={screensaver?.fit ?? 'canvas'}
+          onSceneChange={setScreensaverScene}
+        />
+      )}
       <div className="mirror-orb-anchor" data-testid="mirror-orb" />
       <Orb
         fullscreen

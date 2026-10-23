@@ -5,8 +5,9 @@ import type { PresenceTimings } from './presence-timings.js';
 import type { DelegationMode } from './delegation.js';
 import type { AdmissionSound } from './admission-sound.js';
 import type { GreetingMode, SilenceClose } from './conversation.js';
-import type { AmbientDisplay, ModuleCard } from './addons.js';
+import type { AddonIcon, AmbientDisplay, ModuleCard } from './addons.js';
 import type { Opening } from './opening.js';
+import type { ScreensaverState } from './screensaver.js';
 
 export type { ModuleCard };
 
@@ -118,6 +119,8 @@ export interface MirrorState {
   advancedAudioBuffer: boolean;
   /** Taille de l’orbe sur le miroir, en pourcentage (100 : taille d’origine). Absent : 100. */
   orbScale?: number;
+  /** Écran de veille (peintures et photos) ; absent des anciens serveurs : désactivé. */
+  screensaver?: ScreensaverState;
   /** Voix de Cornelius (GPT-Live) ; absente des anciens serveurs. */
   speechVoice?: string;
   voiceProvider?: VoiceProvider;
@@ -277,6 +280,9 @@ export interface VisionStatus {
 }
 /** Clé OpenAI ou jeton d’un module, vu par l’administration : jamais sa valeur. */
 export interface SecretView {
+  group: 'providers' | 'modules';
+  /** Icône déclarée par le module ; absente pour les clés du cœur. */
+  icon?: AddonIcon;
   /** Variable du fichier .env qui sert aussi de nom, par exemple OPENAI_API_KEY. */
   env: string;
   label: string;

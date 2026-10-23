@@ -11,6 +11,8 @@ L’ordinateur de Cornelius garde son adresse habituelle, `http://127.0.0.1:3000
 
 L’adresse exacte s’affiche dans l’administration, rubrique **Mise en route**, carte **Accès depuis le réseau local**, et au démarrage du serveur (ligne « Réseau local · https://192.168.1.20:3443 »). Le nom de l’ordinateur suivi de `.local` fonctionne aussi sur la plupart des réseaux (par exemple `https://miroir.local:3443/`).
 
+Une adresse tapée sans le « s » (`http://192.168.1.20:3443/`) renvoie d’elle-même vers l’adresse chiffrée. Le port `3000`, lui, ne répond qu’à l’ordinateur de Cornelius.
+
 Le chiffrement est indispensable : sans lui, les navigateurs refusent le micro, et le mot de passe de l’administration passerait en clair sur le Wi‑Fi.
 
 ## Le certificat

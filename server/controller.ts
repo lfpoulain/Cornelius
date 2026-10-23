@@ -1,6 +1,7 @@
 import type { VoiceProvider } from '../shared/voice-provider.js';
 import { DEFAULT_CARD_SETTINGS, type CardSettings } from '../shared/cards.js';
 import { DEFAULT_LIVE_VOICE, type LiveVoice } from '../shared/voices.js';
+import { DEFAULT_SCREENSAVER, type ScreensaverSettings } from '../shared/screensaver.js';
 import { openingFromSettings, settingsForOpening, type Opening } from '../shared/opening.js';
 import {
   DEFAULT_PRESENCE_TIMINGS,
@@ -80,6 +81,8 @@ export interface SessionPreferencesStore {
   setSilenceClose?(settings: SilenceClose): void;
   getVoiceRecognition?(): boolean;
   setVoiceRecognition?(enabled: boolean): void;
+  getScreensaver?(): ScreensaverSettings;
+  setScreensaver?(settings: ScreensaverSettings): void;
 }
 
 export interface SessionTransport {
@@ -224,6 +227,8 @@ export class SessionController {
   private advancedAudioBuffer = false;
   private orbScale = 100;
   private voiceProvider: VoiceProvider = 'openai';
+  private screensaver: ScreensaverSettings = { ...DEFAULT_SCREENSAVER };
+  private screensaverImages = { count: 0, revision: '' };
   private speechVoice: LiveVoice = DEFAULT_LIVE_VOICE;
   private cardSettings: CardSettings = { ...DEFAULT_CARD_SETTINGS };
   private admissionSound: AdmissionSound = { ...DEFAULT_ADMISSION_SOUND };
@@ -268,6 +273,7 @@ export class SessionController {
     this.advancedAudioBuffer = preferences?.getAdvancedAudioBuffer?.() ?? false;
     this.orbScale = preferences?.getOrbScale?.() ?? 100;
     this.voiceProvider = preferences?.getVoiceProvider?.() ?? 'openai';
+    this.screensaver = { ...(preferences?.getScreensaver?.() ?? DEFAULT_SCREENSAVER) };
     this.speechVoice = preferences?.getSpeechVoice?.() ?? DEFAULT_LIVE_VOICE;
     this.cardSettings = preferences?.getCardSettings?.() ?? { ...DEFAULT_CARD_SETTINGS };
     this.admissionSound = { ...(preferences?.getAdmissionSound?.() ?? DEFAULT_ADMISSION_SOUND) };
@@ -399,6 +405,11 @@ export class SessionController {
       privacyMode: this.privacyMode,
       advancedAudioBuffer: this.advancedAudioBuffer,
       orbScale: this.orbScale,
+      screensaver: {
+        ...this.screensaver,
+        imageCount: this.screensaverImages.count,
+        revision: this.screensaverImages.revision,
+      },
       speechVoice: this.speechVoice,
       voiceProvider: this.voiceProvider,
       cardSettings: { ...this.cardSettings },
@@ -982,6 +993,20 @@ export class SessionController {
     if (this.orbScale === scale) return;
     this.preferences?.setOrbScale?.(scale);
     this.orbScale = scale;
+    this.publish();
+  }
+
+  setScreensaver(settings: ScreensaverSettings): void {
+    this.preferences?.setScreensaver?.(settings);
+    this.screensaver = { ...settings };
+    this.publish();
+  }
+
+  /** Images de l’écran de veille ajoutées ou retirées : le miroir relit la liste. */
+  setScreensaverImages(count: number, revision: string): void {
+    if (this.screensaverImages.count === count && this.screensaverImages.revision === revision)
+      return;
+    this.screensaverImages = { count, revision };
     this.publish();
   }
 

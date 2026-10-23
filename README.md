@@ -76,6 +76,16 @@ La caméra, les visages et l’écoute du mot d’appel restent sur l’ordinate
       Des modules ajoutent de nouvelles informations et de nouveaux outils vocaux. Les modules externes vivent dans <a href="https://github.com/lfpoulain/cornelius-modules">cornelius-modules</a> et se mettent à jour à part.
     </td>
   </tr>
+  <tr>
+    <td valign="top">
+      <h4>🖼️ Il expose de l’art au repos</h4>
+      Quand personne n’est là, le miroir affiche des peintures du domaine public ou vos photos ; l’orbe les efface à votre retour.
+    </td>
+    <td valign="top">
+      <h4>📡 Il répond dans les autres pièces</h4>
+      Des satellites audio (micro et haut-parleur) répondent à « Cornelius » ailleurs dans la maison.
+    </td>
+  </tr>
 </table>
 
 ## 🧰 Ce qu’il faut

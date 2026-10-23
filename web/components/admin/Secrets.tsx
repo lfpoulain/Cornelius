@@ -1,7 +1,8 @@
-import { useCallback, useState, type FormEvent } from 'react';
-import { ExternalLink } from 'lucide-react';
+import { useCallback, useId, useState, type FormEvent } from 'react';
+import { Boxes, ExternalLink, KeyRound, Sparkles, type LucideIcon } from 'lucide-react';
 import type { SecretView } from '../../../shared/types';
 import { api } from '../../api';
+import { addonIcon } from './addon-icons';
 import type { RunAction } from './types';
 import { ConfirmAction, ResourceState } from './shared';
 import { useAdminResource } from './useAdminResource';
@@ -56,7 +57,7 @@ export function SecretField({
     }
   };
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {!inline && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <Badge variant={secret.configured ? 'secondary' : 'outline'}>{status(secret)}</Badge>
@@ -96,27 +97,29 @@ export function SecretField({
             type="password"
             autoComplete="off"
             spellCheck={false}
-            className="min-w-0 flex-1 font-mono"
+            className="min-w-0 flex-1 basis-48 font-mono"
             placeholder="Collez la valeur ici"
             value={value}
             onChange={(event) => setValue(event.target.value)}
           />
-          <Button type="submit" size="sm" disabled={value.trim().length < 8}>
-            Enregistrer
-          </Button>
-          {secret.configured && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setValue('');
-                setEditing(false);
-              }}
-            >
-              Annuler
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" disabled={value.trim().length < 8}>
+              Enregistrer
             </Button>
-          )}
+            {secret.configured && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setValue('');
+                  setEditing(false);
+                }}
+              >
+                Annuler
+              </Button>
+            )}
+          </div>
         </form>
       )}
       {secret.url && !inline && (
@@ -134,7 +137,88 @@ export function SecretField({
   );
 }
 
-/** Clé OpenAI et jetons des modules, saisis sans toucher au fichier .env ni redémarrer. */
+function SecretCard({
+  secret,
+  run,
+  onChanged,
+}: {
+  secret: SecretView;
+  run: RunAction;
+  onChanged: (secrets: SecretView[]) => void;
+}) {
+  const Icon = secret.group === 'modules' ? addonIcon(secret.icon) : KeyRound;
+  return (
+    <article className="flex min-w-0 flex-col gap-4 rounded-xl border bg-card/50 p-4 shadow-sm">
+      <div className="flex min-w-0 items-start gap-3">
+        <span
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+          aria-hidden="true"
+        >
+          <Icon className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h4 className="text-sm font-semibold leading-5">
+            {secret.label}
+            {secret.note ? (
+              <span className="font-normal text-muted-foreground"> ({secret.note})</span>
+            ) : null}
+          </h4>
+          <p className="mt-0.5 text-xs text-muted-foreground">{secret.usedBy}</p>
+          <code className="mt-1 block break-all text-[0.7rem] text-muted-foreground/80">
+            {secret.env}
+          </code>
+        </div>
+      </div>
+      <div className="mt-auto">
+        <SecretField
+          key={`${secret.env}-${secret.configured}`}
+          secret={secret}
+          run={run}
+          onChanged={onChanged}
+        />
+      </div>
+    </article>
+  );
+}
+
+function SecretGroup({
+  icon: Icon,
+  title,
+  description,
+  secrets,
+  run,
+  onChanged,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  secrets: SecretView[];
+  run: RunAction;
+  onChanged: (secrets: SecretView[]) => void;
+}) {
+  const headingId = useId();
+  if (secrets.length === 0) return null;
+  return (
+    <section className="space-y-3" aria-labelledby={headingId}>
+      <div className="flex items-start gap-2">
+        <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <div>
+          <h3 id={headingId} className="text-sm font-semibold">
+            {title}
+          </h3>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(min(22rem,100%),1fr))]">
+        {secrets.map((secret) => (
+          <SecretCard key={secret.env} secret={secret} run={run} onChanged={onChanged} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Clés des fournisseurs IA et jetons des modules, saisis sans toucher au fichier .env. */
 export function Secrets({ run }: { run: RunAction }) {
   const load = useCallback(() => api.secrets().then((result) => result.secrets), []);
   const resource = useAdminResource(load);
@@ -152,31 +236,30 @@ export function Secrets({ run }: { run: RunAction }) {
       </CardHeader>
       <CardContent>
         <ResourceState resource={shown} loadingLabel="Lecture des clés…">
-          {(secrets) => (
-            <ul className="divide-y divide-border">
-              {secrets.map((secret) => (
-                <li key={secret.env} className="space-y-2 py-4 first:pt-0 last:pb-0">
-                  <div>
-                    <h3 className="text-sm font-medium">
-                      {secret.label}
-                      {secret.note ? (
-                        <span className="font-normal text-muted-foreground"> ({secret.note})</span>
-                      ) : null}
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      {secret.usedBy} · <code>{secret.env}</code>
-                    </p>
-                  </div>
-                  <SecretField
-                    key={`${secret.env}-${secret.configured}`}
-                    secret={secret}
-                    run={run}
-                    onChanged={setUpdated}
-                  />
-                </li>
-              ))}
-            </ul>
-          )}
+          {(secrets) => {
+            const providers = secrets.filter((secret) => secret.group === 'providers');
+            const modules = secrets.filter((secret) => secret.group === 'modules');
+            return (
+              <div className="space-y-7">
+                <SecretGroup
+                  icon={Sparkles}
+                  title="Fournisseurs IA"
+                  description="Conversation, voix, mémoire et génération."
+                  secrets={providers}
+                  run={run}
+                  onChanged={setUpdated}
+                />
+                <SecretGroup
+                  icon={Boxes}
+                  title="Modules"
+                  description="Services externes utilisés par les modules installés."
+                  secrets={modules}
+                  run={run}
+                  onChanged={setUpdated}
+                />
+              </div>
+            );
+          }}
         </ResourceState>
       </CardContent>
     </Card>

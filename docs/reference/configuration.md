@@ -135,6 +135,7 @@ Les ports `3000` et `5173` n’écoutent que sur `127.0.0.1`. Seul le port `3443
 | `data/run/` | Numéros des processus lancés par les scripts (`*.pid`). | les scripts |
 | `data/run/logs/` | Sortie des services lancés par les scripts : `backend.*.log` (serveur), `perception.*.log`, `frontend.*.log` (Vite). Avec systemd, lisez plutôt `journalctl --user -u cornelius`. | les scripts |
 | `data/generated-images/` | Les trois dernières images créées. Vidé à chaque démarrage du serveur. | le serveur |
+| `data/screensaver/` | Les images de l’écran de veille : photos envoyées et peintures téléchargées. | le serveur |
 | `models/` | Modèles locaux : `yunet.onnx` (détection des visages), `sface.onnx` (reconnaissance), `silero.onnx` (détection de la parole), `lfm2.5-vl-450m/`, `lfm2.5-vl-1.6b/`, `lfm2.5-vl-3b/` (vision), `openwakeword/` et `cornelius.onnx` (mot d’appel), `image-generation/<modèle>/` (images). Les modèles de visages, de parole et de vision sont téléchargés avec leur licence. | `perception/download_models.py`, l’administration, `perception/install_wake_features.py` |
 | `.venv/` | L’environnement Python 3.12 de la perception. | `scripts/install-linux.sh`, ou à la main sous Windows |
 | `.venv-image/` | L’environnement Python séparé du générateur d’images (PyTorch, Diffusers). | l’installation d’un modèle depuis **Modules → Génération d’image** |

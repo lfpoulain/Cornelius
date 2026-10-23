@@ -1,7 +1,8 @@
 import { createHash, createPublicKey } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { hostname as systemHostname, networkInterfaces } from 'node:os';
-import { isIP } from 'node:net';
+import { createServer as createHttpServer } from 'node:http';
+import { createServer as createNetServer, isIP, type Server as NetServer } from 'node:net';
 import { join } from 'node:path';
 import { generate } from 'selfsigned';
 
@@ -66,6 +67,42 @@ export function allowedHostname(hostname: string, lan: boolean, extra: readonly 
   return (
     machineHostnames().includes(host) || extra.map((item) => item.toLowerCase()).includes(host)
   );
+}
+
+/**
+ * Port du réseau local partagé entre HTTPS et une redirection HTTP : quelqu'un qui tape
+ * http://10.0.0.20:3443 (sans le « s ») est renvoyé vers l'adresse chiffrée au lieu d'une
+ * page vide. Le premier octet suffit à les distinguer : 0x16 ouvre toute poignée de main TLS.
+ * La redirection ne vise qu'un hôte accepté, pour ne pas servir de rebond vers un autre site.
+ */
+export function tlsWithHttpRedirect(
+  tls: NetServer,
+  accepts: (hostname: string) => boolean,
+): NetServer {
+  const redirect = createHttpServer((req, res) => {
+    let target: URL | null = null;
+    try {
+      target = new URL(req.url ?? '/', `https://${req.headers.host ?? ''}`);
+    } catch {
+      target = null;
+    }
+    if (!target || !accepts(target.hostname)) {
+      res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8', connection: 'close' });
+      res.end('Hôte non autorisé.');
+      return;
+    }
+    res.writeHead(301, { location: target.href, connection: 'close' });
+    res.end();
+  });
+  return createNetServer((socket) => {
+    socket.on('error', () => socket.destroy());
+    socket.once('data', (head) => {
+      socket.pause();
+      socket.unshift(head);
+      (head[0] === 0x16 ? tls : redirect).emit('connection', socket);
+      process.nextTick(() => socket.resume());
+    });
+  });
 }
 
 export interface Certificate {
