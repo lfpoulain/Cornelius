@@ -11,6 +11,7 @@ import { openDatabase, ProfileRepository, SessionPreferences } from '../server/s
 import { createApp } from '../server/app.js';
 import { SessionController, type SessionTransport } from '../server/controller.js';
 import { mobilePath } from '../shared/mobile.js';
+import { createMobileProxy } from '../server/mobile-ingress.js';
 import { LiveTransport } from '../server/live/transport.js';
 import type { LiveGateway } from '../server/live/gateway.js';
 import type { StateEvent } from '../shared/types.js';
@@ -296,5 +297,36 @@ test('Swift fixture preserves card scope and a valid recognition observation', (
       })),
     }),
     true,
+  );
+});
+
+test('actual proxy ingress refuses web/admin and requires bearer even with an administrator cookie', async (t) => {
+  const f = await fixture(t);
+  const proxy = createMobileProxy(f.app);
+  await new Promise<void>((resolve) => proxy.listen(0, '127.0.0.1', resolve));
+  t.after(async () => {
+    proxy.closeAllConnections();
+    await new Promise<void>((resolve) => proxy.close(() => resolve()));
+  });
+  const address = proxy.address() as { port: number };
+  const base = 'http://127.0.0.1:' + address.port;
+  for (const path of ['/admin', '/api/admin/mobile', '/perception', '/image-generation'])
+    assert.equal((await fetch(base + path, { headers: { cookie: f.headers.cookie } })).status, 404);
+  assert.equal(
+    (
+      await fetch(base + '/mobile/info', {
+        headers: { cookie: f.headers.cookie, 'x-cornelius-mobile': 'true' },
+      })
+    ).status,
+    401,
+  );
+  const credential = await f.pair();
+  assert.equal(
+    (
+      await fetch(base + '/mobile/info', {
+        headers: { authorization: 'Bearer ' + credential.token },
+      })
+    ).status,
+    200,
   );
 });

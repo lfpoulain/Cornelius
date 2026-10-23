@@ -2,8 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, openSync } from 'node:fs';
 import { createServer } from 'node:https';
 import { createServer as createHttpServer } from 'node:http';
-import { mobileIngress } from './mobile-ingress.js';
-import { mobilePath } from '../shared/mobile.js';
+import { createMobileProxy } from './mobile-ingress.js';
 import { dirname, join } from 'node:path';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
@@ -78,7 +77,7 @@ try {
     }
     process.exit(0);
   };
-  const { app } = await createApp(config, { restart: () => void restart() });
+  const { app, mobileServerId } = await createApp(config, { restart: () => void restart() });
   // HTTP sur la seule boucle locale : le navigateur de la machine, la perception et le
   // générateur d'images.
   await listenWithRetry(() => app.listen({ host: '127.0.0.1', port: config.port }));
@@ -106,6 +105,7 @@ try {
     if (config.mdns !== false) {
       unannounce = announceSatellites({
         port: config.httpsPort ?? 3443,
+        mobileServerId,
         keyFingerprint: certificate.keyFingerprint,
         onError: (error) =>
           console.warn('Annonce mDNS des satellites impossible :', (error as Error)?.message),
@@ -121,22 +121,7 @@ try {
       [config.port, config.httpsPort].includes(config.mobileProxyPort)
     )
       throw new Error('CORNELIUS_MOBILE_PROXY_PORT invalide.');
-    mobileProxy = createHttpServer((req, res) => {
-      if (!mobilePath(req.url ?? '')) {
-        res.writeHead(404).end();
-        return;
-      }
-      mobileIngress.add(req);
-      app.routing(req, res);
-    });
-    mobileProxy.on('upgrade', (req, socket, head) => {
-      if (!mobilePath(req.url ?? '')) {
-        socket.destroy();
-        return;
-      }
-      mobileIngress.add(req);
-      app.server.emit('upgrade', req, socket, head);
-    });
+    mobileProxy = createMobileProxy(app);
     await new Promise<void>((resolve, reject) => {
       mobileProxy!.once('error', reject);
       mobileProxy!.listen(config.mobileProxyPort, config.mobileProxyHost, resolve);

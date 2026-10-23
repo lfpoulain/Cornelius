@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0062C864A9B89C0D39223426 /* test-certificate.der in Resources */ = {isa = PBXBuildFile; fileRef = 4E5F12A455996DFE2ADB8E16 /* test-certificate.der */; };
 		1A218282805534B102CD703F /* dm-mono-400.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CCFDEE65EA769B4441D41081 /* dm-mono-400.ttf */; };
 		2A71169096DE352F7DEBC386 /* MetalMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = 240E9699491DC84FDC3D2471 /* MetalMirror.swift */; };
 		3F3216E0A0AB2452C6EC4D20 /* dm-sans-500.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9E4033AC7070B3481331C97C /* dm-sans-500.ttf */; };
@@ -22,6 +23,7 @@
 		9FACF719397914A30C89CE1C /* Media.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9734D2FE0695D1B31C40BF5E /* Media.swift */; };
 		A37B9DF783A96335CD0EAD3D /* Discovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10622F5D665013F1CA6B1DF /* Discovery.swift */; };
 		B85F446D425285449B7026CB /* dm-sans-400.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 56A15881B96CD843542375AE /* dm-sans-400.ttf */; };
+		CBE864544329EF48372ACB6A /* test-certificate-pin.txt in Resources */ = {isa = PBXBuildFile; fileRef = 0B61BB4FE9FCA7A31122F55E /* test-certificate-pin.txt */; };
 		D48094ECFCC4587C7FAD9D70 /* dmsans-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9771FC841371501412548FAF /* dmsans-OFL.txt */; };
 		FA8DBA34ACFC4C475E7EF356 /* MirrorClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0178AE50A884E55539CDD7BB /* MirrorClient.swift */; };
 		FD67DBC960D636541DFB1E93 /* dmmono-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 198BA33A951F53393F29EE83 /* dmmono-OFL.txt */; };
@@ -40,6 +42,7 @@
 /* Begin PBXFileReference section */
 		0178AE50A884E55539CDD7BB /* MirrorClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MirrorClient.swift; sourceTree = "<group>"; };
 		08C9BE72EA065CBE88F00255 /* CorneliusTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CorneliusTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		0B61BB4FE9FCA7A31122F55E /* test-certificate-pin.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "test-certificate-pin.txt"; sourceTree = "<group>"; };
 		15D8B2B32C75870700E03090 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		198BA33A951F53393F29EE83 /* dmmono-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "dmmono-OFL.txt"; sourceTree = "<group>"; };
 		240E9699491DC84FDC3D2471 /* MetalMirror.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalMirror.swift; sourceTree = "<group>"; };
@@ -47,6 +50,7 @@
 		3D4C45D7C75EF07F5455DD3C /* Mirror.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Mirror.metal; sourceTree = "<group>"; };
 		47E775E916B654F641E7301C /* MirrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MirrorView.swift; sourceTree = "<group>"; };
 		4875827854195935FDA9E55B /* Trust.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trust.swift; sourceTree = "<group>"; };
+		4E5F12A455996DFE2ADB8E16 /* test-certificate.der */ = {isa = PBXFileReference; path = "test-certificate.der"; sourceTree = "<group>"; };
 		56A15881B96CD843542375AE /* dm-sans-400.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "dm-sans-400.ttf"; sourceTree = "<group>"; };
 		570AE428860BF128B4B64ED3 /* dm-mono-500.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "dm-mono-500.ttf"; sourceTree = "<group>"; };
 		9734D2FE0695D1B31C40BF5E /* Media.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Media.swift; sourceTree = "<group>"; };
@@ -107,6 +111,8 @@
 				198BA33A951F53393F29EE83 /* dmmono-OFL.txt */,
 				9771FC841371501412548FAF /* dmsans-OFL.txt */,
 				3371227C22CAD3D5AC1ECF5A /* mirror-fixture.json */,
+				0B61BB4FE9FCA7A31122F55E /* test-certificate-pin.txt */,
+				4E5F12A455996DFE2ADB8E16 /* test-certificate.der */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -220,6 +226,8 @@
 				FD67DBC960D636541DFB1E93 /* dmmono-OFL.txt in Resources */,
 				D48094ECFCC4587C7FAD9D70 /* dmsans-OFL.txt in Resources */,
 				4F68A2A30AFE23C9233A283B /* mirror-fixture.json in Resources */,
+				CBE864544329EF48372ACB6A /* test-certificate-pin.txt in Resources */,
+				0062C864A9B89C0D39223426 /* test-certificate.der in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

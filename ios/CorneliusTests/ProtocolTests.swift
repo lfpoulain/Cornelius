@@ -23,6 +23,13 @@ final class ProtocolTests: XCTestCase {
         XCTAssertFalse(freshness.fresh(at: Date(timeIntervalSince1970: event.sentAt / 1000 + 5)))
         XCTAssertEqual(event.state.ambient(now: event.sentAt).count, 1)
     }
+    func testCertificatePinMatchesNodeSPKIAndRejectsOtherKeys() throws {
+        let certificate = try Data(contentsOf: XCTUnwrap(Bundle.main.url(forResource: "test-certificate", withExtension: "der")))
+        let pin = try String(contentsOf: XCTUnwrap(Bundle.main.url(forResource: "test-certificate-pin", withExtension: "txt")), encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
+        XCTAssertTrue(CertificatePin.matches(certificate, fingerprint: pin))
+        XCTAssertFalse(CertificatePin.matches(certificate, fingerprint: String(repeating: "00", count: 32)))
+        for length in 0..<min(certificate.count, 128) { XCTAssertNil(CertificatePin.spki(certificate.prefix(length))) }
+    }
     func testPinParserRejectsTruncation() {
         for data in [Data(), Data([0x30,0x80]), Data([0x30,0xff,1,2,3]), Data(repeating: 0, count: 128)] { XCTAssertNil(CertificatePin.spki(data)) }
     }

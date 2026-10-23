@@ -51,7 +51,7 @@ struct DisplayCard: Decodable, Identifiable {
     let id: String; let profileId: String?; let createdAt: Double; let expiresAt: Double
     let interactionId: String?; let profileEpoch: Int; let contextVersion: Int; let content: CardContent; let sources: [CardSource]; let stale: Bool?
     func visible(in state: MirrorState, now: Double) -> Bool {
-        expiresAt > now && state.session.interactionId != nil && interactionId == state.session.interactionId && profileEpoch == state.session.profileEpoch && contextVersion == state.session.contextVersion && (profileId == nil || (profileId == state.activeProfile?.id && state.recognized(now: now)))
+        expiresAt > now && state.session.interactionId != nil && interactionId == state.session.interactionId && profileEpoch == state.session.profileEpoch && contextVersion == state.session.contextVersion && (profileId == nil || (profileId == state.activeProfile?.id && state.profileVisible(now: now)))
     }
 }
 struct Ambient: Decodable, Identifiable {
@@ -67,12 +67,15 @@ struct MirrorState: Decodable {
     struct WakeWord: Decodable { let enabled: Bool; let ready: Bool; let detail: String? }
     struct ImageActivity: Decodable { let phase: String? }
     struct Setup: Decodable { let openaiKey: Bool; let perception: Bool }
+    func profileVisible(now: Double) -> Bool {
+        presence.health == "ok" && now - (presence.observedAt ?? 0) < 2000 && activeProfile != nil && !(privacyMode && presence.peopleCount > 1) && presence.people.contains(where: { $0.profileId == activeProfile?.id })
+    }
     func recognized(now: Double) -> Bool {
         presence.health == "ok" && presence.peopleCount == 1 && now - (presence.observedAt ?? 0) < 2000 && activeProfile != nil && presence.people.contains(where: { $0.profileId == activeProfile?.id })
     }
     func ambient(now: Double) -> [Ambient] {
         guard browserConnected, presence.health == "ok", presence.state != "absent", presence.peopleCount > 0, now - (presence.observedAt ?? 0) < 2000, !(privacyMode && presence.peopleCount > 1) else { return [] }
-        return ambientDisplays.filter { $0.profileId == nil || (recognized(now: now) && $0.profileId == activeProfile?.id) }
+        return ambientDisplays.filter { $0.profileId == nil || (profileVisible(now: now) && $0.profileId == activeProfile?.id) }
     }
 }
 struct Snapshot: Decodable { let schemaVersion: Int; let bootId: String; let sequence: Int; let sentAt: Double; let state: MirrorState }

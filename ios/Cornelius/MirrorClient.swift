@@ -16,6 +16,7 @@ import Combine
     @Published var transport = ""
     var freshness = Freshness()
     let media = MirrorMedia()
+    private let discovery = Discovery()
     private var connection: Task<Void, Never>?
     private var heartbeat: Task<Void, Never>?
     private var audioReceiver: Task<Void, Never>?
@@ -62,7 +63,7 @@ import Combine
     }
     func activate() {
         guard credential != nil, connection == nil, !preparing else { return }
-        interrupted = false; preparing = true
+        interrupted = false; preparing = true; discovery.start()
         connection = Task { [weak self] in
             guard let self else { return }
             defer {
@@ -76,7 +77,9 @@ import Combine
             var delay: UInt64 = 1
             while !Task.isCancelled && !self.interrupted {
                 guard !self.background || self.snapshot?.state.session.phase == "ready", let credential = self.credential else { break }
-                for endpoint in credential.endpoints.sorted(by: { $0.trust == "pinned" && $1.trust != "pinned" }) {
+                var endpoints = credential.endpoints
+                if let discovered = self.discovery.identifiedServers[credential.serverId], !endpoints.contains(where: { $0.url == discovered }) { endpoints.insert(Endpoint(url: discovered, trust: "pinned"), at: 0) }
+                for endpoint in endpoints.sorted(by: { $0.trust == "pinned" && $1.trust != "pinned" }) {
                     if Task.isCancelled || self.interrupted { break }
                     do { try await self.connect(endpoint, credential: credential) }
                     catch {
@@ -126,7 +129,7 @@ import Combine
                 updated.endpoints = credential.endpoints.filter { $0.trust != "system" } + hello.endpoints.filter { $0.trust == "system" && $0.url.scheme == "https" && ($0.url.host?.hasSuffix(".ts.net") ?? false) }
                 try CredentialStore.save(updated); self.credential = updated
                 try await openMedia(session, endpoint: endpoint, credential: credential, generation: hello.generation)
-                connected = true; transport = endpoint.trust == "pinned" ? "Réseau local" : "Tailscale"; message = nil
+                connected = true; UIApplication.shared.isIdleTimerDisabled = !background; transport = endpoint.trust == "pinned" ? "Réseau local" : "Tailscale"; message = nil
                 media.setCameraEnabled(!background && cameraWanted)
                 send(["type": "media_ready", "ready": true])
                 if background { send(["type": "background", "enabled": true]) }
@@ -165,7 +168,9 @@ import Combine
         audioReceiver = Task { [weak self, socket = audioSocket!] in
             do {
                 while !Task.isCancelled {
-                    switch try await socket.receive() {
+                    let received = try await socket.receive()
+                    guard !Task.isCancelled, self?.audioSocket === socket else { break }
+                    switch received {
                     case .data(let pcm): if self?.snapshot?.state.session.phase == "ready" { self?.outputLevel = self?.media.play(pcm) ?? 0 }
                     case .string: self?.media.clear()
                     @unknown default: break
@@ -196,17 +201,19 @@ import Combine
     func setBackground(_ value: Bool) {
         background = value
         if value {
+            discovery.stop()
             media.setCameraEnabled(false)
             if snapshot?.state.session.phase == "ready" { send(["type": "background", "enabled": true]) }
             else { deactivate() }
         } else {
+            discovery.start()
             if connected { send(["type": "background", "enabled": false]); media.setCameraEnabled(cameraWanted && audioReady) }
             else if credential != nil && !interrupted { activate() }
         }
         UIApplication.shared.isIdleTimerDisabled = !value && connected
     }
     func stopConversation() { send(["type": "stop"]); media.clear(); if background { deactivate() } }
-    func deactivate() { connection?.cancel(); heartbeat?.cancel(); closeNetwork(); media.stop(); audioReady = false; snapshot = nil; UIApplication.shared.isIdleTimerDisabled = false }
+    func deactivate() { discovery.stop(); connection?.cancel(); heartbeat?.cancel(); closeNetwork(); media.stop(); audioReady = false; snapshot = nil; UIApplication.shared.isIdleTimerDisabled = false }
     func forget() { deactivate(); CredentialStore.clear(); credential = nil; interrupted = false; message = nil }
     func addLocalAddress(_ text: String) {
         guard var credential, let url = URL(string: text), url.scheme == "https", url.host != nil, url.user == nil, url.password == nil, url.query == nil, url.fragment == nil, url.path.isEmpty || url.path == "/" else { message = "Saisissez une adresse HTTPS locale."; return }
@@ -221,7 +228,7 @@ import Combine
         return data
     }
     private func closeNetwork() {
-        connected = false; generation = nil; heartbeat?.cancel(); audioReceiver?.cancel()
+        connected = false; UIApplication.shared.isIdleTimerDisabled = false; generation = nil; heartbeat?.cancel(); audioReceiver?.cancel()
         events?.cancel(with: .normalClosure, reason: nil); audioSocket?.cancel(with: .normalClosure, reason: nil); cameraSocket?.cancel(with: .normalClosure, reason: nil)
         session?.invalidateAndCancel(); events = nil; audioSocket = nil; cameraSocket = nil; session = nil
         media.setCameraEnabled(false); media.clear()

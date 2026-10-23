@@ -249,6 +249,8 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | abstract-logging | 2.0.1 | MIT | exécution |
 | ajv-formats | 3.0.1 | MIT | exécution |
 | ajv | 8.20.0 | MIT | exécution |
+| ansi-regex | 5.0.1 | MIT | exécution |
+| ansi-styles | 4.3.0 | MIT | exécution |
 | aria-hidden | 1.2.6 | MIT | exécution |
 | asn1js | 3.0.10 | BSD-3-Clause | exécution |
 | atomic-sleep | 1.0.0 | MIT | exécution |
@@ -257,18 +259,25 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | bonjour-service | 1.4.4 | MIT | exécution |
 | brace-expansion | 5.0.12 | MIT | exécution |
 | bytestreamjs | 2.0.1 | BSD-3-Clause | exécution |
+| camelcase | 5.3.1 | MIT | exécution |
 | class-variance-authority | 0.7.1 | Apache-2.0 | exécution |
+| cliui | 6.0.0 | ISC | exécution |
 | clsx | 2.1.1 | MIT | exécution |
+| color-convert | 2.0.1 | MIT | exécution |
+| color-name | 1.1.4 | MIT | exécution |
 | content-disposition | 2.0.1 | MIT | exécution |
 | cookie | 1.1.1 | MIT | exécution |
 | cookie | 2.0.1 | MIT | exécution |
 | csstype | 3.2.3 | MIT | exécution |
+| decamelize | 1.2.0 | MIT | exécution |
 | depd | 2.0.0 | MIT | exécution |
 | dequal | 2.0.3 | MIT | exécution |
 | detect-libc | 2.1.2 | Apache-2.0 | outil |
 | detect-node-es | 1.1.0 | MIT | exécution |
+| dijkstrajs | 1.0.3 | MIT | exécution |
 | dns-packet | 5.6.1 | MIT | exécution |
 | duplexify | 4.1.3 | MIT | exécution |
+| emoji-regex | 8.0.0 | MIT | exécution |
 | end-of-stream | 1.4.5 | MIT | exécution |
 | enhanced-resolve | 5.25.1 | MIT | outil |
 | esbuild | 0.28.2 | MIT | outil |
@@ -285,7 +294,9 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | fdir | 6.5.0 | MIT | outil |
 | fflate | 0.8.3 | MIT | outil |
 | find-my-way | 9.9.0 | MIT | exécution |
+| find-up | 4.1.0 | MIT | exécution |
 | fsevents | 2.3.3 | MIT | outil |
+| get-caller-file | 2.0.5 | ISC | exécution |
 | get-nonce | 1.0.1 | MIT | exécution |
 | glob | 13.0.6 | BlueOak-1.0.0 | exécution |
 | graceful-fs | 4.2.11 | ISC | outil |
@@ -293,6 +304,7 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | inherits | 2.0.4 | ISC | exécution |
 | ip-address | 10.7.2 | MIT | exécution |
 | ipaddr.js | 2.5.0 | MIT | exécution |
+| is-fullwidth-code-point | 3.0.0 | MIT | exécution |
 | jiti | 2.7.0 | MIT | outil |
 | json-schema-ref-resolver | 3.0.0 | MIT | exécution |
 | json-schema-traverse | 1.0.0 | MIT | exécution |
@@ -321,6 +333,7 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | lightningcss-win32-x64-msvc | 1.33.0 | MPL-2.0 | outil |
 | lightningcss | 1.32.0 | MPL-2.0 | outil |
 | lightningcss | 1.33.0 | MPL-2.0 | outil |
+| locate-path | 5.0.0 | MIT | exécution |
 | lru-cache | 11.5.2 | BlueOak-1.0.0 | exécution |
 | lucide-react | 1.46.0 | ISC | exécution |
 | magic-string | 0.30.21 | MIT | outil |
@@ -333,6 +346,10 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | on-exit-leak-free | 2.1.2 | MIT | exécution |
 | once | 1.4.0 | ISC | exécution |
 | openai | 7.15.0 | Apache-2.0 | exécution |
+| p-limit | 2.3.0 | MIT | exécution |
+| p-locate | 4.1.0 | MIT | exécution |
+| p-try | 2.2.0 | MIT | exécution |
+| path-exists | 4.0.0 | MIT | exécution |
 | path-scurry | 2.0.2 | BlueOak-1.0.0 | exécution |
 | picocolors | 1.1.1 | ISC | outil |
 | picomatch | 4.0.7 | MIT | outil |
@@ -342,12 +359,14 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | pkijs | 3.4.1 | BSD-3-Clause | exécution |
 | playwright-core | 1.63.0 | Apache-2.0 | outil |
 | playwright | 1.63.0 | Apache-2.0 | outil |
+| pngjs | 5.0.0 | MIT | exécution |
 | postcss | 8.5.28 | MIT | outil |
 | prettier | 3.9.7 | MIT | outil |
 | process-warning | 4.0.1 | MIT | exécution |
 | process-warning | 5.1.0 | MIT | exécution |
 | pvtsutils | 1.3.6 | MIT | exécution |
 | pvutils | 1.2.0 | MIT | exécution |
+| qrcode | 1.5.4 | MIT | exécution |
 | quick-format-unescaped | 4.0.4 | MIT | exécution |
 | radix-ui | 1.6.7 | MIT | exécution |
 | react-dom | 19.3.0 | MIT | exécution |
@@ -359,7 +378,9 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | real-require | 0.2.0 | MIT | exécution |
 | real-require | 1.0.0 | MIT | exécution |
 | reflect-metadata | 0.2.2 | Apache-2.0 | exécution |
+| require-directory | 2.1.1 | MIT | exécution |
 | require-from-string | 2.0.2 | MIT | exécution |
+| require-main-filename | 2.0.0 | ISC | exécution |
 | ret | 0.5.0 | MIT | exécution |
 | reusify | 1.1.0 | MIT | exécution |
 | rfdc | 1.4.1 | MIT | exécution |
@@ -371,6 +392,7 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | secure-json-parse | 4.1.0 | BSD-3-Clause | exécution |
 | selfsigned | 5.5.0 | MIT | exécution |
 | semver | 7.8.5 | ISC | exécution |
+| set-blocking | 2.0.0 | ISC | exécution |
 | set-cookie-parser | 2.7.2 | MIT | exécution |
 | setprototypeof | 1.2.0 | ISC | exécution |
 | sonic-boom | 4.2.1 | MIT | exécution |
@@ -378,7 +400,9 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | split2 | 4.2.0 | ISC | exécution |
 | statuses | 2.0.2 | MIT | exécution |
 | stream-shift | 1.0.3 | MIT | exécution |
+| string-width | 4.2.3 | MIT | exécution |
 | string_decoder | 1.3.0 | MIT | exécution |
+| strip-ansi | 6.0.1 | MIT | exécution |
 | tailwind-merge | 3.7.0 | MIT | exécution |
 | tailwindcss | 4.3.3 | MIT | outil |
 | tapable | 2.3.3 | MIT | outil |
@@ -398,6 +422,11 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | use-sidecar | 1.1.3 | MIT | exécution |
 | util-deprecate | 1.0.2 | MIT | exécution |
 | vite | 8.3.0 | MIT | outil |
+| which-module | 2.0.1 | ISC | exécution |
+| wrap-ansi | 6.2.0 | MIT | exécution |
 | wrappy | 1.0.2 | ISC | exécution |
 | ws | 8.21.3 | MIT | exécution |
+| y18n | 4.0.3 | ISC | exécution |
+| yargs-parser | 18.1.3 | ISC | exécution |
+| yargs | 15.4.1 | MIT | exécution |
 <!-- npm:fin -->

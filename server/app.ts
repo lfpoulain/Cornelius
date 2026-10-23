@@ -1466,5 +1466,5 @@ export async function createApp(
     perception.dispose();
     db.close();
   });
-  return { app, controller, profiles, logs, memory, agents };
+  return { app, controller, profiles, logs, memory, agents, mobileServerId: mobile.serverId };
 }

@@ -19,6 +19,7 @@ const REFRESH_MS = 30_000;
 export function announceSatellites(options: {
   port: number;
   keyFingerprint: string | null;
+  mobileServerId?: string;
   onError?: (error: unknown) => void;
 }): () => Promise<void> {
   let publishers = new Map<string, Bonjour>();
@@ -39,6 +40,7 @@ export function announceSatellites(options: {
         path: '/satellite',
         protocol: String(SATELLITE_PROTOCOL),
         mobile: '1',
+        ...(options.mobileServerId ? { serverId: options.mobileServerId } : {}),
         mobilePath: '/mobile',
         ...(options.keyFingerprint ? { key: options.keyFingerprint } : {}),
       },

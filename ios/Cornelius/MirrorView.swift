@@ -157,11 +157,13 @@ struct NativeCard: View {
     @ObservedObject var client: MirrorClient
     let compact: Bool; let reduceMotion: Bool
     @State private var image: UIImage?
+    @State private var imageFailed = false
     @State private var appeared = false
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             if card.content.cardType == "image" {
                 if let image { Image(uiImage: image).resizable().scaledToFit().accessibilityLabel(card.content.title) }
+                else if imageFailed { Text("Image indisponible").foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 140) }
                 else { ProgressView("Image en cours de chargement").frame(maxWidth: .infinity, minHeight: 140) }
             } else {
                 Text((card.content.cardType == "luna" ? "Réponse" : card.content.title) + ((card.stale == true || card.content.stale == true) ? " · hors ligne" : "")).font(.caption).tracking(0.8).foregroundStyle(.white.opacity(0.55))
@@ -182,7 +184,7 @@ struct NativeCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .opacity(appeared ? 1 : 0).scaleEffect(appeared ? 1 : 0.88, anchor: .top)
         .onAppear { withAnimation(reduceMotion ? nil : .easeOut(duration: 0.9)) { appeared=true } }
-        .task(id: card.id) { if let path=card.content.imageUrl, let data=await client.image(path) { image=UIImage(data: data) } }
+        .task(id: card.id) { if let path=card.content.imageUrl, let data=await client.image(path) { image=UIImage(data: data); imageFailed = image == nil } else { imageFailed = true } }
         .accessibilityElement(children: .contain)
     }
     private var cardAppearance: OrbAppearance {

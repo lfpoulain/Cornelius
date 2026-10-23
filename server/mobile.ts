@@ -235,14 +235,22 @@ export function registerMobile(
     socket.on('pong', () => {
       if (current()) controller.heartbeat();
     });
+    let lastSnapshot = 0;
     socket.on('message', (data, binary) => {
       if (!current()) return socket.close(1008, 'Afficher ici pour reprendre le miroir.');
       if (binary || Buffer.byteLength(data.toString()) > 4096)
         return socket.close(1008, 'Commande invalide.');
       try {
         const value = JSON.parse(data.toString());
-        if (value.type === 'heartbeat') controller.heartbeat();
-        else if (value.type === 'media_ready' && typeof value.ready === 'boolean')
+        if (value.type === 'heartbeat') {
+          controller.heartbeat();
+          // Presence timestamps are intentionally omitted from broadcast change detection.
+          // Refresh the native snapshot without inventing new observations or sequences.
+          if (now() - lastSnapshot >= 500) {
+            lastSnapshot = now();
+            socket.send(JSON.stringify(controller.snapshot()));
+          }
+        } else if (value.type === 'media_ready' && typeof value.ready === 'boolean')
           controller.setBrowserAudioReady(value.ready && !!owner?.audio);
         else if (value.type === 'background' && typeof value.enabled === 'boolean') {
           controller.setMobileBackground(value.enabled);
@@ -360,6 +368,7 @@ export function registerMobile(
     else socket.send(JSON.stringify({ type: 'clear' }));
   });
   return {
+    serverId: store.serverId,
     release,
     dispose() {
       unsubscribe();
