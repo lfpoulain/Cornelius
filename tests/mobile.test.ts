@@ -127,7 +127,7 @@ test('mobile: token required even on loopback; no browser Origin needed with bea
     403,
   );
   const credential = await f.pair();
-  const headers = { authorization: 'Bearer ' + credential.token };
+  const headers = { host: 'localhost', authorization: 'Bearer ' + credential.token };
   assert.equal((await f.app.inject({ url: '/mobile/info', headers })).statusCode, 200);
   assert.equal((await f.app.inject({ url: '/mobile/images/old.webp', headers })).statusCode, 404);
   const events = await f.app.injectWS('/mobile/events', { headers });
@@ -149,7 +149,7 @@ test('mobile: token required even on loopback; no browser Origin needed with bea
 test('web and mobile share one owner; old native camera cannot send after takeover', async (t) => {
   const f = await fixture(t),
     credential = await f.pair();
-  const headers = { authorization: 'Bearer ' + credential.token };
+  const headers = { host: 'localhost', authorization: 'Bearer ' + credential.token };
   const first = await f.app.injectWS('/mobile/events', { headers });
   f.sockets.push(first);
   assert.ok(f.controller.mobileMirror());
@@ -290,7 +290,10 @@ test('Swift fixture preserves card scope and a valid recognition observation', (
       health: fixture.state.presence.health,
       presence: true,
       engaged: true,
-      people: fixture.state.presence.people,
+      people: fixture.state.presence.people.map(({ trackId, profileId }) => ({
+        trackId,
+        profileId,
+      })),
     }),
     true,
   );
