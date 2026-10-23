@@ -41,6 +41,9 @@ import Combine
         defer { busy = false }
         do {
             let invitation = try Invitation.parse(text)
+            let previous = connection
+            deactivate()
+            await previous?.value
             var lastError: Error = MirrorError.message("Serveur injoignable. Vérifiez le Wi-Fi ou Tailscale.")
             for endpoint in invitation.endpoints {
                 let session = PinnedSession(endpoint: endpoint, fingerprint: invitation.keyFingerprint).session()
@@ -68,7 +71,7 @@ import Combine
             guard let self else { return }
             defer {
                 self.connection = nil; self.preparing = false
-                if Task.isCancelled && !self.background && !self.interrupted && self.credential != nil {
+                if Task.isCancelled && !self.background && !self.interrupted && !self.busy && self.credential != nil {
                     Task { @MainActor [weak self] in self?.activate() }
                 }
             }

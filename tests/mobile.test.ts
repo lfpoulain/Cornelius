@@ -330,3 +330,96 @@ test('actual proxy ingress refuses web/admin and requires bearer even with an ad
     200,
   );
 });
+
+test('foreground return allows camera warmup without fabricating recognized observations', (t) => {
+  const db = openDatabase(':memory:');
+  t.after(() => db.close());
+  let now = 10000;
+  const profiles = new ProfileRepository(db),
+    prefs = new SessionPreferences(db);
+  prefs.setSessionMode(1);
+  const controller = new SessionController(profiles, { open() {}, close() {} }, () => now, prefs);
+  controller.setMobileMirror({ deviceId: 'phone', generation: 'native', background: false });
+  controller.heartbeat();
+  controller.setBrowserAudioReady(true);
+  const observe = (sequence: number) =>
+    controller.observe({
+      schemaVersion: 1,
+      producerBootId: 'native',
+      sequence,
+      observedAt: now,
+      health: 'ok',
+      presence: true,
+      engaged: true,
+      people: [{ trackId: 'visitor', profileId: null }],
+    });
+  observe(1);
+  now += 1000;
+  controller.heartbeat();
+  observe(2);
+  const scope = controller.scope();
+  controller.controlAttached(scope);
+  controller.sessionStarted(scope);
+  assert.equal(controller.sessionState().phase, 'ready');
+  controller.setMobileBackground(true);
+  now += 5000;
+  controller.heartbeat();
+  controller.tick();
+  controller.setMobileBackground(false);
+  controller.tick();
+  assert.equal(controller.sessionState().phase, 'ready');
+  assert.equal(controller.memoryProfileId(), null);
+  now += 1000;
+  controller.heartbeat();
+  observe(3);
+  controller.tick();
+  assert.equal(controller.sessionState().phase, 'ready');
+});
+
+test('worker observations from a retired phone generation never reach the controller', async (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'cornelius-mobile-source-test-'));
+  const f = await createApp(
+    {
+      databasePath: ':memory:',
+      adminPassword: 'test-source-password',
+      origins: ['http://localhost'],
+      secureCookies: false,
+      perceptionToken: 'p'.repeat(40),
+    },
+    { timers: false, imageGenerationRoot: root },
+  );
+  await f.app.ready();
+  const sockets: WebSocket[] = [];
+  t.after(async () => {
+    sockets.forEach((s) => s.terminate());
+    await setImmediate();
+    await f.app.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+  // A simulator worker uses the protected local worker path, not the native path.
+  const worker = await f.app.injectWS('/perception', {
+    headers: {
+      host: 'localhost',
+      origin: 'http://localhost',
+      authorization: 'Bearer ' + 'p'.repeat(40),
+    },
+  });
+  sockets.push(worker);
+  const observedAt = Date.now();
+  const observation = {
+    schemaVersion: 1,
+    producerBootId: 'test-camera',
+    sequence: 1,
+    observedAt,
+    health: 'ok',
+    presence: true,
+    engaged: true,
+    people: [{ trackId: 'visitor', profileId: null }],
+  };
+  worker.send(JSON.stringify({ type: 'observation', generation: 'retired-phone', observation }));
+  await setImmediate();
+  assert.equal(f.controller.memoryObservedAt(), null);
+  worker.send(JSON.stringify({ type: 'observation', observation }));
+  await setImmediate();
+  assert.equal(f.controller.memoryObservedAt(), observedAt);
+});

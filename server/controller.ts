@@ -119,6 +119,7 @@ const unknownPersonDiagnostic =
 export class SessionController {
   readonly bootId = randomUUID();
   private mobile: import('../shared/mobile.js').MobileMirror | null = null;
+  private mobileCameraResumeUntil: number | null = null;
   mobileMirror() {
     return this.mobile;
   }
@@ -127,6 +128,7 @@ export class SessionController {
     this.reopenAfterClose = null;
     this.close('Changement de miroir.');
     this.mobile = value;
+    this.mobileCameraResumeUntil = null;
     this.observation = this.rawObservation = null;
     this.resetPresence();
     this.changeProfile(null, 'household', false);
@@ -136,6 +138,8 @@ export class SessionController {
   setMobileBackground(background: boolean) {
     if (!this.mobile || this.mobile.background === background) return;
     this.mobile = { ...this.mobile, background };
+    this.mobileCameraResumeUntil =
+      !background && this.session.phase === 'ready' ? this.now() + 2000 : null;
     this.rawObservation = null;
     if (background) {
       this.silenceSince = this.now();
@@ -1725,6 +1729,12 @@ export class SessionController {
     }
     // Satellite : ni caméra ni navigateur dans sa pièce, seul le silence termine la conversation.
     if (this.satelliteSession() || this.mobile?.background) {
+      if (this.silenceExpired(now)) this.close('Fin de conversation après silence.');
+    } else if (
+      this.mobileCameraResumeUntil !== null &&
+      now < this.mobileCameraResumeUntil &&
+      !this.sensorHealthy()
+    ) {
       if (this.silenceExpired(now)) this.close('Fin de conversation après silence.');
     } else if (this.session.mode === 4) {
       if (this.silenceExpired(now)) this.close('Fin de conversation après silence.');

@@ -216,6 +216,7 @@ export function registerMobile(
     release();
     const generation = randomUUID();
     owner = { socket, deviceId: device.id, generation, audio: null, camera: null, preroll: [] };
+    socket.send(JSON.stringify({ type: 'mobile', generation, ...info() }));
     services.claim(socket, device.id);
     controller.setMobileMirror({ deviceId: device.id, generation, background: false });
     perception.setMobileSource(generation);
@@ -228,7 +229,6 @@ export function registerMobile(
           current() && !controller.mobileMirror()?.background && controller.wakeDetected(),
       }),
     );
-    socket.send(JSON.stringify({ type: 'mobile', generation, ...info() }));
     captureEnabled = perception.mobileCameraEnabled();
     socket.send(JSON.stringify({ type: 'capture', enabled: captureEnabled }));
     socket.send(JSON.stringify(controller.snapshot()));

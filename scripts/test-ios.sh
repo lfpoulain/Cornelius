@@ -20,7 +20,7 @@ for _ in $(seq 1 50); do
   if ! kill -0 "$ios_server_pid" 2>/dev/null; then echo 'Simulator contract fixture could not start; inspect .local/ios-fixture.log.' >&2; exit 1; fi
   sleep 0.2
 done
-xcodebuild -project ios/Cornelius.xcodeproj -scheme Cornelius -destination "platform=iOS Simulator,id=$ios_simulator" -parallel-testing-enabled NO -derivedDataPath "$ios_data/build" CODE_SIGNING_ALLOWED=NO test > .local/ios-tests.log 2>&1
+xcodebuild -project ios/Cornelius.xcodeproj -scheme Cornelius -destination "platform=iOS Simulator,id=$ios_simulator" -parallel-testing-enabled NO -collect-test-diagnostics never -enableCodeCoverage NO -derivedDataPath "$ios_data/build" CODE_SIGNING_ALLOWED=NO test > .local/ios-tests.log 2>&1
 if [[ "${CORNELIUS_IOS_CAPTURE:-0}" == '1' ]]; then
   xcrun simctl install "$ios_simulator" "$ios_data/build/Build/Products/Debug-iphonesimulator/Cornelius.app"
   xcrun simctl launch --terminate-running-process "$ios_simulator" solutions.pleiades.cornelius -demo -snapshot

@@ -4,11 +4,21 @@ import AVFoundation
 @main struct CorneliusApp: App {
     @StateObject private var client=MirrorClient()
     @Environment(\.scenePhase) private var phase
+    @State private var incomingLink: String?
     var body: some Scene {
         WindowGroup {
             Group { if client.credential != nil || ProcessInfo.processInfo.arguments.contains("-demo") { MirrorView(client: client) } else { PairingView(client: client) } }
                 .preferredColorScheme(.dark)
-                .onOpenURL { url in Task { await client.pair(url.absoluteString) } }
+                .onOpenURL { url in
+                    do { _ = try Invitation.parse(url.absoluteString); incomingLink = url.absoluteString }
+                    catch { client.message = error.localizedDescription }
+                }
+                .confirmationDialog("Associer Cornelius à ce serveur ?", isPresented: Binding(get: { incomingLink != nil }, set: { if !$0 { incomingLink = nil } }), titleVisibility: .visible) {
+                    Button("Associer ce serveur") { if let link = incomingLink { incomingLink = nil; Task { await client.pair(link) } } }
+                    Button("Annuler", role: .cancel) { incomingLink = nil }
+                } message: {
+                    Text((try? Invitation.parse(incomingLink ?? "").endpoints.first?.url.host) ?? "Votre serveur Cornelius")
+                }
                 .task {
                     if ProcessInfo.processInfo.arguments.contains("-demo") { client.loadDemo() }
                     else if client.credential != nil { client.activate() }
