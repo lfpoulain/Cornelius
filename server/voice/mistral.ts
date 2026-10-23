@@ -154,7 +154,9 @@ export function createMistralVoiceAdapter(
         }
         pending.clear();
         // Emit once independently of the data-event filter, even if remote cleanup fails.
-        closing = Promise.resolve().then(() => session.close()).finally(() => emit({ type: 'closed' }));
+        closing = Promise.resolve()
+          .then(() => session.close())
+          .finally(() => emit({ type: 'closed' }));
         return closing;
       };
       const notify = (event: VoiceEvent) => {
@@ -210,7 +212,9 @@ export function createMistralVoiceAdapter(
             message: event.message,
           });
       });
-      session.on('disconnected', () => { void close().catch(() => {}); });
+      session.on('disconnected', () => {
+        void close().catch(() => {});
+      });
       try {
         await session.connect();
       } catch (error) {
@@ -219,7 +223,9 @@ export function createMistralVoiceAdapter(
       }
       if (closed) throw new Error('Session Mistral fermée pendant la connexion.');
       notify({ type: 'connected', id: session.id });
-      maximumDuration = setTimeout(() => { void close().catch(() => {}); }, MISTRAL_MAX_SESSION_MS);
+      maximumDuration = setTimeout(() => {
+        void close().catch(() => {});
+      }, MISTRAL_MAX_SESSION_MS);
       maximumDuration.unref();
       let sending = false;
       const pump = async () => {
@@ -252,10 +258,12 @@ export function createMistralVoiceAdapter(
         },
         async update(config, toolsChanged = true) {
           if (!closed)
-            await session.update({ instructions: config.instructions, ...(toolsChanged ? { tools: tools(config) } : {}) });
+            await session.update({
+              instructions: config.instructions,
+              ...(toolsChanged ? { tools: tools(config) } : {}),
+            });
         },
         close,
-
       };
     },
   };

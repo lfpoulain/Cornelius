@@ -265,16 +265,29 @@ test('a rejected optional session update does not close the active voice connect
   live.dispose();
 });
 
-
 test('context and provider safeguards survive profile updates while append history stays bounded', async () => {
   const updates: { config: VoiceConfiguration; toolsChanged: boolean | undefined }[] = [];
-  const gateway = createVoiceGateway({ connect: async () => ({
-    audio() {}, result() {}, close: async () => {},
-    update: async (config, toolsChanged) => { updates.push({ config, toolsChanged }); },
-  }) });
+  const gateway = createVoiceGateway({
+    connect: async () => ({
+      audio() {},
+      result() {},
+      close: async () => {},
+      update: async (config, toolsChanged) => {
+        updates.push({ config, toolsChanged });
+      },
+    }),
+  });
   const live = gateway.connect!(liveConfiguration(), { open() {}, event() {}, failure() {} });
-  live.send({ type: 'session.thinking.append', content: 'CAMERA_CONTEXT', event_id: 'camera', delegation_id: null });
-  live.send({ type: 'session.update', session: { delegation: { responses: { instructions: 'PROFILE_CONTEXT', tools: [] } } } } as never);
+  live.send({
+    type: 'session.thinking.append',
+    content: 'CAMERA_CONTEXT',
+    event_id: 'camera',
+    delegation_id: null,
+  });
+  live.send({
+    type: 'session.update',
+    session: { delegation: { responses: { instructions: 'PROFILE_CONTEXT', tools: [] } } },
+  } as never);
   await tick();
   assert.match(updates[1]!.config.instructions, /CAMERA_CONTEXT/);
   assert.match(updates[1]!.config.instructions, /PROFILE_CONTEXT/);
@@ -282,7 +295,12 @@ test('context and provider safeguards survive profile updates while append histo
   assert.equal(updates[0]!.toolsChanged, false);
   assert.equal(updates[1]!.toolsChanged, true);
   const baseLength = updates[1]!.config.instructions.length;
-  for (let i = 0; i < 40; i++) live.send({ type: 'session.instructions.append', content: String(i) + 'x'.repeat(1000), delegation_id: null });
+  for (let i = 0; i < 40; i++)
+    live.send({
+      type: 'session.instructions.append',
+      content: String(i) + 'x'.repeat(1000),
+      delegation_id: null,
+    });
   await tick();
   assert.ok(updates.at(-1)!.config.instructions.length <= baseLength + 16_000);
   assert.match(updates.at(-1)!.config.instructions, /39x/);
@@ -299,24 +317,102 @@ for (const cause of ['timeout', 'disconnect', 'explicit', 'close-error'] as cons
     let init: any;
     const remote = {
       id: 'mock-session',
-      on(name: string, callback: (event?: any) => void) { listeners.set(name, callback); },
+      on(name: string, callback: (event?: any) => void) {
+        listeners.set(name, callback);
+      },
       async connect() {},
-      async close() { remoteCloses++; listeners.get('disconnected')?.(); if (cause === 'close-error') throw new Error('cleanup failed'); },
-      async sendAudio() {}, async update() {},
+      async close() {
+        remoteCloses++;
+        listeners.get('disconnected')?.();
+        if (cause === 'close-error') throw new Error('cleanup failed');
+      },
+      async sendAudio() {},
+      async update() {},
     };
-    const client = { audio: { sessions: { async init(config: unknown) { init = config; return remote; } } } };
+    const client = {
+      audio: {
+        sessions: {
+          async init(config: unknown) {
+            init = config;
+            return remote;
+          },
+        },
+      },
+    };
     const adapter = createMistralVoiceAdapter('unused', client as never);
-    const connection = await adapter.connect({ instructions: 'base', tools: [], webSearch: false }, event => events.push(event));
+    const connection = await adapter.connect(
+      { instructions: 'base', tools: [], webSearch: false },
+      (event) => events.push(event),
+    );
     assert.equal(init.llm.model, MISTRAL_LLM_MODEL);
     if (cause === 'timeout') t.mock.timers.tick(MISTRAL_MAX_SESSION_MS);
     else if (cause === 'disconnect') listeners.get('disconnected')?.();
     else await connection.close().catch(() => {});
     await tick();
-    assert.equal(events.filter(event => event.type === 'closed').length, 1);
+    assert.equal(events.filter((event) => event.type === 'closed').length, 1);
     await connection.close().catch(() => {});
     assert.equal(remoteCloses, 1);
     const count = events.length;
     listeners.get('transcript')?.({ role: 'user', content: 'late', final: true, id: 'late' });
     assert.equal(events.length, count);
   });
+}
+
+for (const mode of ['name', 'free', 'off'] as const) {
+  test(
+    'Mistral welcome respects ' + mode + ' and context updates omit unchanged tools',
+    async () => {
+      let init: any;
+      const updates: any[] = [];
+      let greetings = 0;
+      const client = {
+        chat: {
+          async complete(request: any) {
+            greetings++;
+            assert.match(request.messages[0].content, /personality/);
+            return { choices: [{ message: { content: 'Ravi de te voir, Alice !' } }] };
+          },
+        },
+        audio: {
+          sessions: {
+            async init(config: any) {
+              init = config;
+              return {
+                id: 'welcome',
+                on() {},
+                async connect() {},
+                async close() {},
+                async update(value: any) {
+                  updates.push(value);
+                },
+              };
+            },
+          },
+        },
+      };
+      const adapter = createMistralVoiceAdapter('unused', client as never);
+      const configuration: VoiceConfiguration = {
+        instructions: 'personality',
+        tools: [],
+        webSearch: false,
+        ...(mode === 'name' ? { welcomeMessage: 'Bonjour Alice.' } : {}),
+        ...(mode === 'free' ? { welcomeInstructions: 'Salue Alice librement' } : {}),
+      };
+      const connection = await adapter.connect(configuration, () => {});
+      assert.equal(greetings, mode === 'free' ? 1 : 0);
+      assert.equal(
+        init.welcomeMessage,
+        mode === 'name'
+          ? 'Bonjour Alice.'
+          : mode === 'free'
+            ? 'Ravi de te voir, Alice !'
+            : undefined,
+      );
+      await connection.update(configuration, false);
+      assert.equal(Object.hasOwn(updates[0], 'tools'), false);
+      await connection.update(configuration, true);
+      assert.deepEqual(updates[1].tools, []);
+      await connection.close();
+    },
+  );
 }

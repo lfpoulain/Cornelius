@@ -133,7 +133,9 @@ test('une configuration incomplète est dite telle quelle, avec le chemin vers l
   const full = page.getByRole('region', { name: 'Conversation' });
   await expect(full).not.toHaveAttribute('data-compact', 'true');
   await expect(full.getByRole('heading')).toHaveCount(0);
-  await expect(full.getByRole('button', { name: 'Bloquer les services IA', exact: true })).toBeVisible();
+  await expect(
+    full.getByRole('button', { name: 'Bloquer les services IA', exact: true }),
+  ).toBeVisible();
 });
 
 test('« Cornelius » pour tout le monde : la caméra est dite en veille', async ({ page }) => {

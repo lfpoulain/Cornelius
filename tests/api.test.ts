@@ -132,7 +132,12 @@ test('le miroir est public et les droits administrateur restent protégés', asy
 test('l’état diffusé dit ce qui manque au premier lancement sans exposer aucun secret', async (t) => {
   const first = await fixture(t, { openaiKey: undefined, adminPassword: 'cornelius' });
   const firstState = await first.app.inject({ url: '/api/state' });
-  assert.deepEqual(firstState.json().state.setup, { openaiKey: false, perception: false, mistralKey: false, voiceKey: false });
+  assert.deepEqual(firstState.json().state.setup, {
+    openaiKey: false,
+    perception: false,
+    mistralKey: false,
+    voiceKey: false,
+  });
   const firstAdmin = await first.login();
   const firstDevices = (
     await first.app.inject({ url: '/api/admin/devices', headers: { cookie: firstAdmin } })
@@ -144,10 +149,20 @@ test('l’état diffusé dit ce qui manque au premier lancement sans exposer auc
   const f = await fixture(t);
   const secrets = ['test-key', 'p'.repeat(40), 'i'.repeat(40), password];
   const anonymous = await f.app.inject({ url: '/api/state' });
-  assert.deepEqual(anonymous.json().state.setup, { openaiKey: true, perception: false, mistralKey: false, voiceKey: true });
+  assert.deepEqual(anonymous.json().state.setup, {
+    openaiKey: true,
+    perception: false,
+    mistralKey: false,
+    voiceKey: true,
+  });
   const admin = await f.login();
   const { snapshot } = await f.connect('admin', admin);
-  assert.deepEqual(snapshot.state.setup, { openaiKey: true, perception: false, mistralKey: false, voiceKey: true });
+  assert.deepEqual(snapshot.state.setup, {
+    openaiKey: true,
+    perception: false,
+    mistralKey: false,
+    voiceKey: true,
+  });
   const devices = await f.app.inject({ url: '/api/admin/devices', headers: { cookie: admin } });
   assert.equal(devices.json().defaultPassword, false);
   for (const body of [anonymous.body, JSON.stringify(snapshot), devices.body])
@@ -166,7 +181,12 @@ test('l’état diffusé dit ce qui manque au premier lancement sans exposer auc
     .map((message) => JSON.parse(message) as StateEvent)
     .filter((event) => event.type === 'state');
   // Dès la première publication après la connexion : jamais un état intermédiaire incohérent.
-  assert.deepEqual(states[0]?.state.setup, { openaiKey: true, perception: true, mistralKey: false, voiceKey: true });
+  assert.deepEqual(states[0]?.state.setup, {
+    openaiKey: true,
+    perception: true,
+    mistralKey: false,
+    voiceKey: true,
+  });
   for (const message of messages)
     for (const secret of secrets) assert.equal(message.includes(secret), false, secret);
   worker.terminate();
