@@ -12,6 +12,7 @@ from vision import DEFAULT_ENGAGEMENT, Vision
 from vad import Vad
 from wake import WakeDetector
 from camera import Camera
+from remote_camera import RemoteCamera
 from enrollment import Enrollment
 from scene import MODEL_DIRECTORIES, SceneCaptioner, SceneWorker
 
@@ -34,6 +35,8 @@ class Worker:
         # Flux de veille par emplacement : (identifiant du flux, état openWakeWord propre).
         self.wake_streams = {}
         self.camera = Camera(camera, enabled=False)
+        self.hardware_camera = self.camera
+        self.mobile_generation = None
         self.camera_enabled = False
         self.sequence = 0
         self.enrollment = None
@@ -137,7 +140,7 @@ class Worker:
 
     def scene_worker(self):
         if self.scene is None:
-            self.scene = SceneWorker(self.captioner, self.camera.frame, self.vision_emit)
+            self.scene = SceneWorker(self.captioner, lambda: self.camera.frame(), self.vision_emit)
         return self.scene
 
     def set_vision_model(self, requested, device=None, reload=False):
@@ -172,9 +175,12 @@ class Worker:
                 await asyncio.sleep(0.1)
                 continue
             started = time.monotonic()
+            generation = getattr(self, "mobile_generation", None)
             captured, people, engaged, embeddings, health, boot = await asyncio.to_thread(self.frame)
+            if generation != getattr(self, "mobile_generation", None):
+                continue
             self.sequence += 1
-            await socket.send(json.dumps({"type": "observation", "observation": {
+            await socket.send(json.dumps({"type": "observation", "generation": generation, "observation": {
                 "schemaVersion": 1, "producerBootId": boot, "sequence": self.sequence,
                 "observedAt": captured, "health": health, "presence": bool(people),
                 "engaged": engaged, "people": people,
@@ -224,6 +230,12 @@ class Worker:
     async def commands(self, socket):
         async for message in socket:
             if isinstance(message, bytes):
+                if message[:1] == b'C':
+                    split = message.find(b'\n', 1, 70)
+                    if split != -1 and self.mobile_generation and message[1:split].decode('ascii', errors='replace') == self.mobile_generation:
+                        camera = self.camera
+                        await asyncio.to_thread(camera.push, message[split + 1:])
+                    continue
                 if len(message) == 2562 and message[0] == 0x57:
                     entry = self.wake_streams.get(message[1])
                     if entry is None or self.wake.model is None:
@@ -251,6 +263,18 @@ class Worker:
                     self.last_speech, self.last_vad_sent = speaking, now
                 continue
             event = json.loads(message)
+            if event["type"] == "camera_source":
+                generation = event.get("generation")
+                if generation is not None and (not isinstance(generation, str) or len(generation) != 36):
+                    continue
+                if generation != getattr(self, "mobile_generation", None):
+                    await asyncio.to_thread(self.disable_camera)
+                    self.mobile_generation = generation
+                    self.camera = RemoteCamera(generation) if generation else self.hardware_camera
+                    self.sequence = 0
+                    if self.scene:
+                        self.scene.cancel("Changement de caméra.")
+                continue
             if event["type"] in ("camera_enabled", "camera_list", "camera_select", "camera_mode", "camera_preview"):
                 self.camera_job(lambda event=event: self.camera_command(socket, event))
             elif event["type"] == "engagement":

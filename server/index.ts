@@ -1,6 +1,9 @@
 import { spawn } from 'node:child_process';
 import { existsSync, openSync } from 'node:fs';
 import { createServer } from 'node:https';
+import { createServer as createHttpServer } from 'node:http';
+import { mobileIngress } from './mobile-ingress.js';
+import { mobilePath } from '../shared/mobile.js';
 import { dirname, join } from 'node:path';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
@@ -40,11 +43,14 @@ try {
   }
   let lanServer: ReturnType<typeof createServer> | null = null;
   let unannounce: (() => Promise<void>) | null = null;
+  let mobileProxy: ReturnType<typeof createHttpServer> | null = null;
   let stopping = false;
   const stop = async () => {
     if (stopping) return;
     stopping = true;
     await unannounce?.().catch(() => {});
+    mobileProxy?.close();
+    mobileProxy?.closeAllConnections();
     lanServer?.close();
     lanServer?.closeAllConnections();
     // Une connexion qui traîne ne bloque pas l’arrêt plus de quelques secondes.
@@ -106,6 +112,23 @@ try {
       });
       console.info('Satellites · annonce mDNS _cornelius._tcp');
     }
+  }
+  if (config.mobileProxyPort !== undefined) {
+    if (!Number.isInteger(config.mobileProxyPort) || config.mobileProxyPort < 1024 || config.mobileProxyPort > 65535 || [config.port, config.httpsPort].includes(config.mobileProxyPort)) throw new Error('CORNELIUS_MOBILE_PROXY_PORT invalide.');
+    mobileProxy = createHttpServer((req, res) => {
+      if (!mobilePath(req.url ?? '')) { res.writeHead(404).end(); return; }
+      mobileIngress.add(req);
+      app.routing(req, res);
+    });
+    mobileProxy.on('upgrade', (req, socket, head) => {
+      if (!mobilePath(req.url ?? '')) { socket.destroy(); return; }
+      mobileIngress.add(req);
+      app.server.emit('upgrade', req, socket, head);
+    });
+    await new Promise<void>((resolve, reject) => {
+      mobileProxy!.once('error', reject);
+      mobileProxy!.listen(config.mobileProxyPort, config.mobileProxyHost, resolve);
+    });
   }
   for (const signal of ['SIGINT', 'SIGTERM'] as const) process.once(signal, () => void stop());
 } catch (error) {

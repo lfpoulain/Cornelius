@@ -132,3 +132,11 @@ Le bouton **Bloquer OpenAI**, dans le panneau **Conversation** de la rubrique **
 - [Les agents Hermes](../fonctionnalites/agents-hermes.md)
 - [Configuration](configuration.md)
 - [Licences](licences.md)
+
+## App iPhone
+
+Le miroir natif capture le micro et la caméra de l’iPhone. Les images sont transmises chiffrées au serveur Cornelius de votre maison, qui utilise les profils et modèles locaux existants ; elles ne sont pas enregistrées par l’app. Le mot d’appel est analysé sur ce serveur. Seul le son d’une conversation admise est relayé à OpenAI, comme sur le miroir.
+
+L’association individuelle est conservée dans le Trousseau iOS, sans synchronisation iCloud. Le serveur conserve seulement l’empreinte du jeton. L’administration permet de révoquer chaque appareil. À l’extérieur, Tailscale utilise un service de coordination et peut relayer le trafic chiffré.
+
+En arrière-plan, la caméra s’arrête ; seule une conversation déjà ouverte peut continuer en audio. Aucune nouvelle conversation ne démarre et aucune observation d’identité n’est fabriquée. La collecte de mémoire personnelle nécessitant un visage fraîchement reconnu est suspendue. À la fin de la conversation, le micro est arrêté.

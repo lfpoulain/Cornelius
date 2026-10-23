@@ -23,3 +23,8 @@ playwright-report/
 .kilo/
 .pytest_cache/
 .venv-*/
+
+# Xcode user state and build output
+ios/build/
+**/xcuserdata/
+*.xcuserstate

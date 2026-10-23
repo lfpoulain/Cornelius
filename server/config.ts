@@ -31,6 +31,9 @@ export interface AppConfig {
   tlsFingerprint?: string;
   /** Empreinte de la clé publique : celle que vérifient les satellites audio. */
   tlsKeyFingerprint?: string;
+  mobileRemoteUrl?: string;
+  mobileProxyPort?: number;
+  mobileProxyHost?: string;
 }
 
 /** Mot de passe écrit par `npm run setup` et `.env.example`, à changer après l’installation. */
@@ -53,6 +56,9 @@ export function loadConfig(): AppConfig & { port: number } {
     throw new Error('CORNELIUS_HTTPS_PORT invalide.');
   return {
     port,
+    mobileRemoteUrl: process.env.CORNELIUS_MOBILE_REMOTE_URL || undefined,
+    mobileProxyPort: process.env.CORNELIUS_MOBILE_PROXY_PORT ? Number(process.env.CORNELIUS_MOBILE_PROXY_PORT) : undefined,
+    mobileProxyHost: process.env.CORNELIUS_MOBILE_PROXY_HOST || '127.0.0.1',
     loginRateLimit,
     // Réseau local ouvert par défaut ; CORNELIUS_LAN=0 réserve Cornelius à la machine.
     lan: !['0', 'false', 'non', 'no'].includes(

@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "type": "state",
+  "bootId": "demo-boot",
+  "sequence": 1,
+  "sentAt": 1800000000000,
+  "state": {
+    "openaiBlocked": false,
+    "privacyMode": false,
+    "orbScale": 100,
+    "browserConnected": true,
+    "setup": {
+      "openaiKey": true,
+      "perception": true
+    },
+    "session": {
+      "phase": "ready",
+      "reason": null,
+      "mode": 3,
+      "interactionId": "demo",
+      "profileEpoch": 1,
+      "contextVersion": 1,
+      "manualStop": false,
+      "startedAt": 1799999998000,
+      "readyAt": 1799999999000,
+      "microphoneEnabled": true
+    },
+    "presence": {
+      "state": "engaged",
+      "health": "ok",
+      "peopleCount": 1,
+      "people": [
+        {
+          "trackId": "demo-person",
+          "profileId": "demo-profile",
+          "engaged": true
+        }
+      ],
+      "observedAt": 1800000000000
+    },
+    "activeProfile": {
+      "id": "demo-profile",
+      "name": "Camille"
+    },
+    "profiles": [
+      {
+        "id": "demo-profile",
+        "name": "Camille"
+      }
+    ],
+    "voice": {
+      "phase": "speaking",
+      "endsAt": null,
+      "startedAt": 1800000000000
+    },
+    "wakeWord": {
+      "enabled": false,
+      "ready": true,
+      "detail": null
+    },
+    "webSearchActive": false,
+    "diagnostic": null,
+    "ambientDisplays": [
+      {
+        "instanceId": "clock",
+        "profileId": null,
+        "label": "À la maison",
+        "status": "ready",
+        "fetchedAt": null,
+        "content": {
+          "value": "08:42",
+          "subtitle": "Vendredi 23 octobre",
+          "items": [],
+          "layout": "metric"
+        },
+        "validUntil": null,
+        "addonId": "clock"
+      }
+    ],
+    "cards": [
+      {
+        "id": "card-0",
+        "profileId": "demo-profile",
+        "createdAt": 1799999998000,
+        "expiresAt": 1800000060000,
+        "interactionId": "demo",
+        "profileEpoch": 1,
+        "contextVersion": 1,
+        "content": {
+          "cardType": "luna",
+          "title": "Votre matinée, en un regard",
+          "primaryValue": "Tout est prêt.",
+          "subtitle": "Un ciel clair pour commencer la journée.",
+          "description": null,
+          "items": [
+            {
+              "label": "Température",
+              "value": "16 °C"
+            },
+            {
+              "label": "Prochain bus",
+              "value": "Dans 5 min"
+            }
+          ],
+          "schemaVersion": 1,
+          "sources": []
+        },
+        "sources": []
+      },
+      {
+        "id": "card-1",
+        "profileId": null,
+        "createdAt": 1799999998000,
+        "expiresAt": 1800000060000,
+        "interactionId": "demo",
+        "profileEpoch": 1,
+        "contextVersion": 1,
+        "content": {
+          "cardType": "module",
+          "title": "Météo maison",
+          "primaryValue": "16 °C",
+          "subtitle": "Ciel dégagé",
+          "description": null,
+          "items": [],
+          "addonId": "weather",
+          "stale": false,
+          "schemaVersion": 1,
+          "sources": []
+        },
+        "sources": []
+      }
+    ],
+    "advancedAudioBuffer": false,
+    "delegationMode": "fast",
+    "selection": "automatic"
+  },
+  "interactionId": "demo",
+  "profileEpoch": 1,
+  "contextVersion": 1
+}

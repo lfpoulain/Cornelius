@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { MobileAccess } from './MobileAccess';
 import { TriangleAlert } from 'lucide-react';
 import type { NetworkStatus } from '../../../shared/types';
 import { api } from '../../api';
@@ -22,6 +23,7 @@ export function NetworkAccess({
   if (!network) return null;
   const trusted = network.trustedDevices ?? 0;
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle>Accès depuis le réseau local</CardTitle>
@@ -89,5 +91,7 @@ export function NetworkAccess({
         </CardContent>
       )}
     </Card>
+    <MobileAccess defaultPassword={defaultPassword} />
+    </>
   );
 }

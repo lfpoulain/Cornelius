@@ -1,0 +1,496 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1A218282805534B102CD703F /* dm-mono-400.ttf in Resources */ = {isa = PBXBuildFile; fileRef = CCFDEE65EA769B4441D41081 /* dm-mono-400.ttf */; };
+		2A71169096DE352F7DEBC386 /* MetalMirror.swift in Sources */ = {isa = PBXBuildFile; fileRef = 240E9699491DC84FDC3D2471 /* MetalMirror.swift */; };
+		3F3216E0A0AB2452C6EC4D20 /* dm-sans-500.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 9E4033AC7070B3481331C97C /* dm-sans-500.ttf */; };
+		4529AD9C26DD586AE6ACA59C /* Mirror.metal in Sources */ = {isa = PBXBuildFile; fileRef = 3D4C45D7C75EF07F5455DD3C /* Mirror.metal */; };
+		4F68A2A30AFE23C9233A283B /* mirror-fixture.json in Resources */ = {isa = PBXBuildFile; fileRef = 3371227C22CAD3D5AC1ECF5A /* mirror-fixture.json */; };
+		5DDAA76D7394F5C69B576463 /* dm-mono-500.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 570AE428860BF128B4B64ED3 /* dm-mono-500.ttf */; };
+		6604EBA09444D6892C7F7705 /* ProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E306CD2BA99619D4B6EFF0CB /* ProtocolTests.swift */; };
+		693866132FDE7AB9C52280B7 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55EF4D332D7A8E304783BAC /* Models.swift */; };
+		7CA10D74C3CB811056C27BF0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F91B6A71F309C2C96AF53826 /* Assets.xcassets */; };
+		8EAB8FAB06B47B636CF1F479 /* Trust.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4875827854195935FDA9E55B /* Trust.swift */; };
+		96E8BA9DE07026D09BC614D6 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4D2ECDC373FCB6B13C22D03 /* App.swift */; };
+		9FAC95E4FBCFB0B586F4A457 /* MirrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47E775E916B654F641E7301C /* MirrorView.swift */; };
+		9FACF719397914A30C89CE1C /* Media.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9734D2FE0695D1B31C40BF5E /* Media.swift */; };
+		A37B9DF783A96335CD0EAD3D /* Discovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10622F5D665013F1CA6B1DF /* Discovery.swift */; };
+		B85F446D425285449B7026CB /* dm-sans-400.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 56A15881B96CD843542375AE /* dm-sans-400.ttf */; };
+		D48094ECFCC4587C7FAD9D70 /* dmsans-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 9771FC841371501412548FAF /* dmsans-OFL.txt */; };
+		FA8DBA34ACFC4C475E7EF356 /* MirrorClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0178AE50A884E55539CDD7BB /* MirrorClient.swift */; };
+		FD67DBC960D636541DFB1E93 /* dmmono-OFL.txt in Resources */ = {isa = PBXBuildFile; fileRef = 198BA33A951F53393F29EE83 /* dmmono-OFL.txt */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		DA587BFF7EB7B4C1CEBB40C9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 67AA18836C8B1F7B6FFB7B06 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CAC2A31434FBE610A19AC375;
+			remoteInfo = Cornelius;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		0178AE50A884E55539CDD7BB /* MirrorClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MirrorClient.swift; sourceTree = "<group>"; };
+		08C9BE72EA065CBE88F00255 /* CorneliusTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CorneliusTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		15D8B2B32C75870700E03090 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		198BA33A951F53393F29EE83 /* dmmono-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "dmmono-OFL.txt"; sourceTree = "<group>"; };
+		240E9699491DC84FDC3D2471 /* MetalMirror.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalMirror.swift; sourceTree = "<group>"; };
+		3371227C22CAD3D5AC1ECF5A /* mirror-fixture.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "mirror-fixture.json"; sourceTree = "<group>"; };
+		3D4C45D7C75EF07F5455DD3C /* Mirror.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Mirror.metal; sourceTree = "<group>"; };
+		47E775E916B654F641E7301C /* MirrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MirrorView.swift; sourceTree = "<group>"; };
+		4875827854195935FDA9E55B /* Trust.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Trust.swift; sourceTree = "<group>"; };
+		56A15881B96CD843542375AE /* dm-sans-400.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "dm-sans-400.ttf"; sourceTree = "<group>"; };
+		570AE428860BF128B4B64ED3 /* dm-mono-500.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "dm-mono-500.ttf"; sourceTree = "<group>"; };
+		9734D2FE0695D1B31C40BF5E /* Media.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Media.swift; sourceTree = "<group>"; };
+		9771FC841371501412548FAF /* dmsans-OFL.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "dmsans-OFL.txt"; sourceTree = "<group>"; };
+		97F73CBA1B1E1B93EFEF5E1A /* Cornelius.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Cornelius.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		9E4033AC7070B3481331C97C /* dm-sans-500.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "dm-sans-500.ttf"; sourceTree = "<group>"; };
+		CCFDEE65EA769B4441D41081 /* dm-mono-400.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "dm-mono-400.ttf"; sourceTree = "<group>"; };
+		D10622F5D665013F1CA6B1DF /* Discovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Discovery.swift; sourceTree = "<group>"; };
+		D4D2ECDC373FCB6B13C22D03 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		D55EF4D332D7A8E304783BAC /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		E306CD2BA99619D4B6EFF0CB /* ProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolTests.swift; sourceTree = "<group>"; };
+		F91B6A71F309C2C96AF53826 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		03667A1E77981B4CEBA830EE = {
+			isa = PBXGroup;
+			children = (
+				C98B3BF451920EB3140F6701 /* Cornelius */,
+				4B68C22C110745A303C5BF76 /* CorneliusTests */,
+				8C1296635861CAF738744BB1 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		3F3177E0252F4B4B69F8763B /* Shaders */ = {
+			isa = PBXGroup;
+			children = (
+				3D4C45D7C75EF07F5455DD3C /* Mirror.metal */,
+			);
+			path = Shaders;
+			sourceTree = "<group>";
+		};
+		4B68C22C110745A303C5BF76 /* CorneliusTests */ = {
+			isa = PBXGroup;
+			children = (
+				E306CD2BA99619D4B6EFF0CB /* ProtocolTests.swift */,
+			);
+			path = CorneliusTests;
+			sourceTree = "<group>";
+		};
+		8C1296635861CAF738744BB1 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				97F73CBA1B1E1B93EFEF5E1A /* Cornelius.app */,
+				08C9BE72EA065CBE88F00255 /* CorneliusTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B41DB81289797D3A0B968D22 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				F91B6A71F309C2C96AF53826 /* Assets.xcassets */,
+				CCFDEE65EA769B4441D41081 /* dm-mono-400.ttf */,
+				570AE428860BF128B4B64ED3 /* dm-mono-500.ttf */,
+				56A15881B96CD843542375AE /* dm-sans-400.ttf */,
+				9E4033AC7070B3481331C97C /* dm-sans-500.ttf */,
+				198BA33A951F53393F29EE83 /* dmmono-OFL.txt */,
+				9771FC841371501412548FAF /* dmsans-OFL.txt */,
+				3371227C22CAD3D5AC1ECF5A /* mirror-fixture.json */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		C98B3BF451920EB3140F6701 /* Cornelius */ = {
+			isa = PBXGroup;
+			children = (
+				D4D2ECDC373FCB6B13C22D03 /* App.swift */,
+				D10622F5D665013F1CA6B1DF /* Discovery.swift */,
+				15D8B2B32C75870700E03090 /* Info.plist */,
+				9734D2FE0695D1B31C40BF5E /* Media.swift */,
+				240E9699491DC84FDC3D2471 /* MetalMirror.swift */,
+				0178AE50A884E55539CDD7BB /* MirrorClient.swift */,
+				47E775E916B654F641E7301C /* MirrorView.swift */,
+				D55EF4D332D7A8E304783BAC /* Models.swift */,
+				4875827854195935FDA9E55B /* Trust.swift */,
+				B41DB81289797D3A0B968D22 /* Resources */,
+				3F3177E0252F4B4B69F8763B /* Shaders */,
+			);
+			path = Cornelius;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2B2DB41AC190E94F56CBDCDF /* CorneliusTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5AC1279E3B40F9B7F689DA9A /* Build configuration list for PBXNativeTarget "CorneliusTests" */;
+			buildPhases = (
+				22EC600A7BC7851881B44058 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0B46FBB289826B020557B37E /* PBXTargetDependency */,
+			);
+			name = CorneliusTests;
+			packageProductDependencies = (
+			);
+			productName = CorneliusTests;
+			productReference = 08C9BE72EA065CBE88F00255 /* CorneliusTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		CAC2A31434FBE610A19AC375 /* Cornelius */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2F30CC90AA08B1F575720878 /* Build configuration list for PBXNativeTarget "Cornelius" */;
+			buildPhases = (
+				E6404F048E6C7116E04B6795 /* Sources */,
+				F3F4E498D28A213AFF1B8509 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Cornelius;
+			packageProductDependencies = (
+			);
+			productName = Cornelius;
+			productReference = 97F73CBA1B1E1B93EFEF5E1A /* Cornelius.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		67AA18836C8B1F7B6FFB7B06 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					2B2DB41AC190E94F56CBDCDF = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					CAC2A31434FBE610A19AC375 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 17D368DDE2664AADB1F17B22 /* Build configuration list for PBXProject "Cornelius" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 03667A1E77981B4CEBA830EE;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 8C1296635861CAF738744BB1 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				CAC2A31434FBE610A19AC375 /* Cornelius */,
+				2B2DB41AC190E94F56CBDCDF /* CorneliusTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		F3F4E498D28A213AFF1B8509 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7CA10D74C3CB811056C27BF0 /* Assets.xcassets in Resources */,
+				1A218282805534B102CD703F /* dm-mono-400.ttf in Resources */,
+				5DDAA76D7394F5C69B576463 /* dm-mono-500.ttf in Resources */,
+				B85F446D425285449B7026CB /* dm-sans-400.ttf in Resources */,
+				3F3216E0A0AB2452C6EC4D20 /* dm-sans-500.ttf in Resources */,
+				FD67DBC960D636541DFB1E93 /* dmmono-OFL.txt in Resources */,
+				D48094ECFCC4587C7FAD9D70 /* dmsans-OFL.txt in Resources */,
+				4F68A2A30AFE23C9233A283B /* mirror-fixture.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		22EC600A7BC7851881B44058 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6604EBA09444D6892C7F7705 /* ProtocolTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E6404F048E6C7116E04B6795 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				96E8BA9DE07026D09BC614D6 /* App.swift in Sources */,
+				A37B9DF783A96335CD0EAD3D /* Discovery.swift in Sources */,
+				9FACF719397914A30C89CE1C /* Media.swift in Sources */,
+				2A71169096DE352F7DEBC386 /* MetalMirror.swift in Sources */,
+				4529AD9C26DD586AE6ACA59C /* Mirror.metal in Sources */,
+				FA8DBA34ACFC4C475E7EF356 /* MirrorClient.swift in Sources */,
+				9FAC95E4FBCFB0B586F4A457 /* MirrorView.swift in Sources */,
+				693866132FDE7AB9C52280B7 /* Models.swift in Sources */,
+				8EAB8FAB06B47B636CF1F479 /* Trust.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		0B46FBB289826B020557B37E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CAC2A31434FBE610A19AC375 /* Cornelius */;
+			targetProxy = DA587BFF7EB7B4C1CEBB40C9 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		087587E2433FC7E82DF4356E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		1636113B289EBE2B7553E8BC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = solutions.pleiades.cornelius.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Cornelius.app/Cornelius";
+			};
+			name = Release;
+		};
+		1C5D7E58ECC1469460379E32 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Cornelius/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = solutions.pleiades.cornelius;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		24A9CD105693CCD7D0C6C28E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A6C33EAE77AADECBC38A6967 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = solutions.pleiades.cornelius.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Cornelius.app/Cornelius";
+			};
+			name = Debug;
+		};
+		F23237EBBD2719DE4E979924 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = Cornelius/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = solutions.pleiades.cornelius;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		17D368DDE2664AADB1F17B22 /* Build configuration list for PBXProject "Cornelius" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				24A9CD105693CCD7D0C6C28E /* Debug */,
+				087587E2433FC7E82DF4356E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		2F30CC90AA08B1F575720878 /* Build configuration list for PBXNativeTarget "Cornelius" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1C5D7E58ECC1469460379E32 /* Debug */,
+				F23237EBBD2719DE4E979924 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5AC1279E3B40F9B7F689DA9A /* Build configuration list for PBXNativeTarget "CorneliusTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A6C33EAE77AADECBC38A6967 /* Debug */,
+				1636113B289EBE2B7553E8BC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 67AA18836C8B1F7B6FFB7B06 /* Project object */;
+}

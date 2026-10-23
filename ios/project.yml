@@ -1,0 +1,46 @@
+name: Cornelius
+options:
+  minimumXcodeGenVersion: 2.38.0
+  deploymentTarget:
+    iOS: '18.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    DEVELOPMENT_TEAM: ''
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    TARGETED_DEVICE_FAMILY: '1'
+    GENERATE_INFOPLIST_FILE: NO
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '1'
+targets:
+  Cornelius:
+    type: application
+    platform: iOS
+    sources:
+      - path: Cornelius
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: solutions.pleiades.cornelius
+        INFOPLIST_FILE: Cornelius/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies: []
+  CorneliusTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: CorneliusTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: solutions.pleiades.cornelius.tests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: Cornelius
+schemes:
+  Cornelius:
+    build:
+      targets:
+        Cornelius: all
+        CorneliusTests: [test]
+    test:
+      targets: [CorneliusTests]

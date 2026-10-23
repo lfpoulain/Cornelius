@@ -87,6 +87,9 @@ import {
 import { PERSONALITY_MAX_LENGTH, PERSONAL_CONTEXT_MAX_LENGTH } from '../shared/personality.js';
 import { liveConfiguration } from './live/configuration.js';
 
+import { registerMobile } from './mobile.js';
+import { mobileIngress } from './mobile-ingress.js';
+
 type Role = 'admin' | 'kiosk';
 interface Login {
   password: string;
@@ -427,6 +430,7 @@ export async function createApp(
   // personne dès « Cornelius » ; avec la seule vision locale, allumée pendant la conversation ;
   // sinon éteinte. Modes caméra : toujours allumée.
   perception.setCameraPolicy(() => {
+    if (controller.mobileMirror()?.background) return false;
     const session = controller.sessionState();
     if (session.mode !== 4 || controller.isVoiceRecognitionEnabled()) return true;
     if (!vision.isEnabled()) return false;
@@ -552,6 +556,8 @@ export async function createApp(
       'Content-Security-Policy',
       "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
     );
+    // The dedicated proxy listener can route only /mobile/*; each route authenticates independently.
+    if (mobileIngress.has(request.raw)) return;
     // Clients : la machine elle-même, et le réseau local quand il est ouvert. Une adresse
     // publique (port redirigé par un routeur) est toujours refusée.
     const lan = config.lan === true;
@@ -565,6 +571,7 @@ export async function createApp(
       !fromMachine(request)
     )
       return reply.code(403).send({ error: 'Réservé à cet ordinateur.' });
+    if (request.url.startsWith('/mobile/')) return;
     // Le miroir n'a pas de mot de passe sur la machine. Depuis un autre appareil, ses données
     // (état, son, événements) demandent une session d'administration ou un appareil autorisé.
     if (!fromMachine(request) && !lanPublic(request.url) && !lanAuthorized(request))
@@ -584,6 +591,19 @@ export async function createApp(
     ) {
       return reply.code(403).send({ error: 'Origine non autorisée.' });
     }
+  });
+
+  const mobile = registerMobile(app, {
+    db, now, config, controller, perception, live, wakeArbiter, requireAdmin, defaultPassword,
+    image: (id) => imageGeneration.generatedFile(id),
+    claim: (socket, deviceId) => {
+      if (kiosk?.socket !== socket) kiosk?.socket.close(1008, 'Miroir affiché sur un autre appareil.');
+      kiosk = { socket, kioskId: 'mobile:' + deviceId };
+      clients.set(socket, { role: 'kiosk', sessionId: null, kioskId: kiosk.kioskId, remote: true });
+      controller.heartbeat();
+    },
+    current: (socket) => kiosk?.socket === socket,
+    gone: (socket) => { clients.delete(socket); if (kiosk?.socket === socket) kiosk = null; },
   });
 
   app.addHook('onSend', async (request, reply, payload) => {
@@ -1284,6 +1304,7 @@ export async function createApp(
       logs.write('info', 'local', 'Navigateur connecté', { role });
       clients.set(socket, { role, sessionId, kioskId, remote: !fromMachine(request) });
       if (role === 'kiosk') {
+        mobile.release();
         if (kiosk) kiosk.socket.close(1008, 'Miroir ouvert dans un autre onglet');
         // L’état audio appartient à la page : elle le renvoie dès l’ouverture (media_ready).
         kiosk = { socket, kioskId: kioskId! };
@@ -1416,6 +1437,7 @@ export async function createApp(
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     if (controllerTimer) clearInterval(controllerTimer);
     unsubscribe();
+    mobile.dispose();
     ambient.dispose();
     homeAssistant.dispose();
     imageGenerationRuntime.dispose();

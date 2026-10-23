@@ -38,6 +38,8 @@ export function announceSatellites(options: {
       txt: {
         path: '/satellite',
         protocol: String(SATELLITE_PROTOCOL),
+        mobile: '1',
+        mobilePath: '/mobile',
         ...(options.keyFingerprint ? { key: options.keyFingerprint } : {}),
       },
     });

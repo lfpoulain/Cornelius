@@ -118,6 +118,29 @@ const unknownPersonDiagnostic =
 /** The sole authority for session admission, identity and display ownership. */
 export class SessionController {
   readonly bootId = randomUUID();
+  private mobile: import('../shared/mobile.js').MobileMirror | null = null;
+  mobileMirror() { return this.mobile; }
+  setMobileMirror(value: import('../shared/mobile.js').MobileMirror | null) {
+    if (this.mobile?.generation === value?.generation) return;
+    this.reopenAfterClose = null;
+    this.close('Changement de miroir.');
+    this.mobile = value;
+    this.observation = this.rawObservation = null;
+    this.resetPresence();
+    this.changeProfile(null, 'household', false);
+    this.setBrowserAudioReady(false);
+    this.publish();
+  }
+  setMobileBackground(background: boolean) {
+    if (!this.mobile || this.mobile.background === background) return;
+    this.mobile = { ...this.mobile, background };
+    this.rawObservation = null;
+    if (background) {
+      this.silenceSince = this.now();
+      if (this.session.phase !== 'ready') this.close('Miroir en arrière-plan.');
+    }
+    this.publish();
+  }
   private sequence = 0;
   private publishedState = '';
   private listeners = new Set<(event: StateEvent) => void>();
@@ -169,6 +192,7 @@ export class SessionController {
     return this.rawObservation?.observedAt ?? null;
   }
   memoryProfileId(): string | null {
+    if (this.mobile?.background) return null;
     // Satellite : le profil rattaché à sa pièce (choisi dans l’administration), ou personne.
     if (this.satelliteSession()) return this.profile?.id ?? null;
     const input = this.rawObservation;
@@ -444,6 +468,7 @@ export class SessionController {
       activeProfile: this.profile,
       selection: this.selection,
       profiles: this.profiles.list(),
+      mobileMirror: this.mobile ? { ...this.mobile } : null,
       cards: visibleCards,
       ambientDisplays: [],
       voice: this.voice,
@@ -524,6 +549,7 @@ export class SessionController {
   }
 
   observe(input: PerceptionObservation): boolean {
+    if (this.mobile?.background) return true;
     const now = this.now();
     if (
       !validateObservation(input) ||
@@ -1185,6 +1211,7 @@ export class SessionController {
   }
 
   private maybeOpen(source: OpenSource = 'automatic'): void {
+    if (this.mobile?.background) return;
     if (['connecting', 'ready', 'closing'].includes(this.session.phase) || this.session.manualStop)
       return;
     // Le mot d’appel est exigé (toujours vrai sans caméra en veille) : la présence seule n’ouvre pas.
@@ -1588,11 +1615,11 @@ export class SessionController {
 
   /** Minuterie de silence : toujours en mode voix, sur option dans les modes caméra. */
   silenceTracking(): boolean {
-    return this.session.mode === 4 || this.silenceClose.enabled || this.satelliteSession();
+    return !!this.mobile?.background || this.session.mode === 4 || this.silenceClose.enabled || this.satelliteSession();
   }
 
   private silenceDelay(): number {
-    return this.silenceClose.delayMs;
+    return this.mobile?.background && !this.silenceClose.enabled ? 20_000 : this.silenceClose.delayMs;
   }
 
   /** Parole locale détectée (VAD) : le silence ne compte qu’après la fin de la phrase. */
@@ -1688,7 +1715,7 @@ export class SessionController {
       if (!this.userSpeaking && !this.assistantBusy) this.silenceSince = outputEndedAt;
     }
     // Satellite : ni caméra ni navigateur dans sa pièce, seul le silence termine la conversation.
-    if (this.satelliteSession()) {
+    if (this.satelliteSession() || this.mobile?.background) {
       if (this.silenceExpired(now)) this.close('Fin de conversation après silence.');
     } else if (this.session.mode === 4) {
       if (this.silenceExpired(now)) this.close('Fin de conversation après silence.');

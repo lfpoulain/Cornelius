@@ -108,6 +108,7 @@ export interface MirrorSetup {
   perception: boolean;
 }
 export interface MirrorState {
+  mobileMirror?: import('./mobile.js').MobileMirror | null;
   /** Absent des anciens serveurs : état de configuration inconnu. */
   setup?: MirrorSetup;
   openaiBlocked: boolean;

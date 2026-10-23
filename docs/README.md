@@ -79,3 +79,6 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 - [README du projet](../README.md)
 - [Premier démarrage](installation/premier-demarrage.md)
 - [Dépannage](utilisation/depannage.md)
+
+- [App iPhone et accès extérieur privé](installation/ios.md)
+- [Protocole du miroir natif](developpement/mobile-protocole.md)
