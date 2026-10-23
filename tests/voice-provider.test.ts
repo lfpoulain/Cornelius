@@ -9,7 +9,6 @@ import {
   MISTRAL_MAX_SESSION_MS,
   createMistralVoiceAdapter,
   MISTRAL_TTS_MODEL,
-  MISTRAL_MAX_SESSION_MS,
   shouldForwardVoiceAudio,
 } from '../server/voice/mistral.js';
 import type { VoiceConfiguration, VoiceConnection, VoiceEvent } from '../server/voice/provider.js';
