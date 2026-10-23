@@ -1,6 +1,7 @@
 import Foundation
+import UIKit
 
-final class Discovery: NSObject, ObservableObject, NetServiceBrowserDelegate, NetServiceDelegate {
+@MainActor final class Discovery: NSObject, ObservableObject, NetServiceBrowserDelegate, NetServiceDelegate {
     struct Server: Hashable {
         let name: String
         let url: URL
@@ -11,16 +12,55 @@ final class Discovery: NSObject, ObservableObject, NetServiceBrowserDelegate, Ne
     @Published var servers: [String: URL] = [:]
     @Published var error: String?
     @Published var identifiedServers: [String: URL] = [:]
-    private var started = false
-    private let browser = NetServiceBrowser()
-    private var services: [NetService] = []
-    override init() { super.init(); browser.delegate = self }
-    func start() { guard !started else { return }; started = true; browser.searchForServices(ofType: "_cornelius._tcp.", inDomain: "local.") }
-    func stop() { started = false; browser.stop(); services.forEach { $0.stop() }; services = [] }
-    func netServiceBrowser(_ browser: NetServiceBrowser, didFind service: NetService, moreComing: Bool) { services.append(service); service.delegate = self; service.resolve(withTimeout: 5) }
-    func netServiceBrowser(_ browser: NetServiceBrowser, didRemove service: NetService, moreComing: Bool) { servers.removeValue(forKey: service.name); candidates.removeValue(forKey: service.name); services.removeAll { $0 == service } }
+    private var browser: NetServiceBrowser?
+    private var services: [ObjectIdentifier: NetService] = [:]
+    private var wanted = false
+    private var retrySeconds: UInt64 = 1
+    private var restartTask: Task<Void, Never>?
+    private var activeObserver: NSObjectProtocol?
+    func start() {
+        guard !wanted else { return }
+        wanted = true
+        activeObserver = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.scheduleRestart(after: .milliseconds(150)) }
+        }
+        restart()
+    }
+    func stop() {
+        wanted = false; restartTask?.cancel(); restartTask = nil
+        browser?.stop(); browser = nil
+        services.values.forEach { $0.stop() }; services.removeAll()
+        if let activeObserver { NotificationCenter.default.removeObserver(activeObserver) }
+        activeObserver = nil
+    }
+    private func scheduleRestart(after delay: Duration) {
+        guard wanted else { return }
+        restartTask?.cancel()
+        restartTask = Task { [weak self] in
+            try? await Task.sleep(for: delay)
+            guard !Task.isCancelled else { return }
+            self?.restart()
+        }
+    }
+    private func restart() {
+        guard wanted else { return }
+        restartTask?.cancel(); restartTask = nil
+        browser?.stop(); services.values.forEach { $0.stop() }; services.removeAll(); error = nil
+        let next = NetServiceBrowser(); next.delegate = self; browser = next
+        next.searchForServices(ofType: "_cornelius._tcp.", inDomain: "local.")
+    }
+    func netServiceBrowser(_ browser: NetServiceBrowser, didFind service: NetService, moreComing: Bool) {
+        guard browser === self.browser else { return }
+        retrySeconds = 1
+        // Resolve every result immediately and independently instead of waiting for the previous one.
+        services[ObjectIdentifier(service)] = service; service.delegate = self; service.resolve(withTimeout: 3)
+    }
+    func netServiceBrowser(_ browser: NetServiceBrowser, didRemove service: NetService, moreComing: Bool) {
+        guard browser === self.browser else { return }
+        servers.removeValue(forKey: service.name); candidates.removeValue(forKey: service.name); services.removeValue(forKey: ObjectIdentifier(service))
+    }
     func netServiceDidResolveAddress(_ sender: NetService) {
-        guard let txt = sender.txtRecordData(), let mobile = NetService.dictionary(fromTXTRecord: txt)["mobile"], String(data: mobile, encoding: .utf8) == "1", let host = sender.hostName, sender.port > 0 else { return }
+        guard services[ObjectIdentifier(sender)] === sender, let txt = sender.txtRecordData(), let mobile = NetService.dictionary(fromTXTRecord: txt)["mobile"], String(data: mobile, encoding: .utf8) == "1", let host = sender.hostName, sender.port > 0 else { return }
         let url = URL(string: "https://\(host.trimmingCharacters(in: CharacterSet(charactersIn: "."))):\(sender.port)")
         servers[sender.name] = url
         if let id = NetService.dictionary(fromTXTRecord: txt)["serverId"].flatMap({ String(data: $0, encoding: .utf8) }), UUID(uuidString: id) != nil { identifiedServers[id] = url
@@ -29,5 +69,11 @@ final class Discovery: NSObject, ObservableObject, NetServiceBrowserDelegate, Ne
             }
         }
     }
-    func netServiceBrowser(_ browser: NetServiceBrowser, didNotSearch errorDict: [String: NSNumber]) { error = "Découverte locale indisponible. Autorisez le réseau local dans Réglages, ou utilisez le QR code. Les Wi-Fi invités peuvent isoler les appareils." }
+    func netServiceBrowser(_ browser: NetServiceBrowser, didNotSearch errorDict: [String: NSNumber]) {
+        guard browser === self.browser else { return }
+        error = "Découverte locale indisponible. Autorisez le réseau local dans Réglages, ou utilisez le QR code. Les Wi-Fi invités peuvent isoler les appareils."
+        // The permission sheet can interrupt the initial browse. Retry here and as soon as the app becomes active.
+        scheduleRestart(after: .seconds(retrySeconds))
+        retrySeconds = min(retrySeconds * 2, 8)
+    }
 }
