@@ -38,3 +38,31 @@ test('un jeton de module se saisit dans Mise en route, compte aussitôt et s’e
     });
   }
 });
+
+for (const width of [390, 1440]) {
+  test(`les cartes et le formulaire du module restent accessibles à ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await login(page);
+    const cards = page.locator('#secrets article');
+    await expect(cards.first()).toBeVisible();
+    for (const card of await cards.all()) {
+      const box = await card.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+      expect(await card.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+    }
+    await page.getByRole('button', { name: 'Modules', exact: true }).click();
+    const weather = page.locator('[data-slot="card"]').filter({ has: page.locator('#module-weather') });
+    const field = weather.getByLabel('Jeton Météo Concept', { exact: true });
+    await field.fill('meteo-inline-test-0123456789');
+    await field.locator('xpath=ancestor::form').getByRole('button', { name: 'Enregistrer' }).click();
+    try {
+      await expect(weather.getByText('Jeton manquant', { exact: true })).toHaveCount(0);
+    } finally {
+      await page.request.delete('/api/admin/secrets/CORNELIUS_METEO_CONCEPT_TOKEN', {
+        headers: { origin: new URL(page.url()).origin },
+      });
+    }
+  });
+}
