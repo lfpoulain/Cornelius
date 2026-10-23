@@ -64,6 +64,45 @@ import Combine
             throw lastError
         } catch { message = error.localizedDescription }
     }
+    func pairDiscovered(_ server: Discovery.Server) async {
+        guard !busy, credential == nil else { return }
+        busy = true; message = nil
+        defer { busy = false }
+        let endpoint = Endpoint(url: server.url, trust: "pinned")
+        let session = PinnedSession(endpoint: endpoint, fingerprint: server.fingerprint).session()
+        defer { session.invalidateAndCancel() }
+        func post(_ path: String, _ body: [String: String]) async throws -> Data {
+            var request = URLRequest(url: server.url.appendingPathComponent(path))
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+            let (data, response) = try await session.data(for: request)
+            try Self.requireSuccess(data, response)
+            return data
+        }
+        do {
+            struct Pending: Decodable { let id: String; let secret: String; let code: String; let serverId: String }
+            struct Status: Decodable { let status: String; let invitation: String?; let serverId: String; let keyFingerprint: String; let endpoints: [Endpoint] }
+            let pending = try JSONDecoder().decode(Pending.self, from: await post("mobile/requests", ["name": UIDevice.current.name, "serverId": server.serverId]))
+            guard pending.serverId == server.serverId else { throw MirrorError.message("Identité de serveur inattendue.") }
+            message = "Dans l’administration → App iPhone, approuvez cet iPhone uniquement si le code affiché est \(pending.code)."
+            for _ in 0..<150 {
+                try await Task.sleep(for: .seconds(2))
+                let status = try JSONDecoder().decode(Status.self, from: await post("mobile/requests/status", ["id": pending.id, "secret": pending.secret]))
+                guard status.serverId == server.serverId, status.keyFingerprint == server.fingerprint else { throw MirrorError.message("Identité de serveur inattendue.") }
+                if status.status == "rejected" { throw MirrorError.message("Association refusée dans l’administration.") }
+                if let invitation = status.invitation, status.status == "approved" {
+                    let data = try await post("mobile/pair", ["invitation": invitation, "name": UIDevice.current.name])
+                    let result = try JSONDecoder().decode(PairResponse.self, from: data)
+                    guard result.serverId == server.serverId, result.protocol == 1 else { throw MirrorError.message("Identité de serveur inattendue.") }
+                    let value = Credential(deviceId: result.deviceId, token: result.token, serverId: result.serverId, endpoints: [endpoint] + status.endpoints, keyFingerprint: server.fingerprint)
+                    try CredentialStore.save(value); credential = value; message = nil; activate(); return
+                }
+            }
+            throw MirrorError.message("Demande expirée. Réessayez la connexion.")
+        } catch is CancellationError { message = nil }
+        catch { message = error.localizedDescription }
+    }
     func activate() {
         guard credential != nil, connection == nil, !preparing else { return }
         interrupted = false; preparing = true; discovery.start()

@@ -5,9 +5,11 @@ L’app est native (SwiftUI, Metal, AVFoundation), compatible iOS 18 et suivants
 ## Associer l’iPhone
 
 1. Démarrez le serveur et son worker de perception, avec HTTPS activé et un mot de passe administrateur personnel.
-2. Ouvrez **Administration → Mise en route → App iPhone**. Vérifiez l’adresse HTTPS locale : sous Docker, indiquez l’adresse de l’hôte, pas l’adresse du conteneur.
-3. Choisissez **Associer un iPhone**. Dans l’app, scannez le QR code ; sur le même iPhone, utilisez le lien ou copiez-le dans l’app. L’invitation expire après cinq minutes et fonctionne une seule fois.
-4. Autorisez réseau local, caméra et micro. L’app mémorise le jeton et la clé du serveur dans le Trousseau, sans synchronisation iCloud. Aucun certificat à installer.
+2. Ouvrez l’app sur le même Wi-Fi et autorisez le réseau local. Elle recherche Cornelius automatiquement ; si plusieurs instances sont présentes, choisissez votre serveur.
+3. Dans **Administration → Mise en route → App iPhone**, comparez le code de la demande avec celui affiché sur l’iPhone, puis choisissez **Approuver**. La demande expire après cinq minutes. Refusez toute demande inconnue, même si son nom vous semble familier.
+4. Autorisez caméra et micro. L’app mémorise le jeton et la clé du serveur dans le Trousseau, sans synchronisation iCloud. Aucun certificat à installer.
+
+Si la découverte échoue, choisissez **Connexion par QR Code** dans l’app. Dans l’administration, vérifiez l’adresse HTTPS locale (sous Docker, celle de l’hôte), puis choisissez **Associer un iPhone**. Scannez le code ou collez le lien. L’invitation expire après cinq minutes et fonctionne une seule fois.
 
 Le QR code accorde l’accès au miroir : ne le partagez pas. Pour retirer l’accès, révoquez l’iPhone depuis cette même carte. Oublier le serveur dans l’app efface seulement son association locale.
 

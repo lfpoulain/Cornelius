@@ -110,8 +110,28 @@ export function registerMobile(
   app.get('/api/admin/mobile', { preHandler: services.requireAdmin }, async () => ({
     ...info(),
     devices: store.list(),
+    pending: store.pendingRequests(),
     remoteConfigured: remoteEndpoint().length > 0,
   }));
+  app.post<{ Params: { id: string }; Body: { approve?: boolean } }>(
+    '/api/admin/mobile/requests/:id', { preHandler: services.requireAdmin }, async (req, reply) => {
+      if (services.defaultPassword() || !config.tlsKeyFingerprint) return reply.code(403).send({ error: 'Configurez HTTPS et le mot de passe administrateur.' });
+      if (typeof req.body?.approve !== 'boolean') return reply.code(400).send({ error: 'Décision invalide.' });
+      return store.decidePairing(req.params.id, req.body.approve) ? { ok: true } : reply.code(404).send({ error: 'Demande expirée.' });
+    });
+  app.post<{ Body: { name?: string; serverId?: string } }>(
+    '/mobile/requests', { config: { rateLimit: { max: 5, timeWindow: 60_000 } } }, async (req, reply) => {
+      if (!config.tlsKeyFingerprint || services.defaultPassword()) return reply.code(403).send({ error: 'Configurez HTTPS et le mot de passe administrateur.' });
+      if (req.body?.serverId !== store.serverId || typeof req.body?.name !== 'string') return reply.code(400).send({ error: 'Serveur ou appareil invalide.' });
+      const request = store.requestPairing(req.body.name);
+      return request ? { ...request, serverId: store.serverId } : reply.code(429).send({ error: 'Trop de demandes ou nom invalide.' });
+    });
+  app.post<{ Body: { id?: string; secret?: string } }>(
+    '/mobile/requests/status', { config: { rateLimit: { max: 120, timeWindow: 60_000 } } }, async (req, reply) => {
+      if (typeof req.body?.id !== 'string' || typeof req.body?.secret !== 'string') return reply.code(400).send({ error: 'Demande invalide.' });
+      const result = store.pairingStatus(req.body.id, req.body.secret);
+      return result ? { ...result, ...info(), keyFingerprint: config.tlsKeyFingerprint } : reply.code(404).send({ error: 'Demande expirée ou déjà utilisée.' });
+    });
   app.post<{ Body: { localUrl?: string } }>(
     '/api/admin/mobile/invitations',
     { preHandler: services.requireAdmin },

@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
 
 export function MobileAccess({ defaultPassword }: { defaultPassword: boolean }) {
+  const [pending, setPending] = useState<{ id: string; name: string; code: string }[]>([]);
   const [devices, setDevices] = useState<MobileDevice[]>([]);
   const [invitation, setInvitation] = useState<{
     link: string;
@@ -16,14 +17,19 @@ export function MobileAccess({ defaultPassword }: { defaultPassword: boolean }) 
   const [remote, setRemote] = useState(false);
   const [localUrl, setLocalUrl] = useState(location.protocol === 'https:' ? location.origin : '');
   const refresh = async () => {
-    const value = await request<{ devices: MobileDevice[]; remoteConfigured: boolean }>(
+    const value = await request<{ devices: MobileDevice[]; pending?: { id: string; name: string; code: string }[]; remoteConfigured: boolean }>(
       '/api/admin/mobile',
     );
     setDevices(value.devices);
+    setPending(value.pending ?? []);
     setRemote(value.remoteConfigured);
   };
   useEffect(() => {
-    void refresh().catch((failure) => setError(errorMessage(failure)));
+    let active = true;
+    const update = () => { if (active) void refresh().catch((failure) => { if (active) setError(errorMessage(failure)); }); };
+    update();
+    const timer = setInterval(update, 3000);
+    return () => { active = false; clearInterval(timer); };
   }, []);
   useEffect(() => {
     if (!invitation) return;
@@ -43,6 +49,19 @@ export function MobileAccess({ defaultPassword }: { defaultPassword: boolean }) 
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
+        <p>Ouvrez l’app sur le même Wi-Fi : elle détecte Cornelius automatiquement. Approuvez ensuite sa demande ici en comparant le code affiché sur l’iPhone.</p>
+        {pending.map((item) => (
+          <div key={item.id} className="space-y-2 rounded-md border p-3">
+            <p>{item.name} — code <strong>{item.code}</strong></p>
+            <p>Approuvez uniquement si ce code correspond à celui de votre iPhone.</p>
+            {[true, false].map((approve) => <Button key={String(approve)} variant="outline" disabled={busy || defaultPassword} onClick={async () => {
+              setBusy(true);
+              try { await request('/api/admin/mobile/requests/' + item.id, { method: 'POST', body: JSON.stringify({ approve }) }); await refresh(); }
+              catch (failure) { setError(errorMessage(failure)); }
+              finally { setBusy(false); }
+            }}>{approve ? 'Approuver' : 'Refuser'}</Button>)}
+          </div>
+        ))}
         <label className="block space-y-2">
           Adresse HTTPS du serveur sur le réseau local
           <input
