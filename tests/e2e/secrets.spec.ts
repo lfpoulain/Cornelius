@@ -46,7 +46,9 @@ test('un jeton de module se saisit dans Mise en route, compte aussitôt et s’e
 });
 
 for (const width of [390, 1440]) {
-  test(`les cartes et le formulaire du module restent accessibles à ${width}px`, async ({ page }) => {
+  test(`les cartes et le formulaire du module restent accessibles à ${width}px`, async ({
+    page,
+  }) => {
     await page.setViewportSize({ width, height: 1000 });
     await login(page);
     const cards = page.locator('#secrets article');
@@ -58,11 +60,17 @@ for (const width of [390, 1440]) {
       expect(box!.x + box!.width).toBeLessThanOrEqual(width);
       expect(await card.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
     }
-    await page.getByRole('button', { name: 'Modules', exact: true }).click();
-    const weather = page.locator('[data-slot="card"]').filter({ has: page.locator('#module-weather') });
+    await page.goto('/admin#modules');
+    await page.locator('#module-weather > summary').click();
+    const weather = page
+      .locator('[data-slot="card"]')
+      .filter({ has: page.locator('#module-weather') });
     const field = weather.getByLabel('Jeton Météo Concept', { exact: true });
     await field.fill('meteo-inline-test-0123456789');
-    await field.locator('xpath=ancestor::form').getByRole('button', { name: 'Enregistrer' }).click();
+    await field
+      .locator('xpath=ancestor::form')
+      .getByRole('button', { name: 'Enregistrer' })
+      .click();
     try {
       await expect(weather.getByText('Jeton manquant', { exact: true })).toHaveCount(0);
     } finally {

@@ -1,11 +1,5 @@
 import { useCallback, useId, useState, type FormEvent } from 'react';
-import {
-  Boxes,
-  ExternalLink,
-  KeyRound,
-  Sparkles,
-  type LucideIcon,
-} from 'lucide-react';
+import { Boxes, ExternalLink, KeyRound, Sparkles, type LucideIcon } from 'lucide-react';
 import type { SecretView } from '../../../shared/types';
 import { api } from '../../api';
 import { addonIcon } from './addon-icons';

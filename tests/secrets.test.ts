@@ -132,8 +132,12 @@ test('jetons des modules : saisis dans l’administration, lus par le module', a
 
 test('les groupes et icônes des jetons viennent des déclarations des modules', async (t) => {
   const f = await fixture(t);
-  const { definitions } = (await f.app.inject({ url: '/api/admin/addons', headers: f.headers })).json();
-  const { secrets } = (await f.app.inject({ url: '/api/admin/secrets', headers: f.headers })).json();
+  const { definitions } = (
+    await f.app.inject({ url: '/api/admin/addons', headers: f.headers })
+  ).json();
+  const { secrets } = (
+    await f.app.inject({ url: '/api/admin/secrets', headers: f.headers })
+  ).json();
   for (const definition of definitions) {
     for (const declared of definition.secrets ?? []) {
       const secret = secrets.find((entry: { env: string }) => entry.env === declared.env);
