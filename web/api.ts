@@ -41,6 +41,7 @@ import type { ToolResult } from '../shared/addons';
 import type { MemoryView, MemoryEdit } from '../shared/memory';
 import type { PersonalityView } from '../shared/personality';
 import type { PendingSatelliteView, SatelliteView } from '../shared/satellites';
+import type { ScreensaverImage, ScreensaverSettings, ScreensaverView } from '../shared/screensaver';
 
 export type Role = 'admin' | 'kiosk';
 
@@ -274,6 +275,29 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ scale }),
     }),
+  screensaverImages: () => request<{ images: ScreensaverImage[] }>('/api/screensaver'),
+  screensaver: () => request<ScreensaverView>('/api/admin/screensaver'),
+  screensaverSettings: (settings: ScreensaverSettings) =>
+    request<StateEvent>('/api/admin/screensaver', {
+      method: 'PATCH',
+      body: JSON.stringify(settings),
+    }),
+  addScreensaverImage: (file: File) =>
+    request<ScreensaverView>('/api/admin/screensaver/images', {
+      method: 'POST',
+      body: file,
+      // Le fichier brut : son type et son nom remplacent l’en-tête JSON par défaut.
+      headers: { 'Content-Type': file.type, 'X-File-Name': encodeURIComponent(file.name) },
+      timeoutMs: SLOW_REQUEST_TIMEOUT_MS,
+    }),
+  removeScreensaverImage: (id: string) =>
+    request<ScreensaverView>('/api/admin/screensaver/images/' + encodeURIComponent(id), {
+      method: 'DELETE',
+    }),
+  removeScreensaverImages: (ids: string[]) =>
+    post<ScreensaverView>('/api/admin/screensaver/images/remove', { ids }),
+  installScreensaverCollection: () =>
+    post<ScreensaverView>('/api/admin/screensaver/collection', {}),
   advancedAudioBuffer: (enabled: boolean) =>
     request<StateEvent>('/api/admin/advanced-audio-buffer', {
       method: 'PATCH',

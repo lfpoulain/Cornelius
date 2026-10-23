@@ -66,6 +66,8 @@ import { AgentRepository } from './agents-store.js';
 import { HermesClient } from './hermes-client.js';
 import { Agents } from './agents.js';
 import { registerAgents } from './agents-api.js';
+import { ScreensaverLibrary } from './screensaver.js';
+import { registerScreensaver } from './screensaver-api.js';
 import { ImageGeneration } from './image-generation.js';
 import { createOpenAIImageCreator, type OpenAIImageCreator } from './openai-images.js';
 import {
@@ -136,6 +138,10 @@ export async function createApp(
     imageInstallerLauncher?: ImageInstallerLauncher;
     imageWorkerLauncher?: ImageWorkerLauncher;
     imageGenerationRoot?: string;
+    /** Dossier des images de l’écran de veille (data/screensaver par défaut). */
+    screensaverRoot?: string;
+    /** Téléchargement de la collection de peintures (remplacé dans les tests). */
+    screensaverFetch?: typeof fetch;
     memoryExtractor?: MemoryExtractor;
     /** Crée les images OpenAI (remplacé dans les tests, sans appel réseau). */
     openaiImageCreator?: (apiKey: string) => OpenAIImageCreator;
@@ -291,6 +297,17 @@ export async function createApp(
     logs.write('info', 'mesure', name, details),
   );
   controller.setSetup({ openaiKey: !!initialKey });
+  const screensaver = new ScreensaverLibrary(
+    db,
+    options.screensaverRoot ??
+      // À côté de la base (data/screensaver) ; une base en mémoire (tests) a son dossier jetable.
+      (config.databasePath === ':memory:'
+        ? mkdtempSync(join(tmpdir(), 'cornelius-screensaver-'))
+        : join(dirname(config.databasePath), 'screensaver')),
+    logs,
+    now,
+    options.screensaverFetch,
+  );
   imageGeneration.onActivity((activity) => controller.setImageActivity(activity));
   const ambient = new AmbientModules(
     addonRuntime,
@@ -651,6 +668,7 @@ export async function createApp(
 
   registerHomeAssistant(app, homeAssistant, requireAdmin, () => controller.homeAssistantChanged());
   registerAgents(app, agents, requireAdmin);
+  registerScreensaver(app, screensaver, controller, requireAdmin);
   const satellitePairing = new SatellitePairing(logs, now);
   registerSatellites(app, {
     store: satelliteStore,
@@ -906,6 +924,7 @@ export async function createApp(
     return [
       {
         ...describe('OPENAI_API_KEY'),
+        group: 'providers' as const,
         label: 'Clé OpenAI',
         usedBy: 'Conversation et mémoire',
         url: 'https://platform.openai.com/api-keys',
@@ -915,6 +934,8 @@ export async function createApp(
         ...new Map([...addonSecrets.values()].map((secret) => [secret.env, secret])).values(),
       ].map((secret) => ({
         ...describe(secret.env),
+        group: 'modules' as const,
+        icon: secret.addon.display?.icon,
         label: secret.label.replace(/^(un|une)\s+/u, '').replace(/^./u, (c) => c.toUpperCase()),
         usedBy: secret.addon.sourceLabel,
         url: secret.url ?? null,

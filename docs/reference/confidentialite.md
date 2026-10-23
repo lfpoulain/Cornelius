@@ -53,6 +53,7 @@ Les conversations sont ouvertes avec l’option `store: false` d’OpenAI, qui d
 - **Home Assistant** reçoit les commandes des appareils autorisés, à l’adresse de votre installation.
 - **Les agents** (Hermes) reçoivent la demande confiée par la personne reconnue, à l’adresse de votre agent.
 - **Les modèles** sont téléchargés depuis leurs sites (GitHub, Hugging Face) lors de leur installation.
+- **Les peintures de l’écran de veille** sont téléchargées depuis Wikimedia Commons, seulement quand vous cliquez sur « Télécharger les peintures ». Vos photos ne quittent jamais l’ordinateur.
 
 ## Les données enregistrées
 
@@ -65,6 +66,7 @@ Tout est sur l’ordinateur du miroir, dans le dossier `data/` (voir [Configurat
 | Copies de sécurité de la base | à côté de la base, `cornelius.sqlite.backup-v…sqlite` |
 | Journal technique | `data/logs/cornelius.log` |
 | Trois dernières images créées | `data/generated-images/`, vidé à chaque démarrage |
+| Images de l’écran de veille (vos photos et les peintures) | `data/screensaver/` ; leur titre dans la base |
 | Mot de passe de l’administration | le fichier `.env` au départ ; s’il est changé dans **Mise en route**, une empreinte (scrypt) dans la base, jamais le mot de passe lui-même |
 | Secrets des commandes (`CORNELIUS_SECRET_*`) | le fichier `.env`, jamais dans la base |
 | Clé OpenAI, jetons Météo et Transports | la base locale s’ils sont saisis dans l’administration (ils y passent avant ceux de `.env`), sinon le fichier `.env`. L’administration n’en montre que les quatre derniers caractères, et le journal les masque. |

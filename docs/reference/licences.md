@@ -72,6 +72,17 @@ Les bruits AudioSet et les autres enregistrements utilisés pendant l’entraîn
 
 En pratique, le dépôt publie `models/cornelius.onnx` avec `models/cornelius.onnx.LICENSE`, pour un usage non commercial. Il ne publie ni les modèles de prétraitement, ni les voix Piper, ni aucun fichier WAV, NPY ou corpus. S’en servir commercialement demande de réentraîner le modèle avec des données aux droits explicites.
 
+## Les peintures de l’écran de veille
+
+L’écran de veille propose 32 peintures célèbres (liste dans `server/screensaver-collection.ts`), téléchargées seulement quand on clique sur « Télécharger les peintures ». Le dépôt n’en contient aucune.
+
+| Élément | Statut | Ce qu’il faut savoir |
+|---|---|---|
+| Les œuvres | domaine public | Leurs auteurs sont morts depuis plus de 70 ans (le plus récent, Gustav Klimt, en 1918). |
+| Les reproductions, sur [Wikimedia Commons](https://commons.wikimedia.org/) | domaine public | Chaque fichier y est marqué « Public domain » (vérifié le 23 octobre 2026). La photographie fidèle d’une œuvre plate du domaine public n’ouvre pas de nouveaux droits : c’est la position de Wikimedia, la jurisprudence américaine (*Bridgeman c. Corel*) et l’article 14 de la directive européenne 2019/790. |
+
+Le titre et l’auteur de chaque peinture s’affichent sur le miroir. Aucune attribution n’est exigée, mais Commons demande un `User-Agent` qui identifie l’application : Cornelius envoie le sien. Les photos ajoutées depuis l’administration restent sous la responsabilité de la personne qui les ajoute.
+
 ## Avant de publier le dépôt
 
 1. **Garder `LICENSE` et `THIRD_PARTY_NOTICES.md`** à la racine, et lancer `npm run notices` après tout changement de dépendance.

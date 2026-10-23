@@ -21,5 +21,7 @@ __pycache__/
 playwright-report/
 .claude/
 .kilo/
+# Vidéos de présentation générées (/brag) et leurs fichiers de travail.
+brag-output*/
 .pytest_cache/
 .venv-*/

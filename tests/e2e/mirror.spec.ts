@@ -1,4 +1,5 @@
 import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
+import { crc32, deflateSync } from 'node:zlib';
 import type { AmbientDisplay } from '../../shared/addons';
 import type { DisplayCard, StateEvent } from '../../shared/types';
 import { origin, screenshots } from './env';
@@ -650,6 +651,130 @@ test('la taille de l’orbe choisie dans l’administration s’applique au miro
     });
     await expect.poll(width).toBeCloseTo(base * 0.7, 0);
     await page.screenshot({ path: `${screenshots}/mirror-orb-70.png` });
+  } finally {
+    fixture.close();
+  }
+});
+
+/** Image PNG unie, faite à la main : le miroir la reçoit comme une photo envoyée. */
+function solidPng(width: number, height: number, rgb: [number, number, number]): Buffer {
+  const chunk = (type: string, data: Buffer) => {
+    const body = Buffer.concat([Buffer.from(type), data]);
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.length);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([length, body, crc]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.set([8, 2, 0, 0, 0], 8);
+  const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array(width).fill(rgb).flat())]);
+  return Buffer.concat([
+    Buffer.from('89504e470d0a1a0a', 'hex'),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(Buffer.concat(Array(height).fill(row)))),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+/** Une peinture servie au miroir à la place de la bibliothèque du serveur. */
+async function routeScreensaverImages(page: Page) {
+  await page.route('**/api/screensaver', (route) =>
+    route.fulfill({
+      json: {
+        images: [
+          {
+            id: 'peinture',
+            url: '/api/screensaver/images/peinture',
+            title: 'La Nuit étoilée',
+            credit: 'Vincent van Gogh, 1889',
+            origin: 'collection',
+          },
+        ],
+      },
+    }),
+  );
+  await page.route('**/api/screensaver/images/peinture', (route) =>
+    route.fulfill({ contentType: 'image/png', body: solidPng(64, 40, [40, 70, 160]) }),
+  );
+}
+
+function screensaverState(
+  wake: 'presence' | 'opening',
+): NonNullable<StateEvent['state']['screensaver']> {
+  return {
+    enabled: true,
+    intervalMs: 60_000,
+    returnDelayMs: 0,
+    transition: 'vortex',
+    durationMs: 1_000,
+    wake,
+    fit: 'canvas',
+    imageCount: 1,
+    revision: 'essai',
+  };
+}
+
+test('écran de veille : une peinture quand personne n’est là, l’orbe revient à l’arrivée', async ({
+  page,
+}) => {
+  const fixture = await mirrorFixture(page, (state) => {
+    state.presence = { ...state.presence, state: 'absent', peopleCount: 0, people: [] };
+    state.screensaver = screensaverState('presence');
+  });
+  await routeScreensaverImages(page);
+  try {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto('/');
+    const mirror = page.locator('.mirror-page');
+    await expect(mirror).toHaveAttribute('data-screensaver', 'on');
+    // Rien d’autre que la peinture et son cartel.
+    await expect(page.locator('.mirror-top')).toHaveCSS('opacity', '0');
+    await expect(page.locator('.orb-fullscreen')).toHaveCSS('opacity', '0');
+    await expect(page.locator('.mirror-footer')).toHaveCSS('opacity', '0');
+    await expect(page.locator('.mirror-screensaver-caption')).toContainText('La Nuit étoilée');
+    await page.screenshot({ path: `${screenshots}/mirror-screensaver.png` });
+
+    fixture.publish((state) => {
+      state.presence = {
+        ...state.presence,
+        state: 'present',
+        peopleCount: 1,
+        people: [{ trackId: 'one', profileId: null, engaged: false }],
+      };
+    });
+    await expect(mirror).toHaveAttribute('data-screensaver', 'off');
+    await expect(page.locator('.orb-fullscreen')).toHaveCSS('opacity', '1');
+    await expect(page.locator('.mirror-top')).toHaveCSS('opacity', '1');
+  } finally {
+    fixture.close();
+  }
+});
+
+test('écran de veille calé sur le réveil de Cornelius : un passant ne le retire pas, un regard si', async ({
+  page,
+}) => {
+  const person = { trackId: 'one', profileId: null, engaged: false };
+  const fixture = await mirrorFixture(page, (state) => {
+    state.opening = { trigger: 'gaze', audience: 'everyone', recognizeVoice: false };
+    state.presence = { ...state.presence, state: 'present', peopleCount: 1, people: [person] };
+    state.screensaver = screensaverState('opening');
+  });
+  await routeScreensaverImages(page);
+  try {
+    await page.goto('/');
+    const mirror = page.locator('.mirror-page');
+    await expect(mirror).toHaveAttribute('data-screensaver', 'on');
+    fixture.publish((state) => {
+      state.presence = {
+        ...state.presence,
+        state: 'engaged',
+        people: [{ ...person, engaged: true }],
+      };
+    });
+    await expect(mirror).toHaveAttribute('data-screensaver', 'off');
   } finally {
     fixture.close();
   }

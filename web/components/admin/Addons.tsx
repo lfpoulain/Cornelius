@@ -596,6 +596,7 @@ function MissingSecret({
           inline
           secret={{
             env: secret.env,
+            group: 'modules',
             label: label.charAt(0).toUpperCase() + label.slice(1),
             usedBy: '',
             url: secret.url,

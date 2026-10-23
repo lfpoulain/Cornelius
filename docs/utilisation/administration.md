@@ -139,6 +139,19 @@ Chaque texte compte 4 000 caractères au plus. Enregistrer s’applique aussitô
 - **Voix de Cornelius** : l’une des 22 voix de GPT-Live. Cedar (par défaut) et Marin sont conseillées pour le français ; les autres peuvent garder un léger accent anglais. La nouvelle voix s’entend à la conversation suivante.
 - **Taille de l’orbe** : de 50 à 150 % de sa taille d’origine, appliquée en direct sur le miroir ; « Revenir à 100 % » la remet à l’origine.
 
+## Écran de veille
+
+*Au quotidien.* Les peintures et les photos affichées quand personne n’est devant le miroir. Voir [L’écran de veille](miroir.md#lécran-de-veille).
+
+- **Afficher des images au repos** : désactivé par défaut. Sans image, l’écran reste noir.
+- **L’orbe revient** : « Au moindre mouvement » (par défaut) ou « Selon le réveil de Cornelius », qui suit ce qui ouvre la conversation (présence, regard ou mot « Cornelius », réglés dans « Quand il écoute »). La carte dit ce que cela donne avec vos réglages.
+- **Transition** : « Aspiration » (par défaut), « Cendres », « Onde », « Mosaïque », « Rideau », « Fondu », « Au hasard » ou « Sans transition ».
+- **Affichage des images** : « Entière, de bord à bord » (l’image entière, des bandes noires complètent), « Comme une toile » (par défaut : posée sur son propre flou, ou plein écran si ses proportions sont proches de celles de l’écran) ou « Plein écran » (bords coupés). Une image n’est jamais étirée.
+- **Durée de l’effet** : 0,5, 1 (par défaut), 1,5, 2 ou 3 secondes pour la disparition de l’image ; son retour prend 1,6 fois plus longtemps.
+- **Changer d’image toutes les** : 30 s, 1, 5 (par défaut) ou 15 minutes, ou 1 heure.
+- **Revenir aux images après** : 5 s, 30 s (par défaut), 1 ou 5 minutes sans personne devant le miroir.
+- **Images** : « Ajouter des photos » (JPEG, PNG ou WebP, 25 Mo au plus chacune, plusieurs à la fois) et « Télécharger 32 peintures » : une sélection de peintures célèbres du domaine public (Van Gogh, Monet, Hokusai, Vermeer, Léonard de Vinci…), dont 16 verticales pour un miroir en portrait, prises sur Wikimedia Commons. Pour en retirer, cochez les images (un clic sur la vignette), puis « Retirer (n) » et confirmez. Les filtres « Peintures », « Vos photos », « Verticales » et « Horizontales » limitent la grille, et « Tout sélectionner » coche ce qu’elle montre : retirer toutes les horizontales d’un miroir en portrait se fait en trois clics. Une peinture retirée revient avec « Compléter les peintures ».
+
 ## Modules
 
 *Au quotidien.* Les sources de ses réponses et les commandes qu’il peut lancer.

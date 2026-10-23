@@ -5,7 +5,12 @@ import { dirname, join } from 'node:path';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
 import { announceSatellites } from './discovery.js';
-import { ensureCertificate, localAddresses } from './network.js';
+import {
+  allowedHostname,
+  ensureCertificate,
+  localAddresses,
+  tlsWithHttpRedirect,
+} from './network.js';
 
 /** Écoute un port ; après un redémarrage, attend que l’ancienne instance l’ait libéré. */
 async function listenWithRetry(listen: () => Promise<unknown>) {
@@ -39,12 +44,14 @@ try {
     config.tlsKeyFingerprint = certificate.keyFingerprint;
   }
   let lanServer: ReturnType<typeof createServer> | null = null;
+  let lanPort: ReturnType<typeof tlsWithHttpRedirect> | null = null;
   let unannounce: (() => Promise<void>) | null = null;
   let stopping = false;
   const stop = async () => {
     if (stopping) return;
     stopping = true;
     await unannounce?.().catch(() => {});
+    lanPort?.close();
     lanServer?.close();
     lanServer?.closeAllConnections();
     // Une connexion qui traîne ne bloque pas l’arrêt plus de quelques secondes.
@@ -84,12 +91,17 @@ try {
     lanServer = server;
     // Les WebSocket du miroir et de l'administration passent par le même routage.
     server.on('upgrade', (req, socket, head) => app.server.emit('upgrade', req, socket, head));
+    // Le même port répond en HTTP par une redirection : taper l'adresse sans « s » suffit.
+    const front = tlsWithHttpRedirect(server, (host) =>
+      allowedHostname(host, true, config.allowedHosts ?? []),
+    );
+    lanPort = front;
     await listenWithRetry(
       () =>
         new Promise<void>((resolve, reject) => {
-          server.once('error', reject);
-          server.listen(config.httpsPort, '0.0.0.0', () => {
-            server.off('error', reject);
+          front.once('error', reject);
+          front.listen(config.httpsPort, '0.0.0.0', () => {
+            front.off('error', reject);
             resolve();
           });
         }),

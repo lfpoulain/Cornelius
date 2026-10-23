@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHash, X509Certificate } from 'node:crypto';
 import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
+import { createServer as createHttpsServer, request as httpsRequest } from 'node:https';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
@@ -12,6 +15,7 @@ import {
   isLoopback,
   isPrivateAddress,
   machineHostnames,
+  tlsWithHttpRedirect,
 } from '../server/network.js';
 
 test('adresses de la machine et du réseau local', () => {
@@ -74,6 +78,49 @@ test('certificat autosigné : créé une fois, réutilisé, recréé si les adre
       .replace(/(..)(?!$)/g, '$1:'),
     moved.keyFingerprint,
   );
+});
+
+test('port du réseau local : HTTPS servi, HTTP renvoyé vers l’adresse chiffrée', async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), 'cornelius-tls-'));
+  const certificate = await ensureCertificate({ directory, names: [], addresses: ['127.0.0.1'] });
+  const tls = createHttpsServer({ key: certificate.key, cert: certificate.cert }, (_req, res) =>
+    res.end('chiffré'),
+  );
+  const front = tlsWithHttpRedirect(tls, (host) => host === '127.0.0.1');
+  await new Promise<void>((resolve) => front.listen(0, '127.0.0.1', resolve));
+  t.after(() => {
+    front.close();
+    tls.closeAllConnections();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  const { port } = front.address() as AddressInfo;
+  const get = (send: typeof httpsRequest, url: string, host?: string) =>
+    new Promise<{ status?: number; location?: string; body: string }>((resolve, reject) => {
+      const req = send(url, { rejectUnauthorized: false, headers: host ? { host } : {} }, (res) => {
+        let body = '';
+        res.on('data', (chunk) => (body += chunk));
+        res.on('end', () =>
+          resolve({ status: res.statusCode, location: res.headers.location, body }),
+        );
+      });
+      req.on('error', reject);
+      req.end();
+    });
+  assert.equal((await get(httpsRequest, `https://127.0.0.1:${port}/`)).body, 'chiffré');
+  const redirected = await get(
+    httpRequest as typeof httpsRequest,
+    `http://127.0.0.1:${port}/admin?x=1`,
+  );
+  assert.equal(redirected.status, 301);
+  assert.equal(redirected.location, `https://127.0.0.1:${port}/admin?x=1`);
+  // Un hôte inconnu n'est pas renvoyé ailleurs.
+  const foreign = await get(
+    httpRequest as typeof httpsRequest,
+    `http://127.0.0.1:${port}/`,
+    'evil.example',
+  );
+  assert.equal(foreign.status, 400);
+  assert.equal(foreign.location, undefined);
 });
 
 async function fixture(t: TestContext, overrides: Partial<AppConfig> = {}) {

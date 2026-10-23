@@ -513,6 +513,81 @@ body {
     0 0 30px #ff304a99;
 }
 
+/*
+ * Écran de veille : peintures et photos plein écran, sous l’orbe. Pendant qu’elles s’affichent,
+ * tout le reste s’efface ; au retour d’une personne, l’orbe réapparaît d’abord, devant la
+ * peinture qu’il aspire, et le texte revient une fois l’écran redevenu noir.
+ */
+.mirror-screensaver {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.mirror-screensaver[data-scene='off'] {
+  visibility: hidden;
+}
+.mirror-screensaver canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.mirror-screensaver-fallback {
+  position: absolute;
+  inset: 0;
+}
+.mirror-screensaver-fallback img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.mirror-screensaver[data-fit='fill'] .mirror-screensaver-fallback img {
+  object-fit: cover;
+}
+.mirror-screensaver-fallback img.is-next {
+  opacity: var(--screensaver-mix, 0);
+}
+.mirror-screensaver-caption {
+  position: absolute;
+  right: var(--mirror-edge);
+  bottom: var(--mirror-edge);
+  max-width: 34ch;
+  text-align: right;
+  font-size: var(--mirror-text-label);
+  color: rgb(237 241 236 / 0.62);
+  text-shadow: 0 1px 8px rgb(0 0 0 / 0.85);
+  animation: screensaver-caption-in 1.2s ease 1.6s both;
+}
+.mirror-screensaver-caption span {
+  display: block;
+  font-size: var(--mirror-text);
+  color: rgb(237 241 236 / 0.82);
+}
+.mirror-screensaver:not([data-scene='on']) .mirror-screensaver-caption {
+  display: none;
+}
+@keyframes screensaver-caption-in {
+  from {
+    opacity: 0;
+  }
+}
+/* .mirror-stack passe en display: contents en paysage : on efface ses enfants, pas lui. */
+.mirror-top,
+.mirror-card-rail,
+.mirror-footer,
+.mirror-voice-state {
+  transition: opacity 0.8s ease;
+}
+.orb-fullscreen {
+  transition: opacity 0.4s ease;
+}
+.mirror-page:is([data-screensaver='entering'], [data-screensaver='on'])
+  :is(.mirror-top, .mirror-card-rail, .mirror-footer, .mirror-voice-state, .orb-fullscreen),
+.mirror-page[data-screensaver='leaving'] :is(.mirror-top, .mirror-card-rail, .mirror-footer) {
+  opacity: 0;
+}
+
 /* Cartes : la rangée de la grille fixe la hauteur disponible, la carte s’y centre. */
 /*
  * Cartes un cinquième plus petites que le reste du miroir sur grand écran (1920 x 1080 et
