@@ -1,3 +1,4 @@
+import type { VoiceProvider } from './voice-provider.js';
 import type { CameraMode } from './camera.js';
 import type { CardSettings } from './cards.js';
 import type { PresenceTimings } from './presence-timings.js';
@@ -105,6 +106,8 @@ export interface VoiceActivity {
 export interface MirrorSetup {
   /** OPENAI_API_KEY est renseignée dans .env (sa valeur n’est jamais diffusée). */
   openaiKey: boolean;
+  mistralKey?: boolean;
+  voiceKey?: boolean;
   /** Le service caméra (perception) est connecté au serveur. */
   perception: boolean;
 }
@@ -120,6 +123,7 @@ export interface MirrorState {
   screensaver?: ScreensaverState;
   /** Voix de Cornelius (GPT-Live) ; absente des anciens serveurs. */
   speechVoice?: string;
+  voiceProvider?: VoiceProvider;
   /** Module « Cartes » ; absent des anciens serveurs (3 cartes, raccourcies, 60 s). */
   cardSettings?: CardSettings;
   /** Absent des anciens serveurs : aucun son. */

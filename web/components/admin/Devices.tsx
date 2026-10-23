@@ -68,7 +68,7 @@ export function Devices({
       >
         <AdvancedAudioBuffer state={state} run={run} />
         <PresenceTimingSettings status={status} run={run} />
-        <DelegationSettings state={state} run={run} />
+        {state.voiceProvider !== 'mistral' && <DelegationSettings state={state} run={run} />}
       </CollapsibleSection>
       <p className="text-xs text-muted-foreground">
         Ces réglages sont enregistrés sur le serveur et conservés après un redémarrage.
