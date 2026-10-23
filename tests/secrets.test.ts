@@ -55,6 +55,7 @@ test('la clé OpenAI se saisit dans l’administration et compte sans redémarra
   assert.equal(list.statusCode, 200);
   const before = list.json().secrets;
   assert.equal(before[0].env, 'OPENAI_API_KEY');
+  assert.equal(before[0].group, 'providers');
   assert.equal(before[0].configured, false);
   assert.equal(f.controller.snapshot().state.setup?.openaiKey, false);
 
@@ -127,6 +128,20 @@ test('jetons des modules : saisis dans l’administration, lus par le module', a
   });
   assert.equal(saved.statusCode, 200, saved.body);
   assert.equal(weatherSecret(await definitions())?.configured, true);
+});
+
+test('les groupes et icônes des jetons viennent des déclarations des modules', async (t) => {
+  const f = await fixture(t);
+  const { definitions } = (await f.app.inject({ url: '/api/admin/addons', headers: f.headers })).json();
+  const { secrets } = (await f.app.inject({ url: '/api/admin/secrets', headers: f.headers })).json();
+  for (const definition of definitions) {
+    for (const declared of definition.secrets ?? []) {
+      const secret = secrets.find((entry: { env: string }) => entry.env === declared.env);
+      assert.ok(secret, declared.env);
+      assert.equal(secret.group, 'modules');
+      assert.equal(secret.icon, definition.display?.icon);
+    }
+  }
 });
 
 test('clés : réservées à l’administration, noms inconnus et valeurs invalides refusés', async (t) => {
