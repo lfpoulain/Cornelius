@@ -114,14 +114,26 @@ try {
     }
   }
   if (config.mobileProxyPort !== undefined) {
-    if (!Number.isInteger(config.mobileProxyPort) || config.mobileProxyPort < 1024 || config.mobileProxyPort > 65535 || [config.port, config.httpsPort].includes(config.mobileProxyPort)) throw new Error('CORNELIUS_MOBILE_PROXY_PORT invalide.');
+    if (
+      !Number.isInteger(config.mobileProxyPort) ||
+      config.mobileProxyPort < 1024 ||
+      config.mobileProxyPort > 65535 ||
+      [config.port, config.httpsPort].includes(config.mobileProxyPort)
+    )
+      throw new Error('CORNELIUS_MOBILE_PROXY_PORT invalide.');
     mobileProxy = createHttpServer((req, res) => {
-      if (!mobilePath(req.url ?? '')) { res.writeHead(404).end(); return; }
+      if (!mobilePath(req.url ?? '')) {
+        res.writeHead(404).end();
+        return;
+      }
       mobileIngress.add(req);
       app.routing(req, res);
     });
     mobileProxy.on('upgrade', (req, socket, head) => {
-      if (!mobilePath(req.url ?? '')) { socket.destroy(); return; }
+      if (!mobilePath(req.url ?? '')) {
+        socket.destroy();
+        return;
+      }
       mobileIngress.add(req);
       app.server.emit('upgrade', req, socket, head);
     });

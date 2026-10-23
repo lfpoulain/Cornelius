@@ -26,119 +26,272 @@ test('mobile association: one use, expiry, hashed credentials, restart identity,
     assert.ok(credential);
     assert.equal(store.pair(invitation.invitation, 'duplicate'), null);
     assert.equal(store.authenticate(credential.token)?.id, credential.deviceId);
-    assert.equal(JSON.stringify(db.prepare('SELECT * FROM mobile_devices').all()).includes(credential.token), false);
-    const second = store.invite(); now += 300_000;
+    assert.equal(
+      JSON.stringify(db.prepare('SELECT * FROM mobile_devices').all()).includes(credential.token),
+      false,
+    );
+    const second = store.invite();
+    now += 300_000;
     assert.equal(store.pair(second.invitation, 'expired'), null);
     assert.equal(new MobileStore(db, () => now).serverId, store.serverId);
     assert.equal(new MobileStore(db, () => now).pair(store.invite().invitation, 'restart'), null);
     store.remove(credential.deviceId);
     assert.equal(store.authenticate(credential.token), null);
-  } finally { db.close(); }
+  } finally {
+    db.close();
+  }
 });
 
 test('proxy allowlist cannot expose admin, workers, web, traversal or prefix lookalikes', () => {
-  for (const url of ['/admin', '/api/login', '/perception', '/image-generation', '/mobile/../admin', '/mobile/%2e%2e/admin', '/mobile/info/admin', '/mobile/events-evil', '/mobile//events', '/mobile/images/../secret.webp']) assert.equal(mobilePath(url), false, url);
-  for (const url of ['/mobile/pair', '/mobile/info', '/mobile/events?generation=example', '/mobile/audio', '/mobile/camera', '/mobile/images/abc-123.webp']) assert.equal(mobilePath(url), true, url);
+  for (const url of [
+    '/admin',
+    '/api/login',
+    '/perception',
+    '/image-generation',
+    '/mobile/../admin',
+    '/mobile/%2e%2e/admin',
+    '/mobile/info/admin',
+    '/mobile/events-evil',
+    '/mobile//events',
+    '/mobile/images/../secret.webp',
+  ])
+    assert.equal(mobilePath(url), false, url);
+  for (const url of [
+    '/mobile/pair',
+    '/mobile/info',
+    '/mobile/events?generation=example',
+    '/mobile/audio',
+    '/mobile/camera',
+    '/mobile/images/abc-123.webp',
+  ])
+    assert.equal(mobilePath(url), true, url);
 });
 
 async function fixture(t: TestContext) {
   const root = mkdtempSync(join(tmpdir(), 'cornelius-mobile-test-'));
-  const services = await createApp({ databasePath: ':memory:', adminPassword: 'test-password', origins: ['http://localhost'], secureCookies: false, tlsKeyFingerprint: 'AB:'.repeat(31) + 'AB', lan: true, httpsPort: 3443 }, { timers: false, imageGenerationRoot: root });
+  const services = await createApp(
+    {
+      databasePath: ':memory:',
+      adminPassword: 'test-password',
+      origins: ['http://localhost'],
+      secureCookies: false,
+      tlsKeyFingerprint: 'AB:'.repeat(31) + 'AB',
+      lan: true,
+      httpsPort: 3443,
+    },
+    { timers: false, imageGenerationRoot: root },
+  );
   await services.app.ready();
   const sockets: WebSocket[] = [];
-  t.after(async () => { sockets.forEach(s => s.terminate()); await setImmediate(); await services.app.close(); rmSync(root, { recursive: true, force: true }); });
-  const login = await services.app.inject({ method: 'POST', url: '/api/login', headers: { origin: 'http://localhost' }, payload: { password: 'test-password' } });
-  const cookie = login.cookies.map(c => `${c.name}=${c.value}`).join('; ');
+  t.after(async () => {
+    sockets.forEach((s) => s.terminate());
+    await setImmediate();
+    await services.app.close();
+    rmSync(root, { recursive: true, force: true });
+  });
+  const login = await services.app.inject({
+    method: 'POST',
+    url: '/api/login',
+    headers: { origin: 'http://localhost' },
+    payload: { password: 'test-password' },
+  });
+  const cookie = login.cookies.map((c) => `${c.name}=${c.value}`).join('; ');
   const headers = { cookie, origin: 'http://localhost' };
   async function pair() {
-    const response = await services.app.inject({ method: 'POST', url: '/api/admin/mobile/invitations', headers, payload: { localUrl: 'https://mirror.local:3443' } });
+    const response = await services.app.inject({
+      method: 'POST',
+      url: '/api/admin/mobile/invitations',
+      headers,
+      payload: { localUrl: 'https://mirror.local:3443' },
+    });
     assert.equal(response.statusCode, 200);
-    const invitation = response.json(); assert.match(invitation.svg, /^<svg/u);
-    const result = await services.app.inject({ method: 'POST', url: '/mobile/pair', payload: { invitation: invitation.invitation.invitation, name: 'iPhone test' } });
+    const invitation = response.json();
+    assert.match(invitation.svg, /^<svg/u);
+    const result = await services.app.inject({
+      method: 'POST',
+      url: '/mobile/pair',
+      payload: { invitation: invitation.invitation.invitation, name: 'iPhone test' },
+    });
     assert.equal(result.statusCode, 200);
     return result.json() as { token: string; deviceId: string };
   }
   return { ...services, headers, sockets, pair };
 }
 
-test('mobile: token required even on loopback; no browser Origin needed with bearer; revocation immediate', async t => {
+test('mobile: token required even on loopback; no browser Origin needed with bearer; revocation immediate', async (t) => {
   const f = await fixture(t);
   assert.equal((await f.app.inject('/mobile/info')).statusCode, 401);
-  assert.equal((await f.app.inject({ method: 'POST', url: '/api/admin/mobile/invitations', payload: {} })).statusCode, 403);
+  assert.equal(
+    (await f.app.inject({ method: 'POST', url: '/api/admin/mobile/invitations', payload: {} }))
+      .statusCode,
+    403,
+  );
   const credential = await f.pair();
   const headers = { authorization: 'Bearer ' + credential.token };
   assert.equal((await f.app.inject({ url: '/mobile/info', headers })).statusCode, 200);
   assert.equal((await f.app.inject({ url: '/mobile/images/old.webp', headers })).statusCode, 404);
-  const events = await f.app.injectWS('/mobile/events', { headers }); f.sockets.push(events);
+  const events = await f.app.injectWS('/mobile/events', { headers });
+  f.sockets.push(events);
   const generation = f.controller.mobileMirror()!.generation;
-  const camera = await f.app.injectWS('/mobile/camera?generation=' + generation, { headers }); f.sockets.push(camera);
+  const camera = await f.app.injectWS('/mobile/camera?generation=' + generation, { headers });
+  f.sockets.push(camera);
   const closed = once(events, 'close');
-  await f.app.inject({ method: 'DELETE', url: '/api/admin/mobile/devices/' + credential.deviceId, headers: f.headers });
+  await f.app.inject({
+    method: 'DELETE',
+    url: '/api/admin/mobile/devices/' + credential.deviceId,
+    headers: f.headers,
+  });
   await closed;
   assert.equal(f.controller.mobileMirror(), null);
   assert.equal((await f.app.inject({ url: '/mobile/info', headers })).statusCode, 401);
 });
 
-test('web and mobile share one owner; old native camera cannot send after takeover', async t => {
-  const f = await fixture(t), credential = await f.pair();
+test('web and mobile share one owner; old native camera cannot send after takeover', async (t) => {
+  const f = await fixture(t),
+    credential = await f.pair();
   const headers = { authorization: 'Bearer ' + credential.token };
-  const first = await f.app.injectWS('/mobile/events', { headers }); f.sockets.push(first);
+  const first = await f.app.injectWS('/mobile/events', { headers });
+  f.sockets.push(first);
   assert.ok(f.controller.mobileMirror());
   const closed = once(first, 'close');
-  const web = await f.app.injectWS('/events', { headers: { origin: 'http://localhost', host: 'localhost' } }); f.sockets.push(web);
+  const web = await f.app.injectWS('/events', {
+    headers: { origin: 'http://localhost', host: 'localhost' },
+  });
+  f.sockets.push(web);
   await closed;
   assert.equal(f.controller.mobileMirror(), null);
   assert.equal(f.controller.snapshot().state.browserAudioReady, false);
 });
 
-test('background: only admitted session continues, fresh camera cannot change identity, silence ends it', t => {
-  const db = openDatabase(':memory:'); t.after(() => db.close());
+test('background: only admitted session continues, fresh camera cannot change identity, silence ends it', (t) => {
+  const db = openDatabase(':memory:');
+  t.after(() => db.close());
   let now = 10000;
-  const profiles = new ProfileRepository(db), prefs = new SessionPreferences(db);
+  const profiles = new ProfileRepository(db),
+    prefs = new SessionPreferences(db);
   prefs.setSessionMode(4);
   const transport: SessionTransport = { open() {}, close() {} };
   const controller = new SessionController(profiles, transport, () => now, prefs);
   controller.setMobileMirror({ deviceId: 'phone', generation: 'native', background: false });
-  controller.heartbeat(); controller.setBrowserAudioReady(true); controller.setWakeWordAvailability(true, null);
+  controller.heartbeat();
+  controller.setBrowserAudioReady(true);
+  controller.setWakeWordAvailability(true, null);
   assert.equal(controller.wakeDetected(), true);
-  const scope = controller.scope(); controller.controlAttached(scope); controller.mediaConnected(scope); controller.started(scope);
+  const scope = controller.scope();
+  controller.controlAttached(scope);
+  controller.sessionStarted(scope);
   assert.equal(controller.sessionState().phase, 'ready');
   controller.setMobileBackground(true);
   assert.equal(controller.memoryProfileId(), null);
-  controller.observe({ schemaVersion: 1, producerBootId: 'stale', sequence: 1, observedAt: now, health: 'ok', presence: true, engaged: true, people: [{ trackId: 'old', profileId: null }] });
-  for (let i = 0; i < 19; i++) { now += 1000; controller.heartbeat(); controller.tick(); }
+  controller.observe({
+    schemaVersion: 1,
+    producerBootId: 'stale',
+    sequence: 1,
+    observedAt: now,
+    health: 'ok',
+    presence: true,
+    engaged: true,
+    people: [{ trackId: 'old', profileId: null }],
+  });
+  for (let i = 0; i < 19; i++) {
+    now += 1000;
+    controller.heartbeat();
+    controller.tick();
+  }
   assert.equal(controller.sessionState().phase, 'ready');
-  now += 1001; controller.heartbeat(); controller.tick();
+  now += 1001;
+  controller.heartbeat();
+  controller.tick();
   assert.notEqual(controller.sessionState().phase, 'ready');
   controller.command({ type: 'start' });
   assert.notEqual(controller.sessionState().phase, 'connecting');
 });
 
-test('native relay opens PCM Live with screen tools and never calls WebRTC', async t => {
-  const db = openDatabase(':memory:'); t.after(() => db.close());
+test('native relay opens PCM Live with screen tools and never calls WebRTC', async (t) => {
+  const db = openDatabase(':memory:');
+  t.after(() => db.close());
   let handlers: Parameters<NonNullable<LiveGateway['connect']>>[1] | null = null;
   let config: Parameters<NonNullable<LiveGateway['connect']>>[0] | null = null;
   const sent: Buffer[] = [];
   const gateway: LiveGateway = {
-    create: async () => { throw new Error('WebRTC must not run'); },
-    attach: () => { throw new Error('sideband must not run'); },
-    connect(value, listener) { config = value; handlers = listener; return { send() {}, dispose() {}, sendAudio(pcm) { sent.push(pcm); } }; },
+    create: async () => {
+      throw new Error('WebRTC must not run');
+    },
+    attach: () => {
+      throw new Error('sideband must not run');
+    },
+    connect(value, listener) {
+      config = value;
+      handlers = listener;
+      return {
+        send() {},
+        dispose() {},
+        sendAudio(pcm) {
+          sent.push(pcm);
+        },
+      };
+    },
   };
-  const live = new LiveTransport(gateway); t.after(() => live.dispose());
-  const profiles = new ProfileRepository(db), prefs = new SessionPreferences(db); prefs.setSessionMode(4);
-  const controller = new SessionController(profiles, live, Date.now, prefs); live.attach(controller);
-  controller.setMobileMirror({ deviceId: 'phone', generation: 'native-generation', background: false });
-  controller.heartbeat(); controller.setBrowserAudioReady(true); controller.setWakeWordAvailability(true, null); controller.wakeDetected();
-  assert.ok(config); assert.ok(handlers);
-  assert.deepEqual((config as { audio: { format: unknown } }).audio.format, { type: 'audio/pcm', rate: 16000 });
-  (handlers as Parameters<LiveGateway['attach']>[1]).event({ type: 'session.started', session: { id: 'test' } } as never);
-  live.mobileAudio('wrong-generation', Buffer.alloc(2560)); assert.equal(sent.length, 0);
-  live.mobileAudio('native-generation', Buffer.alloc(2560)); assert.equal(sent.length, 1);
+  const live = new LiveTransport(gateway);
+  t.after(() => live.dispose());
+  const profiles = new ProfileRepository(db),
+    prefs = new SessionPreferences(db);
+  prefs.setSessionMode(4);
+  const controller = new SessionController(profiles, live, Date.now, prefs);
+  live.attach(controller);
+  controller.setMobileMirror({
+    deviceId: 'phone',
+    generation: 'native-generation',
+    background: false,
+  });
+  controller.heartbeat();
+  controller.setBrowserAudioReady(true);
+  controller.setWakeWordAvailability(true, null);
+  controller.wakeDetected();
+  assert.ok(config);
+  assert.ok(handlers);
+  assert.deepEqual((config as { audio: { format: unknown } }).audio.format, {
+    type: 'audio/pcm',
+    rate: 16000,
+  });
+  (handlers as Parameters<LiveGateway['attach']>[1]).event({
+    type: 'session.started',
+    session: { id: 'test' },
+  } as never);
+  live.mobileAudio('wrong-generation', Buffer.alloc(2560));
+  assert.equal(sent.length, 0);
+  live.mobileAudio('native-generation', Buffer.alloc(2560));
+  assert.equal(sent.length, 1);
 });
 
 test('Swift fixture preserves card scope and a valid recognition observation', () => {
-  const fixture = JSON.parse(readFileSync(new URL('../ios/Cornelius/Resources/mirror-fixture.json', import.meta.url), 'utf8')) as StateEvent;
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('../ios/Cornelius/Resources/mirror-fixture.json', import.meta.url),
+      'utf8',
+    ),
+  ) as StateEvent;
   assert.equal(fixture.schemaVersion, 1);
-  for (const card of fixture.state.cards) assert.deepEqual([card.interactionId, card.profileEpoch, card.contextVersion], [fixture.state.session.interactionId, fixture.state.session.profileEpoch, fixture.state.session.contextVersion]);
-  assert.equal(validateObservation({ schemaVersion: 1, producerBootId: fixture.bootId, sequence: 1, observedAt: fixture.sentAt, health: fixture.state.presence.health, presence: true, engaged: true, people: fixture.state.presence.people }), true);
+  for (const card of fixture.state.cards)
+    assert.deepEqual(
+      [card.interactionId, card.profileEpoch, card.contextVersion],
+      [
+        fixture.state.session.interactionId,
+        fixture.state.session.profileEpoch,
+        fixture.state.session.contextVersion,
+      ],
+    );
+  assert.equal(
+    validateObservation({
+      schemaVersion: 1,
+      producerBootId: fixture.bootId,
+      sequence: 1,
+      observedAt: fixture.sentAt,
+      health: fixture.state.presence.health,
+      presence: true,
+      engaged: true,
+      people: fixture.state.presence.people,
+    }),
+    true,
+  );
 });

@@ -119,7 +119,9 @@ const unknownPersonDiagnostic =
 export class SessionController {
   readonly bootId = randomUUID();
   private mobile: import('../shared/mobile.js').MobileMirror | null = null;
-  mobileMirror() { return this.mobile; }
+  mobileMirror() {
+    return this.mobile;
+  }
   setMobileMirror(value: import('../shared/mobile.js').MobileMirror | null) {
     if (this.mobile?.generation === value?.generation) return;
     this.reopenAfterClose = null;
@@ -1615,11 +1617,18 @@ export class SessionController {
 
   /** Minuterie de silence : toujours en mode voix, sur option dans les modes caméra. */
   silenceTracking(): boolean {
-    return !!this.mobile?.background || this.session.mode === 4 || this.silenceClose.enabled || this.satelliteSession();
+    return (
+      !!this.mobile?.background ||
+      this.session.mode === 4 ||
+      this.silenceClose.enabled ||
+      this.satelliteSession()
+    );
   }
 
   private silenceDelay(): number {
-    return this.mobile?.background && !this.silenceClose.enabled ? 20_000 : this.silenceClose.delayMs;
+    return this.mobile?.background && !this.silenceClose.enabled
+      ? 20_000
+      : this.silenceClose.delayMs;
   }
 
   /** Parole locale détectée (VAD) : le silence ne compte qu’après la fin de la phrase. */

@@ -594,16 +594,28 @@ export async function createApp(
   });
 
   const mobile = registerMobile(app, {
-    db, now, config, controller, perception, live, wakeArbiter, requireAdmin, defaultPassword,
+    db,
+    now,
+    config,
+    controller,
+    perception,
+    live,
+    wakeArbiter,
+    requireAdmin,
+    defaultPassword,
     image: (id) => imageGeneration.generatedFile(id),
     claim: (socket, deviceId) => {
-      if (kiosk?.socket !== socket) kiosk?.socket.close(1008, 'Miroir affiché sur un autre appareil.');
+      if (kiosk?.socket !== socket)
+        kiosk?.socket.close(1008, 'Miroir affiché sur un autre appareil.');
       kiosk = { socket, kioskId: 'mobile:' + deviceId };
       clients.set(socket, { role: 'kiosk', sessionId: null, kioskId: kiosk.kioskId, remote: true });
       controller.heartbeat();
     },
     current: (socket) => kiosk?.socket === socket,
-    gone: (socket) => { clients.delete(socket); if (kiosk?.socket === socket) kiosk = null; },
+    gone: (socket) => {
+      clients.delete(socket);
+      if (kiosk?.socket === socket) kiosk = null;
+    },
   });
 
   app.addHook('onSend', async (request, reply, payload) => {

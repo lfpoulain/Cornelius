@@ -215,10 +215,20 @@ export class LiveTransport implements SessionTransport {
   private vision: VisionToolBridge | null = null;
   private memory: PersonalMemory | null = null;
   private mobileOutput: ((pcm: Buffer | null) => void) | null = null;
-  attachMobileOutput(output: (pcm: Buffer | null) => void) { this.mobileOutput = output; }
+  attachMobileOutput(output: (pcm: Buffer | null) => void) {
+    this.mobileOutput = output;
+  }
   mobileAudio(generation: string, pcm: Buffer) {
     const active = this.active;
-    if (active?.mobileGeneration === generation && active.attached && !active.closing && !active.finalized && !active.blocked && !this.isBlocked()) active.audio?.sendAudio(pcm);
+    if (
+      active?.mobileGeneration === generation &&
+      active.attached &&
+      !active.closing &&
+      !active.finalized &&
+      !active.blocked &&
+      !this.isBlocked()
+    )
+      active.audio?.sendAudio(pcm);
   }
   private satelliteOutput: ((satelliteId: string, pcm: Buffer) => void) | null = null;
   /** Son de Cornelius vers le satellite de la conversation, au rythme où Live le produit. */
@@ -369,7 +379,11 @@ export class LiveTransport implements SessionTransport {
     }
     // Profil rattaché au satellite (choisi dans l’administration), ou conversation anonyme.
     const profileId = this.controller.snapshot().state.activeProfile?.id ?? null;
-    const { client: _client, audio, ...config } = this.configuration(profileId, !active.mobileGeneration);
+    const {
+      client: _client,
+      audio,
+      ...config
+    } = this.configuration(profileId, !active.mobileGeneration);
     active.toolsProfileId = profileId;
     // Mémoire personnelle seulement au nom d’un profil : une conversation anonyme ne laisse rien.
     if (profileId) this.memory?.open(active.scope);
@@ -527,7 +541,8 @@ export class LiveTransport implements SessionTransport {
     if (this.isBlocked()) throw new Error('Connexions OpenAI bloquées.');
     const active = this.require(scope);
     // Le satellite porte déjà le son de sa conversation : aucune offre WebRTC n’y a sa place.
-    if (active.satelliteId || active.mobileGeneration) throw new Error('Conversation portée par un appareil.');
+    if (active.satelliteId || active.mobileGeneration)
+      throw new Error('Conversation portée par un appareil.');
     // Une clé changée pendant la création ne mélange pas deux comptes : cette session garde la
     // passerelle qui l’a créée.
     const gateway = this.gateway;
@@ -879,11 +894,15 @@ export class LiveTransport implements SessionTransport {
           : {}),
       });
     }
-    if (active.mobileGeneration && this.controller.mobileMirror()?.generation === active.mobileGeneration) {
+    if (
+      active.mobileGeneration &&
+      this.controller.mobileMirror()?.generation === active.mobileGeneration
+    ) {
       const type = String(object(event).type ?? '');
       if (type === 'session.output_audio.delta') {
         const delta = object(event).delta;
-        if (typeof delta === 'string' && delta.length <= 262_144) this.mobileOutput?.(Buffer.from(delta, 'base64'));
+        if (typeof delta === 'string' && delta.length <= 262_144)
+          this.mobileOutput?.(Buffer.from(delta, 'base64'));
       }
     }
     // Satellite : le flux de sortie (16 kHz, silences compris) part tel quel vers sa pièce.
@@ -1463,7 +1482,8 @@ export class LiveTransport implements SessionTransport {
     const profileId = this.controller.snapshot().state.activeProfile?.id ?? null;
     let tool: ToolResult;
     try {
-      if (this.controller.mobileMirror()?.background) throw new Error('Caméra suspendue en arrière-plan.');
+      if (this.controller.mobileMirror()?.background)
+        throw new Error('Caméra suspendue en arrière-plan.');
       tool = await this.vision!.look(
         {
           profileId,

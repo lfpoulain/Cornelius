@@ -57,7 +57,9 @@ export function loadConfig(): AppConfig & { port: number } {
   return {
     port,
     mobileRemoteUrl: process.env.CORNELIUS_MOBILE_REMOTE_URL || undefined,
-    mobileProxyPort: process.env.CORNELIUS_MOBILE_PROXY_PORT ? Number(process.env.CORNELIUS_MOBILE_PROXY_PORT) : undefined,
+    mobileProxyPort: process.env.CORNELIUS_MOBILE_PROXY_PORT
+      ? Number(process.env.CORNELIUS_MOBILE_PROXY_PORT)
+      : undefined,
     mobileProxyHost: process.env.CORNELIUS_MOBILE_PROXY_HOST || '127.0.0.1',
     loginRateLimit,
     // Réseau local ouvert par défaut ; CORNELIUS_LAN=0 réserve Cornelius à la machine.

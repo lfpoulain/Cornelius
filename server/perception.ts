@@ -80,8 +80,12 @@ export class PerceptionBridge {
   private worker: WebSocket | null = null;
   private mobileGeneration: string | null = null;
   private mobileSnapshot: (() => void) | null = null;
-  onMobileSnapshot(callback: () => void) { this.mobileSnapshot = callback; }
-  mobileCameraEnabled() { return this.wantsCamera(); }
+  onMobileSnapshot(callback: () => void) {
+    this.mobileSnapshot = callback;
+  }
+  mobileCameraEnabled() {
+    return this.wantsCamera();
+  }
   setMobileSource(generation: string | null) {
     this.mobileGeneration = generation;
     this.send({ type: 'camera_source', generation });
@@ -89,7 +93,13 @@ export class PerceptionBridge {
     this.syncCamera();
   }
   mobileFrame(generation: string, jpeg: Buffer) {
-    if (this.mobileGeneration !== generation || !this.wantsCamera() || !this.worker || this.worker.bufferedAmount > 256_000) return;
+    if (
+      this.mobileGeneration !== generation ||
+      !this.wantsCamera() ||
+      !this.worker ||
+      this.worker.bufferedAmount > 256_000
+    )
+      return;
     const header = Buffer.from('C' + generation + '\n');
     this.worker.send(Buffer.concat([header, jpeg]));
   }
@@ -240,7 +250,11 @@ export class PerceptionBridge {
       }
       try {
         const event = JSON.parse(data.toString());
-        if (event.type === 'observation' && (event.generation ?? null) === this.mobileGeneration && validateObservation(event.observation))
+        if (
+          event.type === 'observation' &&
+          (event.generation ?? null) === this.mobileGeneration &&
+          validateObservation(event.observation)
+        )
           this.controller.observe(this.withKnownProfiles(event.observation));
         else if (
           event.type === 'vad' &&
@@ -382,10 +396,17 @@ export class PerceptionBridge {
 
   private send(value: unknown) {
     if (this.mobileGeneration && (value as { type?: string })?.type === 'vision') {
-      const generation = this.mobileGeneration, worker = this.worker;
+      const generation = this.mobileGeneration,
+        worker = this.worker;
       this.mobileSnapshot?.();
       const timer = setTimeout(() => {
-        if (this.mobileGeneration === generation && this.worker === worker && worker?.readyState === 1 && this.wantsCamera()) worker.send(JSON.stringify(value));
+        if (
+          this.mobileGeneration === generation &&
+          this.worker === worker &&
+          worker?.readyState === 1 &&
+          this.wantsCamera()
+        )
+          worker.send(JSON.stringify(value));
       }, 350);
       timer.unref();
       return;
