@@ -1598,15 +1598,3 @@
   line-height: 1.7;
   color: var(--muted-foreground);
 }
-
-.secret-card-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--color-muted-foreground) 55%, transparent) transparent;
-}
-.secret-card-scroll::-webkit-scrollbar {
-  height: 8px;
-}
-.secret-card-scroll::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-muted-foreground) 55%, transparent);
-}

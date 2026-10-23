@@ -1,6 +1,5 @@
-import { useCallback, useState, type FormEvent } from 'react';
+import { useCallback, useId, useState, type FormEvent } from 'react';
 import {
-  AudioWaveform,
   Boxes,
   ExternalLink,
   KeyRound,
@@ -9,6 +8,7 @@ import {
 } from 'lucide-react';
 import type { SecretView } from '../../../shared/types';
 import { api } from '../../api';
+import { addonIcon } from './addon-icons';
 import type { RunAction } from './types';
 import { ConfirmAction, ResourceState } from './shared';
 import { useAdminResource } from './useAdminResource';
@@ -29,29 +29,6 @@ function status(secret: SecretView): string {
   if (!secret.configured) return 'À renseigner';
   const end = secret.hint ? ` (se termine par ${secret.hint})` : '';
   return secret.source === 'admin' ? `Dans l’administration${end}` : `Dans le fichier .env${end}`;
-}
-
-interface SecretPresentation {
-  icon?: LucideIcon;
-  logo?: string;
-  iconClassName: string;
-}
-
-const providerEnvs = new Set(['OPENAI_API_KEY', 'MISTRAL_API_KEY']);
-
-function presentationOf(secret: SecretView): SecretPresentation {
-  switch (secret.env) {
-    case 'OPENAI_API_KEY':
-      return { logo: '/providers/openai.svg', iconClassName: 'bg-white text-black' };
-    case 'MISTRAL_API_KEY':
-      return { icon: AudioWaveform, iconClassName: 'bg-orange-500/10 text-orange-500' };
-    case 'CORNELIUS_PRIM_API_KEY':
-      return { logo: '/providers/idfm.svg', iconClassName: 'bg-white' };
-    case 'CORNELIUS_METEO_CONCEPT_TOKEN':
-      return { logo: '/providers/meteo-concept.png', iconClassName: 'bg-white' };
-    default:
-      return { icon: KeyRound, iconClassName: 'bg-primary/10 text-primary' };
-  }
 }
 
 /**
@@ -117,7 +94,7 @@ export function SecretField({
         />
       )}
       {editing && (
-        <form className="flex flex-col gap-2 sm:flex-row" onSubmit={(event) => void save(event)}>
+        <form className="flex flex-wrap gap-2" onSubmit={(event) => void save(event)}>
           <label htmlFor={id} className="sr-only">
             {secret.label}
           </label>
@@ -126,7 +103,7 @@ export function SecretField({
             type="password"
             autoComplete="off"
             spellCheck={false}
-            className="min-w-0 flex-1 font-mono"
+            className="min-w-0 flex-1 basis-48 font-mono"
             placeholder="Collez la valeur ici"
             value={value}
             onChange={(event) => setValue(event.target.value)}
@@ -175,20 +152,15 @@ function SecretCard({
   run: RunAction;
   onChanged: (secrets: SecretView[]) => void;
 }) {
-  const presentation = presentationOf(secret);
-  const Icon = presentation.icon;
+  const Icon = secret.group === 'modules' ? addonIcon(secret.icon) : KeyRound;
   return (
-    <article className="flex min-w-0 snap-start flex-col gap-4 rounded-xl border bg-card/50 p-4 shadow-sm [flex:0_0_min(28rem,calc(100vw-5rem))]">
+    <article className="flex min-w-0 flex-col gap-4 rounded-xl border bg-card/50 p-4 shadow-sm">
       <div className="flex min-w-0 items-start gap-3">
         <span
-          className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${presentation.iconClassName}`}
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
           aria-hidden="true"
         >
-          {presentation.logo ? (
-            <img src={presentation.logo} alt="" className="size-6 object-contain" />
-          ) : Icon ? (
-            <Icon className="size-5" />
-          ) : null}
+          <Icon className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
           <h4 className="text-sm font-semibold leading-5">
@@ -230,8 +202,8 @@ function SecretGroup({
   run: RunAction;
   onChanged: (secrets: SecretView[]) => void;
 }) {
+  const headingId = useId();
   if (secrets.length === 0) return null;
-  const headingId = `secret-group-${title === 'Modules' ? 'modules' : 'providers'}`;
   return (
     <section className="space-y-3" aria-labelledby={headingId}>
       <div className="flex items-start gap-2">
@@ -243,7 +215,7 @@ function SecretGroup({
           <p className="text-xs text-muted-foreground">{description}</p>
         </div>
       </div>
-      <div className="secret-card-scroll flex snap-x snap-mandatory gap-3 overflow-x-auto pb-3 [scrollbar-gutter:stable]">
+      <div className="grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(min(22rem,100%),1fr))]">
         {secrets.map((secret) => (
           <SecretCard key={secret.env} secret={secret} run={run} onChanged={onChanged} />
         ))}
@@ -271,8 +243,8 @@ export function Secrets({ run }: { run: RunAction }) {
       <CardContent>
         <ResourceState resource={shown} loadingLabel="Lecture des clés…">
           {(secrets) => {
-            const providers = secrets.filter((secret) => providerEnvs.has(secret.env));
-            const modules = secrets.filter((secret) => !providerEnvs.has(secret.env));
+            const providers = secrets.filter((secret) => secret.group === 'providers');
+            const modules = secrets.filter((secret) => secret.group === 'modules');
             return (
               <div className="space-y-7">
                 <SecretGroup

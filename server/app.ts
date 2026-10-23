@@ -902,6 +902,7 @@ export async function createApp(
     return [
       {
         ...describe('OPENAI_API_KEY'),
+        group: 'providers' as const,
         label: 'Clé OpenAI',
         usedBy: 'Conversation et mémoire',
         url: 'https://platform.openai.com/api-keys',
@@ -911,6 +912,8 @@ export async function createApp(
         ...new Map([...addonSecrets.values()].map((secret) => [secret.env, secret])).values(),
       ].map((secret) => ({
         ...describe(secret.env),
+        group: 'modules' as const,
+        icon: secret.addon.display?.icon,
         label: secret.label.replace(/^(un|une)\s+/u, '').replace(/^./u, (c) => c.toUpperCase()),
         usedBy: secret.addon.sourceLabel,
         url: secret.url ?? null,

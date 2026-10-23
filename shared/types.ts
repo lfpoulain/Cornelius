@@ -4,7 +4,7 @@ import type { PresenceTimings } from './presence-timings.js';
 import type { DelegationMode } from './delegation.js';
 import type { AdmissionSound } from './admission-sound.js';
 import type { GreetingMode, SilenceClose } from './conversation.js';
-import type { AmbientDisplay, ModuleCard } from './addons.js';
+import type { AddonIcon, AmbientDisplay, ModuleCard } from './addons.js';
 import type { Opening } from './opening.js';
 
 export type { ModuleCard };
@@ -273,6 +273,9 @@ export interface VisionStatus {
 }
 /** Clé OpenAI ou jeton d’un module, vu par l’administration : jamais sa valeur. */
 export interface SecretView {
+  group: 'providers' | 'modules';
+  /** Icône déclarée par le module ; absente pour les clés du cœur. */
+  icon?: AddonIcon;
   /** Variable du fichier .env qui sert aussi de nom, par exemple OPENAI_API_KEY. */
   env: string;
   label: string;
