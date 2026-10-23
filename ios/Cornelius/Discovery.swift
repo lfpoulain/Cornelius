@@ -1,7 +1,7 @@
 import Foundation
 import UIKit
 
-@MainActor final class Discovery: NSObject, ObservableObject, NetServiceBrowserDelegate, NetServiceDelegate {
+@MainActor final class Discovery: NSObject, ObservableObject, @preconcurrency NetServiceBrowserDelegate, @preconcurrency NetServiceDelegate {
     struct Server: Hashable {
         let name: String
         let url: URL
