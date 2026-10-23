@@ -147,3 +147,44 @@ test('clés : réservées à l’administration, noms inconnus et valeurs invali
   });
   assert.equal(invalid.statusCode, 400);
 });
+
+test('Groq : clé active indépendante d’OpenAI, masquée et prise en compte sans redémarrage', async (t) => {
+  const f = await fixture(t, { aiProvider: 'groq', openaiKey });
+  assert.equal(f.controller.snapshot().state.setup?.aiProvider, 'groq');
+  assert.equal(f.controller.snapshot().state.setup?.openaiKey, false);
+  const groqKey = 'gsk-groq-test-admin-0123456789abcd';
+  const denied = await f.app.inject({
+    method: 'PUT',
+    url: '/api/admin/secrets/GROQ_API_KEY',
+    headers: { origin },
+    payload: { value: groqKey },
+  });
+  assert.equal(denied.statusCode, 401);
+  const saved = await f.app.inject({
+    method: 'PUT',
+    url: '/api/admin/secrets/GROQ_API_KEY',
+    headers: f.headers,
+    payload: { value: groqKey },
+  });
+  assert.equal(saved.statusCode, 200);
+  assert.ok(!saved.body.includes(groqKey));
+  assert.equal(f.controller.snapshot().state.setup?.openaiKey, true);
+  const status = await f.app.inject({ url: '/api/admin/devices', headers: f.headers });
+  assert.equal(status.json().apiConfigured, true);
+  const removed = await f.app.inject({
+    method: 'DELETE',
+    url: '/api/admin/secrets/GROQ_API_KEY',
+    headers: f.headers,
+  });
+  assert.equal(removed.statusCode, 200);
+  assert.equal(f.controller.snapshot().state.setup?.openaiKey, false);
+  assert.ok(!JSON.stringify(f.controller.snapshot()).includes(groqKey));
+  const logs = await f.app.inject({ url: '/api/admin/logs', headers: f.headers });
+  assert.ok(!logs.body.includes(groqKey));
+});
+
+test('Groq : une clé présente ne modifie pas le fournisseur OpenAI par défaut', async (t) => {
+  const f = await fixture(t, { groqKey: 'gsk-env-groq-test-123456789' });
+  assert.equal(f.controller.snapshot().state.setup?.openaiKey, false);
+  assert.equal(f.controller.snapshot().state.setup?.aiProvider, undefined);
+});

@@ -43,6 +43,7 @@ import {
 import { SessionController } from './controller.js';
 import { DEFAULT_ADMIN_PASSWORD, type AppConfig } from './config.js';
 import { LiveTransport } from './live/transport.js';
+import { createGroqGateway, createGroqMemoryExtractor } from './groq.js';
 import { createLiveGateway } from './live/gateway.js';
 import { PerceptionBridge } from './perception.js';
 import { ModelDownloads, type ModelLauncher } from './model-downloads.js';
@@ -153,6 +154,7 @@ export async function createApp(
     console: options.timers !== false,
     secrets: [
       config.openaiKey ?? '',
+      config.groqKey ?? '',
       config.adminPassword,
       config.perceptionToken ?? '',
       imageGenerationToken,
@@ -176,9 +178,10 @@ export async function createApp(
     logs.write('warn', 'local', 'Mot de passe administrateur par défaut', {
       conseil: 'Le changer dans l’administration, Mise en route.',
     });
-  // Clé OpenAI et jetons des modules : saisis dans l’administration, sinon lus dans .env.
+  // Clés des fournisseurs et jetons des modules : saisis dans l’administration, sinon lus dans .env.
   const envSecrets: Record<string, string | undefined> = {
     OPENAI_API_KEY: config.openaiKey,
+    GROQ_API_KEY: config.groqKey,
     CORNELIUS_METEO_CONCEPT_TOKEN: config.meteoConceptToken,
     CORNELIUS_PRIM_API_KEY: config.primApiKey,
   };
@@ -205,6 +208,7 @@ export async function createApp(
   // Les secrets du cœur ne sont jamais prêtés à un module.
   const reservedSecrets = new Set([
     'OPENAI_API_KEY',
+    'GROQ_API_KEY',
     'CORNELIUS_ADMIN_PASSWORD',
     'CORNELIUS_PERCEPTION_TOKEN',
     'CORNELIUS_IMAGE_GENERATION_TOKEN',
@@ -257,15 +261,25 @@ export async function createApp(
       : resolve('data', 'generated-images'),
   );
   const agents = new Agents(new AgentRepository(db, now), new HermesClient(http, now), now);
-  const initialKey = openaiKey();
+  const groq = config.aiProvider === 'groq';
+  const conversationKey = () => secretStore.get(groq ? 'GROQ_API_KEY' : 'OPENAI_API_KEY');
+  const groqOptions = {
+    model: config.groqModel,
+    transcriptionModel: config.groqTranscriptionModel,
+  };
+  const makeGateway = (key: string) =>
+    groq ? createGroqGateway(key, groqOptions) : createLiveGateway(key, logs);
+  const makeExtractor = (key: string) =>
+    groq ? createGroqMemoryExtractor(key, groqOptions) : createMemoryExtractor(key);
+  const initialKey = conversationKey();
   const makeImageCreator = options.openaiImageCreator ?? createOpenAIImageCreator;
-  let openaiImageCreator = initialKey ? makeImageCreator(initialKey) : null;
+  let openaiImageCreator = openaiKey() ? makeImageCreator(openaiKey()!) : null;
   imageGeneration.useOpenAI({
     creator: () => openaiImageCreator,
     blocked: () => preferences.getOpenAIBlocked(),
   });
   const live = new LiveTransport(
-    initialKey ? createLiveGateway(initialKey, logs) : null,
+    initialKey ? makeGateway(initialKey) : null,
     () => preferences.getOpenAIBlocked(),
     logs,
     {
@@ -277,20 +291,24 @@ export async function createApp(
       personality: (id) => personality.get(id),
     },
     now,
+    groq ? 'Groq' : 'OpenAI',
   );
   logs.write(
     !initialKey ? 'warn' : 'info',
-    'openai',
+    groq ? 'groq' : 'openai',
     preferences.getOpenAIBlocked()
-      ? 'Connexions OpenAI bloquées par l’administration'
+      ? 'Connexions IA bloquées par l’administration'
       : initialKey
         ? 'Clé configurée ; connexion uniquement au démarrage d’une session'
-        : 'Clé OpenAI absente',
+        : 'Clé du fournisseur de conversation absente',
   );
   const controller = new SessionController(profiles, live, now, preferences, (name, details) =>
     logs.write('info', 'mesure', name, details),
   );
-  controller.setSetup({ openaiKey: !!initialKey });
+  controller.setSetup({
+    openaiKey: !!initialKey,
+    ...(groq ? { aiProvider: 'groq' as const } : {}),
+  });
   imageGeneration.onActivity((activity) => controller.setImageActivity(activity));
   const ambient = new AmbientModules(
     addonRuntime,
@@ -307,7 +325,7 @@ export async function createApp(
   const memory = new PersonalMemory(
     new MemoryRepository(db, now),
     controller,
-    options.memoryExtractor ?? (initialKey ? createMemoryExtractor(initialKey) : null),
+    options.memoryExtractor ?? (initialKey ? makeExtractor(initialKey) : null),
     now,
     logs,
   );
@@ -315,12 +333,14 @@ export async function createApp(
   secretStore.onChange((name) => {
     const value = secretStore.get(name);
     logs.addSecret(value);
-    if (name === 'OPENAI_API_KEY') {
-      live.setGateway(value ? createLiveGateway(value, logs) : null);
-      openaiImageCreator = value ? makeImageCreator(value) : null;
-      if (!options.memoryExtractor)
-        memory.setExtractor(value ? createMemoryExtractor(value) : null);
+    if (name === 'OPENAI_API_KEY') openaiImageCreator = value ? makeImageCreator(value) : null;
+    if (name === (groq ? 'GROQ_API_KEY' : 'OPENAI_API_KEY')) {
+      memory.cancel();
+      live.setGateway(value ? makeGateway(value) : null);
+      if (!options.memoryExtractor) memory.setExtractor(value ? makeExtractor(value) : null);
       controller.setSetup({ openaiKey: !!value });
+      // Une clé retirée ou remplacée annule aussi les requêtes déjà en cours.
+      controller.close('Clé de conversation modifiée.');
     }
     logs.write('info', 'local', value ? 'Clé enregistrée' : 'Clé retirée', {
       name,
@@ -371,7 +391,7 @@ export async function createApp(
     const local = perception.snapshot();
     return {
       presenceTimings: controller.getPresenceTimings(),
-      apiConfigured: !!openaiKey(),
+      apiConfigured: !!conversationKey(),
       perceptionConfigured: !!config.perceptionToken,
       defaultPassword: defaultPassword(),
       enrolledFaces: local.enrolledProfileIds.length,
@@ -903,9 +923,16 @@ export async function createApp(
       {
         ...describe('OPENAI_API_KEY'),
         label: 'Clé OpenAI',
-        usedBy: 'Conversation et mémoire',
+        usedBy: groq ? 'Images OpenAI (optionnel)' : 'Conversation et mémoire',
         url: 'https://platform.openai.com/api-keys',
         note: null,
+      },
+      {
+        ...describe('GROQ_API_KEY'),
+        label: 'Clé Groq',
+        usedBy: groq ? 'Conversation et mémoire (actif)' : 'Conversation et mémoire (optionnel)',
+        url: 'https://console.groq.com/keys',
+        note: 'Pour utiliser Groq, définissez CORNELIUS_AI_PROVIDER=groq dans .env puis redémarrez. La lecture utilise une voix française locale du navigateur.',
       },
       ...[
         ...new Map([...addonSecrets.values()].map((secret) => [secret.env, secret])).values(),

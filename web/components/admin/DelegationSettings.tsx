@@ -59,6 +59,18 @@ export function DelegationSettings({ state, run }: { state: MirrorState; run: Ru
     });
   };
   const label = modes.find((entry) => entry.value === confirming)?.label;
+  if (state.setup?.aiProvider === 'groq')
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle as="h4">Recherches et actions</CardTitle>
+          <CardDescription>
+            Groq utilise le modèle configuré dans CORNELIUS_GROQ_MODEL pour les réponses et les
+            outils. Les modes de vitesse OpenAI ne s’appliquent pas à ce fournisseur.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
   return (
     <Card>
       <CardHeader>

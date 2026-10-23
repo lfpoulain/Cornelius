@@ -9,6 +9,12 @@ Cette page dit ce qui reste sur l’ordinateur du miroir, ce qui part chez OpenA
 - Pendant une conversation, la voix et le texte de l’échange partent chez OpenAI. Après la conversation, le texte dit par une personne reconnue peut repartir chez OpenAI pour choisir les souvenirs à garder.
 - Cornelius n’enregistre ni image, ni son, ni transcription de conversation sur le disque.
 
+## Avec le fournisseur Groq
+
+Quand `CORNELIUS_AI_PROVIDER=groq`, le son des tours de parole est envoyé par le serveur à Groq pour la transcription. Le texte, les consignes, les résultats d’outils et les propositions de mémoire passent également par Groq. Les règles ci-dessous concernant l’identité, la portée des outils et la conservation locale restent les mêmes. Consultez les règles de conservation de votre compte Groq ; aucune option OpenAI de conservation n’est appliquée à Groq.
+
+La réponse est lue par une voix française **locale** du navigateur. Les voix distantes sont refusées. La conversation et la mémoire n’appellent pas OpenAI dans ce mode. La génération d’images « Avec OpenAI », si vous l’activez séparément, continue à utiliser sa propre clé OpenAI. Le bouton **Bloquer Groq** coupe les conversations, l’extraction mémoire et aussi les images OpenAI, comme le blocage existant. Le nom technique historique `openaiBlocked` désigne ce blocage global.
+
 ## Ce qui reste sur l’ordinateur
 
 - **Les images de la caméra.** La caméra est lue par le service caméra (la perception), sur l’ordinateur. Les images restent en mémoire vive et ne sont jamais écrites sur le disque.
@@ -67,7 +73,7 @@ Tout est sur l’ordinateur du miroir, dans le dossier `data/` (voir [Configurat
 | Trois dernières images créées | `data/generated-images/`, vidé à chaque démarrage |
 | Mot de passe de l’administration | le fichier `.env` au départ ; s’il est changé dans **Mise en route**, une empreinte (scrypt) dans la base, jamais le mot de passe lui-même |
 | Secrets des commandes (`CORNELIUS_SECRET_*`) | le fichier `.env`, jamais dans la base |
-| Clé OpenAI, jetons Météo et Transports | la base locale s’ils sont saisis dans l’administration (ils y passent avant ceux de `.env`), sinon le fichier `.env`. L’administration n’en montre que les quatre derniers caractères, et le journal les masque. |
+| Clés OpenAI et Groq, jetons Météo et Transports | la base locale s’ils sont saisis dans l’administration (ils y passent avant ceux de `.env`), sinon le fichier `.env`. L’administration n’en montre que les quatre derniers caractères, et le journal les masque. |
 
 Sous Linux, la base, ses copies, `.env` et le journal ne sont lisibles que par leur propriétaire.
 

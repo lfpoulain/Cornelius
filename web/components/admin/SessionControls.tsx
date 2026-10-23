@@ -65,6 +65,7 @@ export function SessionControls({
   /** Absent sur la rubrique « Mise en route » elle-même. */
   onShowStart?: () => void;
 }) {
+  const provider = state.setup?.aiProvider === 'groq' ? 'Groq' : 'OpenAI';
   const motifId = useId();
   const active = isSessionActive(state);
   const phase = state.session.phase;
@@ -85,7 +86,7 @@ export function SessionControls({
   let title: string;
   if (!fresh) title = 'État de la session inconnu';
   else if (active) title = phase === 'ready' ? 'Conversation en cours' : phaseLabels[phase];
-  else if (state.openaiBlocked) title = 'Accès OpenAI bloqué';
+  else if (state.openaiBlocked) title = `Accès ${provider} bloqué`;
   else if (setup.length) title = 'Configuration à terminer';
   else if (state.session.manualStop) title = 'Session arrêtée';
   else title = phase === 'idle' ? 'En veille attentive' : phaseLabels[phase];
@@ -295,14 +296,14 @@ export function SessionControls({
             onClick={() => {
               void run(
                 state.openaiBlocked
-                  ? 'OpenAI autorisé. La conversation reprend automatiquement si le miroir est prêt.'
-                  : 'OpenAI bloqué.',
+                  ? `${provider} autorisé. La conversation reprend automatiquement si le miroir est prêt.`
+                  : `${provider} bloqué.`,
                 () => api.blockOpenAI(!state.openaiBlocked),
               );
             }}
           >
             {state.openaiBlocked ? <ShieldCheck /> : <ShieldOff />}
-            {state.openaiBlocked ? 'Autoriser OpenAI' : 'Bloquer OpenAI'}
+            {state.openaiBlocked ? `Autoriser ${provider}` : `Bloquer ${provider}`}
           </Button>
         </div>
       </div>

@@ -38,3 +38,24 @@ test('un jeton de module se saisit dans Mise en route, compte aussitôt et s’e
     });
   }
 });
+
+test('la clé Groq est disponible et reste masquée dans l’administration', async ({ page }) => {
+  await login(page);
+  const card = page.locator('#secrets');
+  const field = card.getByLabel('Clé Groq', { exact: true });
+  await expect(field).toBeVisible();
+  await field.fill('gsk-test-groq-e2e-0123456789groq');
+  try {
+    await field
+      .locator('xpath=ancestor::form')
+      .getByRole('button', { name: 'Enregistrer' })
+      .click();
+    await expect(card.getByText('Dans l’administration (se termine par groq)')).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('gsk-test-groq-e2e');
+    await expect(card.getByText(/CORNELIUS_AI_PROVIDER=groq/)).toBeVisible();
+  } finally {
+    await page.request.delete('/api/admin/secrets/GROQ_API_KEY', {
+      headers: { origin: new URL(page.url()).origin },
+    });
+  }
+});

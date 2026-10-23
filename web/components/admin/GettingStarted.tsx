@@ -158,7 +158,7 @@ export function GettingStarted({
                       onClick={onAllowOpenAI}
                     >
                       <ShieldCheck aria-hidden="true" />
-                      Autoriser OpenAI
+                      Autoriser {item.title.replace('Accès à ', '')}
                     </Button>
                   </div>
                 )}

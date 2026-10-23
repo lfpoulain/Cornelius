@@ -28,7 +28,11 @@ Ne publiez jamais ce fichier : il contient le mot de passe et les clés. Il est 
 
 | Variable | Défaut | Effet | Lue par |
 |---|---|---|---|
-| `OPENAI_API_KEY` | vide | Clé de l’API OpenAI, valeur de secours : une clé saisie dans **Mise en route → Clés et jetons** passe avant. Sans clé, aucune conversation ne s’ouvre et la mémoire ne retient rien. La rubrique **Mise en route** affiche alors l’étape **Clé OpenAI** à faire. | serveur |
+| `CORNELIUS_AI_PROVIDER` | `openai` | Fournisseur de conversation et de mémoire : `openai` ou `groq`. Redémarrage requis. Voir [Groq](../fonctionnalites/groq.md). | serveur |
+| `GROQ_API_KEY` | vide | Clé Groq de secours ; la clé saisie dans **Clés et jetons** passe avant. Utilisée seulement si le fournisseur est `groq`. | serveur |
+| `CORNELIUS_GROQ_MODEL` | `openai/gpt-oss-20b` | Modèle Groq de conversation et de mémoire, prenant en charge les appels d’outils et le mode JSON. | serveur |
+| `CORNELIUS_GROQ_TRANSCRIPTION_MODEL` | `whisper-large-v3-turbo` | Modèle Groq de transcription française. | serveur |
+| `OPENAI_API_KEY` | vide | Clé de l’API OpenAI, valeur de secours : une clé saisie dans **Mise en route → Clés et jetons** passe avant. En mode OpenAI, sans clé, aucune conversation ne s’ouvre et la mémoire ne retient rien. La rubrique **Mise en route** affiche alors l’étape **Clé OpenAI** à faire. | serveur |
 | `CORNELIUS_ADMIN_PASSWORD` | `cornelius` (écrit par `npm run setup`) | Mot de passe de départ de l’administration, 4 caractères au moins. Un mot de passe choisi dans **Mise en route** le remplace (seule son empreinte est gardée en base). Le serveur refuse de démarrer sans lui. Tant qu’il vaut `cornelius`, la **Mise en route** demande de le changer. | serveur |
 | `CORNELIUS_LOGIN_RATE_LIMIT` | `10` | Nombre de tentatives de connexion à l’administration permises par minute. Entier de 1 ou plus. | serveur |
 

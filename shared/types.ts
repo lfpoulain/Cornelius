@@ -102,7 +102,9 @@ export interface VoiceActivity {
  * l’administration. Seulement des booléens : jamais la clé ni un jeton.
  */
 export interface MirrorSetup {
-  /** OPENAI_API_KEY est renseignée dans .env (sa valeur n’est jamais diffusée). */
+  /** Fournisseur de conversation ; absent des anciens serveurs : OpenAI. */
+  aiProvider?: 'openai' | 'groq';
+  /** Clé du fournisseur actif renseignée ; nom historique conservé pour compatibilité. */
   openaiKey: boolean;
   /** Le service caméra (perception) est connecté au serveur. */
   perception: boolean;

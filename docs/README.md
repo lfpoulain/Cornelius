@@ -38,6 +38,8 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 
 ## Fonctionnalités
 
+- [Utiliser Groq](fonctionnalites/groq.md) : conversation et mémoire avec une clé Groq et une voix française locale.
+
 - [Ouverture et présence](fonctionnalites/ouverture-et-presence.md) : ce qui ouvre, fait durer et ferme une conversation.
 - [Le mot d’appel](fonctionnalites/mot-d-appel.md) : ouvrir la conversation en disant « Cornelius ».
 - [Les satellites audio](fonctionnalites/satellites.md) : un micro et un haut-parleur dans une autre pièce, installés et associés sans saisie.

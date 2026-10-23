@@ -1561,3 +1561,64 @@ test('mode voix : caméra éteinte sans reconnaissance, allumée en permanence a
   await setImmediate();
   assert.equal(toggles.at(-1), false, 'sans reconnaissance, caméra éteinte en veille');
 });
+
+test('Groq : seul le miroir courant peut ouvrir le média, PCM et clôture sont contrôlés', async (t) => {
+  const f = await fixture(t, {
+    aiProvider: 'groq',
+    openaiKey: undefined,
+    groqKey: 'gsk-test-no-network-1234',
+  });
+  const cookie = await f.kiosk();
+  await f.connect('kiosk', cookie);
+  f.controller.setBrowserAudioReady(true);
+  let sequence = 0;
+  const observe = () => {
+    f.controller.heartbeat();
+    f.controller.observe({
+      schemaVersion: 1,
+      producerBootId: 'groq-camera',
+      sequence: ++sequence,
+      observedAt: f.now(),
+      health: 'ok',
+      presence: true,
+      engaged: true,
+      people: [{ trackId: 'groq-person', profileId: null }],
+    });
+  };
+  observe();
+  f.advance(900);
+  observe();
+  const scope = f.controller.scope();
+  assert.ok(scope.interactionId);
+  const url = '/audio?interactionId=' + scope.interactionId;
+  await assert.rejects(
+    f.app.injectWS(url, { headers: { host: 'localhost', origin, cookie: await f.kiosk() } }),
+    /409/,
+  );
+  let started!: Promise<unknown[]>;
+  const socket = await f.app.injectWS(
+    url,
+    { headers: { host: 'localhost', origin, cookie } },
+    {
+      onInit(ws) {
+        started = once(ws, 'message', { signal: AbortSignal.timeout(2000) });
+      },
+    },
+  );
+  f.sockets.push(socket);
+  assert.deepEqual(JSON.parse(String((await started)[0])), { type: 'ready' });
+  assert.equal(f.controller.sessionState().phase, 'ready');
+  // Les vraies trames du worklet sont de 512 échantillons. Le silence ne déclenche aucun HTTP.
+  socket.send(Buffer.alloc(1024));
+  socket.send(JSON.stringify({ type: 'playback', speaking: true }));
+  await setImmediate();
+  assert.equal(f.controller.snapshot().state.voice.phase, 'speaking');
+  socket.send(JSON.stringify({ type: 'playback', speaking: false }));
+  await setImmediate();
+  assert.equal(f.controller.snapshot().state.voice.phase, 'listening');
+  const ending = closed(socket);
+  socket.send(Buffer.alloc(17));
+  assert.equal((await ending)[0], 1008);
+  await setImmediate();
+  assert.notEqual(f.controller.sessionState().phase, 'ready');
+});

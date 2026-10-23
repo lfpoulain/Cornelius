@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-10-23 : fournisseur Groq
+
+- Conversation et mémoire avec une clé Groq, configurable dans l’administration, sans clé OpenAI.
+- Transcription française Whisper, réponses avec appels des outils existants et lecture par une voix française locale du navigateur ; tours de parole en semi-duplex.
+- Fournisseur et modèles configurables dans `.env` ; OpenAI reste le choix par défaut. Le mode Groq ne propose pas la recherche web native ni les satellites audio.
+
 ### 2026-10-20 : contrat des modules 0.2.0
 
 Cornelius passe en 0.2.0. Ces ajouts restent compatibles `apiVersion: 1` ; un module qui s’en sert déclare `minCoreVersion: '0.2.0'`.

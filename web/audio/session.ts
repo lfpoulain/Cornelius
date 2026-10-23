@@ -1,3 +1,4 @@
+import { createGroqAudioSession } from './groq-session';
 import type { Scope } from '../../shared/types';
 import { request } from '../api';
 import { reportDiagnostic, reportMeasure } from '../diagnostics';
@@ -35,7 +36,9 @@ export function createAudioSession(
   onLocked?: (locked: boolean) => void,
   advancedBuffer = false,
   openedAt: number | null = null,
+  provider: 'openai' | 'groq' = 'openai',
 ) {
+  if (provider === 'groq') return createGroqAudioSession(scope, onFailure, onLocked);
   let stage = 'initialisation audio';
   const report = (event: string, error?: unknown) =>
     reportDiagnostic(event, stage, error, scope.interactionId ?? undefined);

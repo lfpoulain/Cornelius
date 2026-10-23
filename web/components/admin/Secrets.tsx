@@ -134,7 +134,7 @@ export function SecretField({
   );
 }
 
-/** Clé OpenAI et jetons des modules, saisis sans toucher au fichier .env ni redémarrer. */
+/** Clés de conversation et jetons des modules, saisis sans toucher au fichier .env ni redémarrer. */
 export function Secrets({ run }: { run: RunAction }) {
   const load = useCallback(() => api.secrets().then((result) => result.secrets), []);
   const resource = useAdminResource(load);

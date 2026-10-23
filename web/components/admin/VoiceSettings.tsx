@@ -16,6 +16,20 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui
 export function VoiceSettings({ state, run }: { state: MirrorState; run: RunAction }) {
   const voice = isLiveVoice(state.speechVoice) ? state.speechVoice : DEFAULT_LIVE_VOICE;
   const others = LIVE_VOICES.filter((item) => !FRENCH_VOICES.includes(item));
+  if (state.setup?.aiProvider === 'groq')
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Voix de Cornelius</CardTitle>
+          <CardDescription>
+            Groq utilise une voix française locale du navigateur qui affiche le miroir. Installez
+            une voix française sur cet appareil et vérifiez sa disponibilité dans le navigateur. Les
+            voix GPT-Live ne s’appliquent pas à ce mode. Attendez la fin de la réponse avant de
+            parler.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
   return (
     <Card>
       <CardHeader>

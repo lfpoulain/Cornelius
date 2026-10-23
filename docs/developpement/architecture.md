@@ -39,6 +39,12 @@ Le serveur ne décide jamais sur la seule parole du modèle ni sur la seule imag
 
 Chaque conversation porte un identifiant d’interaction, une époque de profil et une version de contexte. Un résultat d’outil, une capture ou une carte qui ne correspond plus à ces trois valeurs est ignoré.
 
+## Parcours Groq
+
+Avec `CORNELIUS_AI_PROVIDER=groq`, `web/audio/groq-session.ts` ouvre le WebSocket local `/audio` à la place de la connexion WebRTC OpenAI. Le serveur contrôle toujours le miroir courant et la portée de session. `server/groq.ts` segmente le PCM 16 kHz en mémoire, appelle Whisper puis Chat Completions sur `api.groq.com`, et adapte les résultats aux événements internes de `LiveTransport`. Les outils gardent donc les mêmes validations, autorisations et cartes. Le serveur refuse un outil absent de la liste du profil, borne les tours et annule les requêtes à la clôture.
+
+Le navigateur lit le texte avec une voix française locale et signale le début, la poursuite et la fin de lecture au serveur. Le micro est muet pendant la réponse et le traitement. La mémoire utilise le mode JSON de Groq ; `PersonalMemory` conserve sa validation des preuves et du schéma. Voir [Groq](../fonctionnalites/groq.md) pour les limites.
+
 ## Ouverture de la conversation
 
 L’administration pose deux questions : ce qui ouvre la conversation (la présence, le regard ou le mot « Cornelius ») et qui peut l’ouvrir (tout le monde ou les membres du foyer reconnus). `shared/opening.ts` traduit chaque réponse en une seule combinaison de réglages internes, et relit les anciennes combinaisons qui se recouvraient.

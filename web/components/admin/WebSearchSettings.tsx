@@ -20,7 +20,8 @@ export function WebSearchSettings({
   hidden?: boolean;
   action?: ReactNode;
 }) {
-  const enabled = state.webSearchEnabled !== false;
+  const groq = state.setup?.aiProvider === 'groq';
+  const enabled = !groq && state.webSearchEnabled !== false;
   return (
     <ModulePanel
       id="module-web"
@@ -29,7 +30,7 @@ export function WebSearchSettings({
       subtitle="Recherche sur le web par OpenAI, avec les sources sur la carte"
       badge={
         <Badge variant={enabled ? 'secondary' : 'outline'}>
-          {enabled ? 'Activée' : 'Désactivée'}
+          {groq ? 'Indisponible avec Groq' : enabled ? 'Activée' : 'Désactivée'}
         </Badge>
       }
       action={action}
@@ -51,6 +52,7 @@ export function WebSearchSettings({
         <Switch
           id="web-search-enabled"
           checked={enabled}
+          disabled={groq}
           onCheckedChange={(value) => {
             void run(value ? 'Recherche web activée.' : 'Recherche web désactivée.', () =>
               api.webSearch(value),

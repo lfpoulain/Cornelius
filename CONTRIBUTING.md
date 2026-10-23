@@ -32,7 +32,7 @@ shellcheck -x scripts/*.sh
 - Textes en français (interface, messages, documentation), phrases courtes, sans tiret long.
 - Outils vocaux nommés `<module>__<outil>`.
 - Migrations SQLite ajoutées à la fin de la liste de `server/storage.ts`, jamais modifiées une fois publiées, et rejouables.
-- Secrets jamais dans le client ni les journaux. Seuls la clé OpenAI et les jetons des modules peuvent être saisis dans l’administration (table `secrets`) ; le reste vit dans `.env`.
+- Secrets jamais dans le client ni les journaux. Seuls les clés OpenAI et Groq et les jetons des modules peuvent être saisis dans l’administration (table `secrets`) ; le reste vit dans `.env`.
 - Un nouveau module s’écrit dans [cornelius-modules](https://github.com/lfpoulain/cornelius-modules), à partir de son gabarit : voir [Créer un module](https://github.com/lfpoulain/cornelius-modules/blob/main/docs/creer-un-module.md). Toute évolution du contrat des modules met à jour [la référence](docs/modules/reference.md) dans le même changement.
 - Si vous changez un libellé de l’interface, une valeur par défaut ou une commande, mettez à jour la documentation qui la cite et ajoutez une ligne à `CHANGELOG.md`.
 

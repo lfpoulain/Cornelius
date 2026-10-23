@@ -16,13 +16,17 @@ export interface LiveConnection {
 export interface LiveAudioConnection extends LiveConnection {
   /** PCM16 mono au format choisi au démarrage, sans en-tête. */
   sendAudio(pcm: Buffer): void;
+  playback?(speaking: boolean): void;
 }
 export interface LiveHandlers {
   open(): void;
   event(event: ConnectServerEvent): void;
   failure(): void;
+  /** Texte à lire par une voix locale du navigateur (Groq). */
+  text?(text: string): void;
 }
 export interface LiveGateway {
+  provider?: 'openai' | 'groq';
   hangup?(id: string): Promise<void>;
   /** Ouvre la connexion HTTPS que réutilisera la création de session, sans rien créer. */
   prewarm?(): Promise<void>;

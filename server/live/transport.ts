@@ -254,6 +254,7 @@ export class LiveTransport implements SessionTransport {
       personality?: (profileId: string | null) => PersonalityPreferences;
     } = {},
     private readonly now: () => number = Date.now,
+    private readonly providerLabel = 'OpenAI',
   ) {}
   attach(controller: SessionController) {
     this.controller = controller;
@@ -274,15 +275,15 @@ export class LiveTransport implements SessionTransport {
       active.connection?.dispose();
       active.connection = undefined;
     }
-    this.controller.close('Connexions OpenAI bloquées.');
+    this.controller.close(`Connexions ${this.providerLabel} bloquées.`);
   }
   unavailableReason() {
-    if (this.isBlocked()) return 'Connexions OpenAI bloquées dans l’administration.';
+    if (this.isBlocked()) return `Connexions ${this.providerLabel} bloquées dans l’administration.`;
     if (!this.gateway)
-      return 'Ajoutez la clé OpenAI dans l’administration (Mise en route, Clés et jetons).';
+      return `Ajoutez la clé ${this.providerLabel} dans l’administration (Mise en route, Clés et jetons).`;
     return null;
   }
-  /** Nouvelle clé OpenAI (ou plus de clé) : prise en compte dès la prochaine conversation. */
+  /** Nouvelle clé du fournisseur (ou plus de clé) : prise en compte dès la prochaine conversation. */
   setGateway(gateway: LiveGateway | null) {
     this.gateway = gateway;
     this.lastPrewarmAt = 0;
@@ -347,7 +348,11 @@ export class LiveTransport implements SessionTransport {
       },
       { once: true },
     );
-    if (satellite) this.connectSatellite(active);
+    if (satellite && this.gateway?.provider === 'groq')
+      queueMicrotask(() =>
+        this.controller.close('Les satellites audio nécessitent le fournisseur OpenAI.'),
+      );
+    else if (satellite) this.connectSatellite(active);
   }
   /**
    * Conversation d’un satellite : pas de navigateur pour négocier WebRTC, le serveur ouvre
@@ -365,9 +370,14 @@ export class LiveTransport implements SessionTransport {
     active.toolsProfileId = profileId;
     // Mémoire personnelle seulement au nom d’un profil : une conversation anonyme ne laisse rien.
     if (profileId) this.memory?.open(active.scope);
-    this.logs?.write('info', 'openai', 'Session Live du satellite demandée', {
-      interactionId: active.scope.interactionId,
-    });
+    this.logs?.write(
+      'info',
+      this.providerLabel.toLowerCase(),
+      'Session Live du satellite demandée',
+      {
+        interactionId: active.scope.interactionId,
+      },
+    );
     const connection = gateway.connect(
       { ...config, audio: { ...audio, format: SATELLITE_AUDIO_FORMAT } },
       {
@@ -396,6 +406,62 @@ export class LiveTransport implements SessionTransport {
     );
     active.connection = connection;
     active.audio = connection;
+  }
+  usesBrowserSpeech() {
+    return this.gateway?.provider === 'groq';
+  }
+  /** Le WebSocket audio local devient le média Groq, sans négociation WebRTC distante. */
+  connectBrowser(
+    scope: Scope,
+    output: (message: { type: 'ready' } | { type: 'speech'; text: string }) => void,
+  ) {
+    const active = this.require(scope);
+    const gateway = this.gateway;
+    if (!gateway?.connect || gateway.provider !== 'groq' || active.satelliteId || active.connection)
+      throw new Error('Session audio Groq indisponible.');
+    const profileId = this.controller.snapshot().state.activeProfile?.id ?? null;
+    const { client: _client, ...config } = this.configuration(profileId);
+    active.toolsProfileId = profileId;
+    this.memory?.open(active.scope);
+    const connection = gateway.connect(config, {
+      open: () => {},
+      event: (event) => {
+        if (
+          this.active !== active ||
+          active.finalized ||
+          (active.closing && event.type !== 'session.closed') ||
+          this.isBlocked()
+        )
+          return;
+        if (event.type === 'session.started') {
+          active.attached = true;
+          active.mediaConnected = true;
+          this.controller.controlAttached(active.scope);
+          output({ type: 'ready' });
+        }
+        this.receive(active, event);
+      },
+      text: (text) => {
+        if (this.active === active && !active.finalized && !active.closing && !this.isBlocked())
+          output({ type: 'speech', text });
+      },
+      failure: () => {
+        if (this.active === active && !active.finalized)
+          this.controller.close('Conversation Groq interrompue.');
+      },
+    });
+    active.connection = active.audio = connection;
+  }
+  browserAudio(scope: Scope, pcm: Buffer) {
+    const active = this.require(scope, true);
+    if (!active.satelliteId && active.attached && !this.isBlocked()) active.audio?.sendAudio(pcm);
+  }
+  browserPlayback(scope: Scope, speaking: boolean) {
+    const active = this.require(scope, true);
+    if (active.satelliteId || this.isBlocked()) return;
+    active.audio?.playback?.(speaking);
+    if (speaking) this.controller.noteAssistantOutput(active.scope);
+    this.controller.setVoiceActivity(active.scope, speaking ? 'speaking' : 'listening', 1500);
   }
   private require(scope: Scope, alreadyReady = false) {
     const active = this.active;
@@ -427,7 +493,7 @@ export class LiveTransport implements SessionTransport {
       this.integrations.personality?.(profileId),
       this.controller.snapshot().state.delegationMode,
       {
-        webSearch: this.controller.isWebSearchEnabled(),
+        webSearch: this.gateway?.provider !== 'groq' && this.controller.isWebSearchEnabled(),
         voice: this.controller.getSpeechVoice(),
         voiceOnly,
       },
@@ -493,10 +559,15 @@ export class LiveTransport implements SessionTransport {
         resolve(accepted && sameScope(scope, this.controller.scope()));
       };
       const timer = setTimeout(() => {
-        this.logs?.write('warn', 'openai', 'Contexte caméra non confirmé par Live', {
-          interactionId: scope.interactionId,
-          eventId,
-        });
+        this.logs?.write(
+          'warn',
+          this.providerLabel.toLowerCase(),
+          'Contexte caméra non confirmé par Live',
+          {
+            interactionId: scope.interactionId,
+            eventId,
+          },
+        );
         finish(false);
       }, 5_000);
       timer.unref();
@@ -525,7 +596,9 @@ export class LiveTransport implements SessionTransport {
     if (!gateway) throw new Error('Clé OpenAI absente.');
     if (active.offer && active.offer !== sdp) throw new Error('Une offre média existe déjà.');
     if (active.response) return active.response;
-    this.logs?.write('info', 'openai', 'Offre média reçue', { interactionId: scope.interactionId });
+    this.logs?.write('info', this.providerLabel.toLowerCase(), 'Offre média reçue', {
+      interactionId: scope.interactionId,
+    });
     active.offer = sdp;
     this.memory?.open(active.scope);
     active.toolsProfileId = this.controller.snapshot().state.activeProfile?.id ?? null;
@@ -537,10 +610,15 @@ export class LiveTransport implements SessionTransport {
         if (this.disposed || active.finalized || this.active !== active) {
           if (!active.blocked && !this.isBlocked()) {
             await gateway.hangup?.(result.session.id).catch((error: unknown) => {
-              this.logs?.write('warn', 'openai', 'Clôture de la création tardive non confirmée', {
-                interactionId: scope.interactionId,
-                error,
-              });
+              this.logs?.write(
+                'warn',
+                this.providerLabel.toLowerCase(),
+                'Clôture de la création tardive non confirmée',
+                {
+                  interactionId: scope.interactionId,
+                  error,
+                },
+              );
             });
           }
           throw new Error('Session média périmée.');
@@ -568,7 +646,7 @@ export class LiveTransport implements SessionTransport {
         return result;
       })
       .catch((error: unknown) => {
-        this.logs?.write('error', 'openai', 'Connexion Live impossible', {
+        this.logs?.write('error', this.providerLabel.toLowerCase(), 'Connexion Live impossible', {
           interactionId: scope.interactionId,
           error,
         });
@@ -629,6 +707,7 @@ export class LiveTransport implements SessionTransport {
       return;
     }
     if (active.attached && !active.blocked) this.send(active, { type: 'session.close' });
+    if (active.finalized) return;
     // The provider may never acknowledge: release the local session so a new one can open.
     this.closeTimer ??= setTimeout(() => this.finalize(active), 5000);
     this.closeTimer.unref();
@@ -659,11 +738,16 @@ export class LiveTransport implements SessionTransport {
       active.connection.send(event);
       return true;
     } catch (error) {
-      this.logs?.write('error', 'openai', 'Envoi sur le canal de contrôle échoué', {
-        interactionId: active.scope.interactionId,
-        event: event.type,
-        error,
-      });
+      this.logs?.write(
+        'error',
+        this.providerLabel.toLowerCase(),
+        'Envoi sur le canal de contrôle échoué',
+        {
+          interactionId: active.scope.interactionId,
+          event: event.type,
+          error,
+        },
+      );
       this.controller.close('Contrôle Live indisponible.');
       return false;
     }
@@ -673,7 +757,7 @@ export class LiveTransport implements SessionTransport {
     if (active.appended.has(key)) return false;
     if (!this.deliverInstruction(active, content)) return false;
     active.appended.add(key);
-    this.logs?.write('info', 'openai', 'Instruction Live ajoutée', {
+    this.logs?.write('info', this.providerLabel.toLowerCase(), 'Instruction Live ajoutée', {
       interactionId: active.scope.interactionId,
       instruction: key,
     });
@@ -712,9 +796,14 @@ export class LiveTransport implements SessionTransport {
       })
     )
       return;
-    this.logs?.write('info', 'openai', 'Information de carte confiée à la voix', {
-      interactionId: active.scope.interactionId,
-    });
+    this.logs?.write(
+      'info',
+      this.providerLabel.toLowerCase(),
+      'Information de carte confiée à la voix',
+      {
+        interactionId: active.scope.interactionId,
+      },
+    );
   }
   /** Session anonyme (mode 1) : actualise les droits des outils après reconnaissance. */
   identify(scope: Scope) {
@@ -762,10 +851,15 @@ export class LiveTransport implements SessionTransport {
             homeDevicesDelegation.trim().replace(/;$/u, '.'),
         );
       active.toolsProfileId = profileId;
-      this.logs?.write('info', 'openai', 'Outils du profil actualisés dans la session', {
-        interactionId: scope.interactionId,
-        profileId,
-      });
+      this.logs?.write(
+        'info',
+        this.providerLabel.toLowerCase(),
+        'Outils du profil actualisés dans la session',
+        {
+          interactionId: scope.interactionId,
+          profileId,
+        },
+      );
     }
     this.greet(active);
   }
@@ -862,13 +956,23 @@ export class LiveTransport implements SessionTransport {
       event.type !== 'response.event'
     ) {
       const error = object(object(event).error);
-      this.logs?.write(event.type === 'error' ? 'error' : 'info', 'openai', event.type, {
-        interactionId: active.scope.interactionId,
-        remoteId: active.remoteId,
-        ...(event.type === 'error'
-          ? { code: error.code, message: error.message, errorType: error.type, param: error.param }
-          : {}),
-      });
+      this.logs?.write(
+        event.type === 'error' ? 'error' : 'info',
+        this.providerLabel.toLowerCase(),
+        event.type,
+        {
+          interactionId: active.scope.interactionId,
+          remoteId: active.remoteId,
+          ...(event.type === 'error'
+            ? {
+                code: error.code,
+                message: error.message,
+                errorType: error.type,
+                param: error.param,
+              }
+            : {}),
+        },
+      );
     }
     // Satellite : le flux de sortie (16 kHz, silences compris) part tel quel vers sa pièce.
     if (active.satelliteId && String(object(event).type ?? '') === 'session.output_audio.delta') {
@@ -909,7 +1013,11 @@ export class LiveTransport implements SessionTransport {
       this.controller.setVoiceActivity(active.scope, 'speaking', 1200);
     }
     if (event.type === 'error' && !cameraContextError) {
-      this.controller.close('Erreur Live ; consultez la configuration et réessayez après clôture.');
+      this.controller.close(
+        this.providerLabel === 'Groq'
+          ? event.error.message
+          : 'Erreur Live ; consultez la configuration et réessayez après clôture.',
+      );
       this.controller.publish();
     }
   }
@@ -1157,7 +1265,7 @@ export class LiveTransport implements SessionTransport {
         // La délégation livre déjà son résumé à Live ; une commentary le ferait parler deux fois.
       }
       if (duplicate)
-        this.logs?.write('info', 'openai', 'Carte Luna en double écartée', {
+        this.logs?.write('info', this.providerLabel.toLowerCase(), 'Carte Luna en double écartée', {
           interactionId: active.scope.interactionId,
         });
       this.sendItem(
@@ -1183,7 +1291,7 @@ export class LiveTransport implements SessionTransport {
           this.collectWebCitations(active, delegationId || delegation, item);
       this.logs?.write(
         event.type === 'response.completed' ? 'info' : 'warn',
-        'openai',
+        this.providerLabel.toLowerCase(),
         String(event.type),
         {
           interactionId: active.scope.interactionId,
@@ -1373,7 +1481,7 @@ export class LiveTransport implements SessionTransport {
         }
       }
     } catch (error) {
-      this.logs?.write('warn', 'openai', 'Outil de module interrompu', {
+      this.logs?.write('warn', this.providerLabel.toLowerCase(), 'Outil de module interrompu', {
         interactionId: active.scope.interactionId,
         tool: name,
         error,
@@ -1429,7 +1537,7 @@ export class LiveTransport implements SessionTransport {
           })
         : failureToolResult('Action inconnue.');
     } catch (error) {
-      this.logs?.write('warn', 'openai', 'Action HTTP interrompue', {
+      this.logs?.write('warn', this.providerLabel.toLowerCase(), 'Action HTTP interrompue', {
         interactionId: active.scope.interactionId,
         error,
       });
@@ -1456,7 +1564,7 @@ export class LiveTransport implements SessionTransport {
         args,
       );
     } catch (error) {
-      this.logs?.write('warn', 'openai', 'Vision locale interrompue', {
+      this.logs?.write('warn', this.providerLabel.toLowerCase(), 'Vision locale interrompue', {
         interactionId: active.scope.interactionId,
         error,
       });

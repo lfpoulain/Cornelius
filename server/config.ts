@@ -8,6 +8,10 @@ export interface AppConfig {
   secureCookies: boolean;
   staticRoot?: string;
   openaiKey?: string;
+  aiProvider?: 'openai' | 'groq';
+  groqKey?: string;
+  groqModel?: string;
+  groqTranscriptionModel?: string;
   perceptionToken?: string;
   imageGenerationToken?: string;
   loginRateLimit?: number;
@@ -43,6 +47,9 @@ export function loadConfig(): AppConfig & { port: number } {
       'Définissez CORNELIUS_ADMIN_PASSWORD (4 caractères minimum) dans .env, ou lancez npm run setup.',
     );
   }
+  const aiProvider = process.env.CORNELIUS_AI_PROVIDER?.trim() || 'openai';
+  if (aiProvider !== 'openai' && aiProvider !== 'groq')
+    throw new Error('CORNELIUS_AI_PROVIDER doit être openai ou groq.');
   const port = Number(process.env.PORT ?? 3000);
   if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('PORT invalide.');
   const loginRateLimit = Number(process.env.CORNELIUS_LOGIN_RATE_LIMIT ?? 10);
@@ -69,6 +76,10 @@ export function loadConfig(): AppConfig & { port: number } {
       .split(',')
       .map((host) => host.trim())
       .filter(Boolean),
+    aiProvider,
+    groqKey: process.env.GROQ_API_KEY || undefined,
+    groqModel: process.env.CORNELIUS_GROQ_MODEL?.trim() || undefined,
+    groqTranscriptionModel: process.env.CORNELIUS_GROQ_TRANSCRIPTION_MODEL?.trim() || undefined,
     openaiKey: process.env.OPENAI_API_KEY || undefined,
     perceptionToken: process.env.CORNELIUS_PERCEPTION_TOKEN || undefined,
     imageGenerationToken: process.env.CORNELIUS_IMAGE_GENERATION_TOKEN || undefined,

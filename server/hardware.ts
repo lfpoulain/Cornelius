@@ -335,18 +335,53 @@ export function registerHardware(
       socket.on('close', () => {
         if (audioCatchupSenders.get(id) === sendAudioCatchup) audioCatchupSenders.delete(id);
       });
+      const scope = controller.scope();
+      const groq = live.usesBrowserSpeech();
+      if (groq) {
+        try {
+          live.connectBrowser(scope, (message) => {
+            if (socket.readyState === 1 && services.currentKiosk(req))
+              socket.send(JSON.stringify(message));
+          });
+        } catch {
+          return socket.close(1008, 'Session Groq indisponible.');
+        }
+        socket.on('close', () => {
+          if (controller.scope().interactionId === id) controller.close('Flux audio Groq fermé.');
+        });
+      }
+      const rejectAudio = (reason: string) => {
+        // Ne pas attendre la poignée de fermeture WebSocket avant d'annuler les requêtes Groq.
+        if (groq && controller.scope().interactionId === id) controller.close(reason);
+        socket.close(1008, reason);
+      };
       socket.on('message', (data, binary) => {
         const state = controller.sessionState();
         if (
-          !binary ||
           state.interactionId !== id ||
           !['connecting', 'ready'].includes(state.phase) ||
           !services.currentKiosk(req)
         )
-          return socket.close(1008, 'Session média périmée.');
-        perception.audio(id, Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer));
+          return rejectAudio('Session média périmée.');
+        try {
+          if (!binary) {
+            if (!groq || data.toString().length > 128)
+              return rejectAudio('Message audio invalide.');
+            const message = JSON.parse(data.toString());
+            if (message.type !== 'playback' || typeof message.speaking !== 'boolean')
+              return rejectAudio('Message audio invalide.');
+            live.browserPlayback(scope, message.speaking);
+            return;
+          }
+          const pcm = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
+          if (pcm.length !== 1024) return rejectAudio('Trame audio invalide.');
+          perception.audio(id, pcm);
+          if (groq) live.browserAudio(scope, pcm);
+        } catch {
+          rejectAudio('Session média périmée.');
+        }
       });
-      socket.on('error', () => socket.close());
+      socket.on('error', () => rejectAudio('Flux audio interrompu.'));
     },
   );
 }

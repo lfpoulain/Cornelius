@@ -94,6 +94,7 @@ export function useVoice(state: MirrorState | null, fresh: boolean) {
             setAudioLocked,
             advancedBuffer,
             scope.startedAt,
+            state?.setup?.aiProvider,
           );
           active.current = { id, audio };
           registry.set(id, active.current);

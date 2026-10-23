@@ -81,6 +81,7 @@ export function needsCamera(opening: Opening, vision?: VisionMode): boolean {
 /** Liste de préparation, dans l’ordre où les étapes se font au premier lancement. */
 export function readinessChecklist(input: ReadinessInput): ReadinessItem[] {
   const { state, devices, defaultPassword, enrolledFaces } = input;
+  const provider = state.setup?.aiProvider === 'groq' ? 'Groq' : 'OpenAI';
   const opening = currentOpening(state);
   const openaiKey = devices?.apiConfigured ?? state.setup?.openaiKey ?? false;
   const perception = devices?.perception.connected ?? state.setup?.perception ?? false;
@@ -91,13 +92,13 @@ export function readinessChecklist(input: ReadinessInput): ReadinessItem[] {
       ? {
           id: 'openai-key',
           status: 'done',
-          title: 'Clé OpenAI',
+          title: `Clé ${provider}`,
           detail: 'Renseignée. Elle reste sur cet ordinateur.',
         }
       : {
           id: 'openai-key',
           status: 'todo',
-          title: 'Clé OpenAI',
+          title: `Clé ${provider}`,
           detail:
             'Sans elle, Cornelius ne peut pas parler. Collez-la plus bas, dans « Clés et jetons » : elle compte tout de suite.',
           action: { kind: 'doc', path: 'docs/installation/premier-demarrage.md' },
@@ -161,14 +162,13 @@ export function readinessChecklist(input: ReadinessInput): ReadinessItem[] {
       ? {
           id: 'openai-blocked',
           status: 'todo',
-          title: 'Accès à OpenAI',
-          detail:
-            'Bloqué depuis l’administration : autorisez OpenAI pour permettre la conversation.',
+          title: `Accès à ${provider}`,
+          detail: `Bloqué depuis l’administration : autorisez ${provider} pour permettre la conversation.`,
         }
       : {
           id: 'openai-blocked',
           status: 'done',
-          title: 'Accès à OpenAI',
+          title: `Accès à ${provider}`,
           detail: 'Autorisé.',
         },
   ];
@@ -337,6 +337,7 @@ export function mirrorBlocker(
   state: MirrorState,
   connection: { fresh: boolean },
 ): MirrorBlocker | null {
+  const provider = state.setup?.aiProvider === 'groq' ? 'Groq' : 'OpenAI';
   if (!connection.fresh)
     return { id: 'connection', reason: 'Connexion au serveur interrompue, reconnexion en cours.' };
   if (['connecting', 'ready', 'closing'].includes(state.session.phase)) return null;
@@ -346,7 +347,7 @@ export function mirrorBlocker(
       reason: 'Cornelius n’est pas encore configuré : ouvrez l’administration sur cet ordinateur.',
     };
   if (state.openaiBlocked)
-    return { id: 'openai-blocked', reason: 'Accès à OpenAI bloqué depuis l’administration.' };
+    return { id: 'openai-blocked', reason: `Accès à ${provider} bloqué depuis l’administration.` };
   const wakeReady = state.wakeWord.enabled && state.wakeWord.ready;
   if (state.session.manualStop)
     return {
@@ -423,16 +424,17 @@ export function adminBlockers(
   state: MirrorState,
   devices: Pick<DevicesStatus, 'apiConfigured'> | null = null,
 ): AdminBlocker[] {
+  const provider = state.setup?.aiProvider === 'groq' ? 'Groq' : 'OpenAI';
   const blockers: AdminBlocker[] = [];
   const add = (id: AdminBlockerId, reason: string, manualStart = false) =>
     blockers.push({ id, reason, manualStart });
   if (!(state.setup?.openaiKey ?? devices?.apiConfigured ?? false))
     add(
       'openai-key',
-      'Clé OpenAI absente : ajoutez-la dans Mise en route, carte « Clés et jetons ».',
+      `Clé ${provider} absente : ajoutez-la dans Mise en route, carte « Clés et jetons ».`,
     );
   if (state.openaiBlocked)
-    add('openai-blocked', 'Autorisez OpenAI pour permettre la conversation.');
+    add('openai-blocked', `Autorisez ${provider} pour permettre la conversation.`);
   if (!state.browserConnected) add('mirror', 'Ouvrez le miroir pour démarrer automatiquement.');
   else if (state.browserAudioReady === false)
     add('voice', 'Autorisez le microphone et le son sur le miroir.');

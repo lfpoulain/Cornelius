@@ -10,7 +10,7 @@ export const secretsMigration = `CREATE TABLE IF NOT EXISTS secrets (
 export type SecretSource = 'admin' | 'env';
 
 /**
- * Clé OpenAI et jetons des modules, nommés par leur variable du fichier .env. Une valeur saisie
+ * Clés OpenAI/Groq et jetons des modules, nommés par leur variable du fichier .env. Une valeur saisie
  * dans l’administration (base locale) passe avant celle de .env ; l’effacer fait revenir celle
  * de .env. Aucune valeur ne quitte le serveur : l’administration n’en voit que la fin.
  */

@@ -151,7 +151,11 @@ export class SessionController {
    */
   setSetup(patch: Partial<MirrorSetup>): void {
     const next = { ...this.setup, ...patch };
-    if (next.openaiKey === this.setup.openaiKey && next.perception === this.setup.perception)
+    if (
+      next.openaiKey === this.setup.openaiKey &&
+      next.perception === this.setup.perception &&
+      next.aiProvider === this.setup.aiProvider
+    )
       return;
     this.setup = next;
     this.publish();

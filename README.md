@@ -31,7 +31,7 @@
 
 Cornelius transforme un écran, tel quel ou glissé derrière un miroir sans tain, en assistant pour toute la famille. Il reconnaît qui se présente devant lui, ouvre la conversation quand on le regarde ou qu’on l’appelle par son nom, et répond à la voix avec des cartes qui s’affichent sur le miroir : la météo, le prochain bus, la lumière du salon, un souvenir, une image…
 
-La caméra, les visages et l’écoute du mot d’appel restent sur l’ordinateur du miroir. Seule la conversation passe par OpenAI, et seulement quand elle est ouverte.
+La caméra, les visages et l’écoute du mot d’appel restent sur l’ordinateur du miroir. Seule la conversation passe par le fournisseur choisi (OpenAI ou Groq), et seulement quand elle est ouverte.
 
 ## ✨ Ce que fait Cornelius
 
@@ -85,7 +85,7 @@ La caméra, les visages et l’écoute du mot d’appel restent sur l’ordinate
 | 💻 **Ordinateur** | x86-64 sous Linux (Debian, Ubuntu, Arch ou une dérivée) ou Windows 10 et 11 |
 | 🎥 **Matériel** | une webcam, un micro, des haut-parleurs et un écran (seul, ou derrière un miroir sans tain) |
 | 🛠️ **Logiciels** | Node.js 24 (24.2 ou plus récent), Python 3.12 et Git |
-| 🔑 **Clé OpenAI** | d’un compte payant : sans elle, Cornelius ne peut pas parler |
+| 🔑 **Clé de conversation** | OpenAI, ou Groq avec une voix française locale du navigateur : voir [Utiliser Groq](docs/fonctionnalites/groq.md) |
 | ➕ **En option** | une carte graphique pour la vision et les images, un jeton [Météo Concept](https://api.meteo-concept.com/) pour la météo, un jeton [PRIM](https://prim.iledefrance-mobilites.fr/) pour les transports d’Île-de-France, des [satellites audio](docs/fonctionnalites/satellites.md) (Waveshare ESP32-S3-AUDIO-Board) pour parler à Cornelius depuis d’autres pièces |
 
 ## 🚀 Installer
@@ -122,10 +122,12 @@ Il n’y a pas d’installateur : l’installation se fait en une dizaine de com
 
 ### 🔑 Après l’installation
 
-Ouvrez l’administration et collez votre clé OpenAI dans **Mise en route → Clés et jetons** : elle compte tout de suite.
+Pour OpenAI (par défaut), ouvrez l’administration et collez votre clé OpenAI dans **Mise en route → Clés et jetons** : elle compte tout de suite.
 
 > [!IMPORTANT]
 > Le mot de passe de départ de l’administration est `cornelius`. Changez-le tout de suite dans **Mise en route → Mot de passe administrateur**.
+
+Pour utiliser votre clé Groq sans clé OpenAI, suivez [Utiliser Groq](docs/fonctionnalites/groq.md).
 
 ## ▶️ Lancer
 
@@ -176,7 +178,7 @@ Toute la documentation part de [l’index](docs/README.md).
 
 - 🎥 Les images de la caméra et les visages restent sur l’ordinateur du miroir.
 - 🎙️ Le mot « Cornelius » est reconnu en local : en veille, le son ne quitte pas l’ordinateur.
-- 💬 La voix et le texte partent chez OpenAI seulement pendant une conversation. Cornelius n’enregistre ni image, ni son, ni transcription sur le disque.
+- 💬 La voix et le texte partent chez le fournisseur choisi seulement pendant une conversation. Cornelius n’enregistre ni image, ni son, ni transcription sur le disque.
 
 > [!CAUTION]
 > Le dossier `data/` (base de données, signatures des visages, souvenirs) et le fichier `.env` ne doivent jamais être publiés.
