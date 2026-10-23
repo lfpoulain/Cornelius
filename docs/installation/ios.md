@@ -57,6 +57,8 @@ Lorsque l’app passe en arrière-plan ou que l’iPhone est verrouillé, la cam
 
 Ouvrez `ios/Cornelius.xcodeproj` avec Xcode 27.1, choisissez le schéma **Cornelius** et un simulateur ou votre iPhone. Pour un appareil physique, sélectionnez votre équipe Apple dans Signing. Aucun CocoaPods ni package Swift externe.
 
+Pour lancer aussi la recette de contrat TLS native contre un serveur de test éphémère, utilisez `scripts/test-ios.sh <identifiant-simulateur>` avec Node 24. Elle ne charge aucun secret ni compte de production, lance les tests séquentiellement et nettoie son DerivedData à la sortie.
+
 `ios/project.yml` permet de régénérer le projet avec XcodeGen si ses sources/cibles changent. Le projet Xcode généré est versionné : XcodeGen n’est pas nécessaire pour compiler un checkout normal.
 
 ```sh
