@@ -82,7 +82,8 @@ export function needsCamera(opening: Opening, vision?: VisionMode): boolean {
 export function readinessChecklist(input: ReadinessInput): ReadinessItem[] {
   const { state, devices, defaultPassword, enrolledFaces } = input;
   const opening = currentOpening(state);
-  const openaiKey = devices?.apiConfigured ?? state.setup?.openaiKey ?? false;
+  const openaiKey =
+    devices?.apiConfigured ?? state.setup?.voiceKey ?? state.setup?.openaiKey ?? false;
   const perception = devices?.perception.connected ?? state.setup?.perception ?? false;
   const voice = opening.trigger === 'voice' || state.wakeWord.enabled;
   const camera = needsCamera(opening, devices?.perception.vision?.mode);
@@ -91,13 +92,13 @@ export function readinessChecklist(input: ReadinessInput): ReadinessItem[] {
       ? {
           id: 'openai-key',
           status: 'done',
-          title: 'Clé OpenAI',
+          title: state.voiceProvider === 'mistral' ? 'Clé Mistral' : 'Clé OpenAI',
           detail: 'Renseignée. Elle reste sur cet ordinateur.',
         }
       : {
           id: 'openai-key',
           status: 'todo',
-          title: 'Clé OpenAI',
+          title: state.voiceProvider === 'mistral' ? 'Clé Mistral' : 'Clé OpenAI',
           detail:
             'Sans elle, Cornelius ne peut pas parler. Collez-la plus bas, dans « Clés et jetons » : elle compte tout de suite.',
           action: { kind: 'doc', path: 'docs/installation/premier-demarrage.md' },
@@ -161,14 +162,14 @@ export function readinessChecklist(input: ReadinessInput): ReadinessItem[] {
       ? {
           id: 'openai-blocked',
           status: 'todo',
-          title: 'Accès à OpenAI',
+          title: 'Accès aux services IA',
           detail:
-            'Bloqué depuis l’administration : autorisez OpenAI pour permettre la conversation.',
+            'Bloqué depuis l’administration : autorisez les services IA pour permettre la conversation.',
         }
       : {
           id: 'openai-blocked',
           status: 'done',
-          title: 'Accès à OpenAI',
+          title: 'Accès aux services IA',
           detail: 'Autorisé.',
         },
   ];
@@ -346,7 +347,10 @@ export function mirrorBlocker(
       reason: 'Cornelius n’est pas encore configuré : ouvrez l’administration sur cet ordinateur.',
     };
   if (state.openaiBlocked)
-    return { id: 'openai-blocked', reason: 'Accès à OpenAI bloqué depuis l’administration.' };
+    return {
+      id: 'openai-blocked',
+      reason: 'Accès aux services IA bloqué depuis l’administration.',
+    };
   const wakeReady = state.wakeWord.enabled && state.wakeWord.ready;
   if (state.session.manualStop)
     return {
@@ -426,13 +430,13 @@ export function adminBlockers(
   const blockers: AdminBlocker[] = [];
   const add = (id: AdminBlockerId, reason: string, manualStart = false) =>
     blockers.push({ id, reason, manualStart });
-  if (!(state.setup?.openaiKey ?? devices?.apiConfigured ?? false))
+  if (!(state.setup?.voiceKey ?? state.setup?.openaiKey ?? devices?.apiConfigured ?? false))
     add(
       'openai-key',
-      'Clé OpenAI absente : ajoutez-la dans Mise en route, carte « Clés et jetons ».',
+      'Clé du fournisseur vocal absente : ajoutez-la dans Mise en route, carte « Clés et jetons ».',
     );
   if (state.openaiBlocked)
-    add('openai-blocked', 'Autorisez OpenAI pour permettre la conversation.');
+    add('openai-blocked', 'Autorisez les services IA pour permettre la conversation.');
   if (!state.browserConnected) add('mirror', 'Ouvrez le miroir pour démarrer automatiquement.');
   else if (state.browserAudioReady === false)
     add('voice', 'Autorisez le microphone et le son sur le miroir.');

@@ -215,7 +215,7 @@ test('nouvelle personne : souvenirs autorisés ou non, et nom déjà pris refus�
   await login(page);
   await page.getByRole('button', { name: 'Le foyer et les visages', exact: true }).click();
   const memoryConsent = page.getByLabel(
-    'Laisser Cornelius retenir des souvenirs pour cette personne (extraits par OpenAI après la conversation)',
+    'Laisser Cornelius retenir des souvenirs pour cette personne (extraits par le fournisseur vocal choisi après la conversation)',
   );
   await expect(memoryConsent).toBeChecked();
   await expect(page.getByText(/Ni souvenir ni service externe/)).toHaveCount(0);

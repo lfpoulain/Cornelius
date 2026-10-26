@@ -157,7 +157,7 @@ test('l’accès à OpenAI bloqué s’autorise depuis son étape', async ({ pag
     const step = page
       .getByRole('list', { name: 'Étapes de la mise en route' })
       .getByRole('listitem')
-      .filter({ hasText: 'Accès à OpenAI' });
+      .filter({ hasText: 'Accès aux services IA' });
     await step.getByRole('button', { name: 'Autoriser OpenAI', exact: true }).click();
     await expect(step).toContainText('Fait');
     await expect

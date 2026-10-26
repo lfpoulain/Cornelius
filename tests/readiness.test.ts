@@ -196,7 +196,7 @@ test('premier lancement : ni clé ni perception, rien ne se dit prêt', () => {
     ['openai-key', 'mirror', 'perception'],
   );
   assert.equal(manualStartAllowed(blockers), false);
-  assert.match(adminWaiting(state), /^Clé OpenAI absente/u);
+  assert.match(adminWaiting(state), /^Clé du fournisseur vocal absente/u);
 });
 
 test('sans état des périphériques, la liste lit la configuration diffusée au miroir', () => {
@@ -356,7 +356,7 @@ test('le miroir explique chaque blocage, dans l’ordre de l’administration', 
       'openai-blocked',
       mirror(gaze, { openaiBlocked: true, session: { manualStop: true } }),
       { fresh: true },
-      'Accès à OpenAI bloqué depuis l’administration.',
+      'Accès aux services IA bloqué depuis l’administration.',
     ],
     [
       'manual-stop',

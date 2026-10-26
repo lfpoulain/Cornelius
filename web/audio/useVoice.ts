@@ -1,3 +1,4 @@
+import { createProviderAudioSession } from './provider-session';
 import { reportDiagnostic } from '../diagnostics';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { MirrorState } from '../../shared/types';
@@ -81,7 +82,9 @@ export function useVoice(state: MirrorState | null, fresh: boolean) {
       if (existing) active.current = existing;
       else if (fresh && scope.phase === 'connecting') {
         try {
-          const audio = createAudioSession(
+          const create =
+            state?.voiceProvider === 'mistral' ? createProviderAudioSession : createAudioSession;
+          const audio = create(
             sessionScope,
             (kind) => {
               // Une coupure réseau ou une clôture serveur ne retire pas l’autorisation audio :

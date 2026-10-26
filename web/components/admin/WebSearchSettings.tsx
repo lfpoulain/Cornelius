@@ -8,7 +8,7 @@ import { Switch } from '../ui/switch';
 import { ModulePanel } from './shared';
 import type { RunAction } from './types';
 
-/** Module natif « Web » : l’outil de recherche web d’OpenAI, commun à tout le foyer. */
+/** Module natif « Web » : l’outil de recherche web du fournisseur vocal, commun à tout le foyer. */
 export function WebSearchSettings({
   state,
   run,
@@ -26,7 +26,7 @@ export function WebSearchSettings({
       id="module-web"
       icon={Globe}
       title="Web"
-      subtitle="Recherche sur le web par OpenAI, avec les sources sur la carte"
+      subtitle="Recherche sur le web par le fournisseur vocal choisi"
       badge={
         <Badge variant={enabled ? 'secondary' : 'outline'}>
           {enabled ? 'Activée' : 'Désactivée'}

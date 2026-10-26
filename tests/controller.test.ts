@@ -21,11 +21,15 @@ class Transport implements SessionTransport {
   identified: Scope[] = [];
   prewarmed = 0;
   reason: string | null = null;
+  metered = false;
 
   prewarm(): void {
     this.prewarmed++;
   }
 
+  meteredByDuration(): boolean {
+    return this.metered;
+  }
   unavailableReason(): string | null {
     return this.reason;
   }
@@ -598,7 +602,7 @@ test('un nouveau suivi du même visage reconnu à temps ne coupe pas la conversa
   }
 });
 
-test('le même visage suivi qui perd son identité retire le profil : contradiction ou maintien expiré', (t) => {
+test('une identité retirée sur le même suivi retire immédiatement le profil et ses droits', (t) => {
   const f = fixture(t);
   f.engage([f.alice.id]);
   f.ready();
@@ -1506,6 +1510,19 @@ test('recherche web et accueil : réglages persistants, la recherche rouvre la s
   );
   assert.equal(restarted.isWebSearchEnabled(), false);
   assert.equal(restarted.greetingMode(), 'free');
+});
+
+test('un fournisseur facturé à la durée ferme après le silence dans tous les modes', (t) => {
+  const f = fixture(t);
+  f.transport.metered = true;
+  f.controller.setSessionMode(2);
+  f.engage([f.alice.id]);
+  f.ready();
+  f.advance(19_999);
+  assert.equal(f.state().session.phase, 'ready');
+  f.advance(2);
+  assert.equal(f.state().session.phase, 'closing');
+  assert.equal(f.state().session.reason, 'Fin de conversation après silence.');
 });
 
 test('fin de parole désactivée par défaut : la conversation reste ouverte devant le miroir', (t) => {
