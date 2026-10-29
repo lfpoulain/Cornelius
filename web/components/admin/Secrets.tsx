@@ -1,5 +1,7 @@
 import { useCallback, useId, useState, type FormEvent } from 'react';
 import { Boxes, ExternalLink, KeyRound, Sparkles, type LucideIcon } from 'lucide-react';
+import type { CustomProviderSettings, CustomProviderView } from '../../../shared/custom-provider';
+import { NativeSelect, NativeSelectOption } from '../ui/native-select';
 import type { SecretView } from '../../../shared/types';
 import { api } from '../../api';
 import { addonIcon } from './addon-icons';
@@ -218,6 +220,139 @@ function SecretGroup({
   );
 }
 
+function CustomProviderForm({ run, keyConfigured }: { run: RunAction; keyConfigured: boolean }) {
+  const resource = useAdminResource(api.customProvider);
+  return (
+    <ResourceState resource={resource} loadingLabel="Lecture du fournisseur mémoire…">
+      {(initial) => (
+        <CustomProviderFields initial={initial} run={run} keyConfigured={keyConfigured} />
+      )}
+    </ResourceState>
+  );
+}
+
+function CustomProviderFields({
+  initial,
+  run,
+  keyConfigured,
+}: {
+  initial: CustomProviderView;
+  run: RunAction;
+  keyConfigured: boolean;
+}) {
+  const [view, setView] = useState(initial);
+  const [form, setForm] = useState<CustomProviderSettings>(initial);
+  const field = (key: keyof CustomProviderSettings, value: string) =>
+    setForm({ ...form, [key]: value });
+  const models = view.models;
+  return (
+    <section
+      className="min-w-0 space-y-4 rounded-xl border bg-muted/20 p-4"
+      aria-labelledby="custom-provider-settings"
+    >
+      <div>
+        <h3 id="custom-provider-settings" className="text-sm font-semibold">
+          Mémoire personnalisée
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Extraction de la mémoire via une API compatible OpenAI. La clé se renseigne ci-dessus.
+        </p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="block min-w-0 space-y-1 text-sm">
+          <span>Nom affiché</span>
+          <Input value={form.name} onChange={(event) => field('name', event.target.value)} />
+        </label>
+        <label className="block min-w-0 space-y-1 text-sm">
+          <span>URL de base</span>
+          <Input
+            type="url"
+            placeholder="http://serveur:port/v1"
+            value={form.baseUrl}
+            onChange={(event) => field('baseUrl', event.target.value)}
+          />
+        </label>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!keyConfigured || !form.baseUrl}
+          onClick={() =>
+            void run('Modèles compatibles détectés.', async () => {
+              const saved = await api.saveCustomProvider(form);
+              setView(saved);
+              const discovered = await api.discoverCustomProviderModels();
+              setView(discovered);
+              setForm(discovered);
+            })
+          }
+        >
+          Détecter les modèles
+        </Button>
+        <span className="self-center text-xs text-muted-foreground">
+          {models.length ? `${models.length} modèle(s) détecté(s)` : 'Aucun modèle détecté'}
+        </span>
+      </div>
+      <datalist id="custom-provider-models">
+        {models.map((model) => (
+          <option key={model} value={model} />
+        ))}
+      </datalist>
+      <label className="block min-w-0 space-y-1 text-sm">
+        <span>Modèle mémoire</span>
+        <Input
+          list="custom-provider-models"
+          value={form.memoryModel}
+          onChange={(event) => field('memoryModel', event.target.value)}
+        />
+      </label>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="block min-w-0 space-y-1 text-sm">
+          <label htmlFor="custom-memoryProvider">Fournisseur mémoire</label>
+          <NativeSelect
+            id="custom-memoryProvider"
+            value={form.memoryProvider}
+            onChange={(event) => field('memoryProvider', event.target.value)}
+          >
+            <NativeSelectOption value="openai">OpenAI</NativeSelectOption>
+            <NativeSelectOption value="mistral">Mistral</NativeSelectOption>
+            <NativeSelectOption value="custom">Personnalisé</NativeSelectOption>
+          </NativeSelect>
+        </div>
+        <div className="block min-w-0 space-y-1 text-sm">
+          <label htmlFor="custom-memoryFallback">Secours mémoire</label>
+          <NativeSelect
+            id="custom-memoryFallback"
+            value={form.memoryFallback}
+            onChange={(event) => field('memoryFallback', event.target.value)}
+          >
+            <NativeSelectOption value="openai">OpenAI</NativeSelectOption>
+            <NativeSelectOption value="mistral">Mistral</NativeSelectOption>
+          </NativeSelect>
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Si le fournisseur personnalisé est indisponible, les données de cette extraction sont
+        envoyées au fournisseur de secours choisi, si sa clé est renseignée.
+      </p>
+      <Button
+        type="button"
+        className="h-auto whitespace-normal"
+        onClick={() =>
+          void run('Fournisseur personnalisé enregistré.', async () => {
+            const saved = await api.saveCustomProvider(form);
+            setView(saved);
+            setForm(saved);
+          })
+        }
+      >
+        Enregistrer la configuration
+      </Button>
+    </section>
+  );
+}
+
 /** Clés des fournisseurs IA et jetons des modules, saisis sans toucher au fichier .env. */
 export function Secrets({ run }: { run: RunAction }) {
   const load = useCallback(() => api.secrets().then((result) => result.secrets), []);
@@ -248,6 +383,12 @@ export function Secrets({ run }: { run: RunAction }) {
                   secrets={providers}
                   run={run}
                   onChanged={setUpdated}
+                />
+                <CustomProviderForm
+                  run={run}
+                  keyConfigured={secrets.some(
+                    (secret) => secret.env === 'CUSTOM_OPENAI_API_KEY' && secret.configured,
+                  )}
                 />
                 <SecretGroup
                   icon={Boxes}

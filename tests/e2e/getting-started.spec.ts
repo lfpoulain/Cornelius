@@ -129,7 +129,7 @@ test('sans clé OpenAI, l’administration s’ouvre sur la mise en route', asyn
     'data-compact',
     'true',
   );
-  await expect(page.getByText(/OPENAI_API_KEY/)).toHaveCount(1);
+  await expect(page.getByText('OPENAI_API_KEY', { exact: true })).toHaveCount(1);
   await expect(page.getByRole('button', { name: /ouvrir le miroir/i })).toHaveCount(1);
   await expect(
     steps

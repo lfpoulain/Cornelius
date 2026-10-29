@@ -60,6 +60,23 @@ for (const width of [390, 1440]) {
       expect(box!.x + box!.width).toBeLessThanOrEqual(width);
       expect(await card.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
     }
+    const memory = page.getByRole('region', { name: 'Mémoire personnalisée', exact: true });
+    await expect(memory).toBeVisible();
+    const box = await memory.boundingBox();
+    expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+    expect(await memory.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+    await memory.getByLabel('URL de base', { exact: true }).fill('http://127.0.0.1:11434/v1');
+    await memory.getByLabel('Modèle mémoire', { exact: true }).fill('local-memory-model');
+    await memory.getByLabel('Fournisseur mémoire', { exact: true }).selectOption('custom');
+    await memory.getByLabel('Secours mémoire', { exact: true }).selectOption('mistral');
+    await memory.getByRole('button', { name: 'Enregistrer la configuration', exact: true }).click();
+    await page.reload();
+    await expect(memory.getByLabel('Modèle mémoire', { exact: true })).toHaveValue(
+      'local-memory-model',
+    );
+    await expect(memory.getByLabel('Fournisseur mémoire', { exact: true })).toHaveValue('custom');
+    await expect(memory.getByLabel('Secours mémoire', { exact: true })).toHaveValue('mistral');
+    await memory.screenshot({ path: `.local/screenshots/pr12-memory-${width}.png` });
     await page.goto('/admin#modules');
     await page.locator('#module-weather > summary').click();
     const weather = page
@@ -80,3 +97,27 @@ for (const width of [390, 1440]) {
     }
   });
 }
+
+test('la clé mémoire active la découverte sans exposer sa valeur', async ({ page }) => {
+  await login(page);
+  const key = 'custom-memory-e2e-only-0123456789';
+  const field = page.locator('#secrets').getByLabel('Clé mémoire personnalisée', { exact: true });
+  await field.fill(key);
+  try {
+    await field
+      .locator('xpath=ancestor::form')
+      .getByRole('button', { name: 'Enregistrer', exact: true })
+      .click();
+    await expect(field).toHaveCount(0);
+    const memory = page.getByRole('region', { name: 'Mémoire personnalisée', exact: true });
+    await memory.getByLabel('URL de base', { exact: true }).fill('http://127.0.0.1:11434/v1');
+    await expect(
+      memory.getByRole('button', { name: 'Détecter les modèles', exact: true }),
+    ).toBeEnabled();
+    await expect(page.locator('body')).not.toContainText(key);
+  } finally {
+    await page.request.delete('/api/admin/secrets/CUSTOM_OPENAI_API_KEY', {
+      headers: { origin: new URL(page.url()).origin },
+    });
+  }
+});
