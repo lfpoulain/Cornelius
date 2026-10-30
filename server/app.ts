@@ -75,6 +75,7 @@ import { HermesClient } from './hermes-client.js';
 import { Agents } from './agents.js';
 import { registerAgents } from './agents-api.js';
 import { ScreensaverLibrary } from './screensaver.js';
+import { GooglePhotosAlbum } from './google-photos.js';
 import { registerScreensaver } from './screensaver-api.js';
 import { ImageGeneration } from './image-generation.js';
 import { createOpenAIImageCreator, type OpenAIImageCreator } from './openai-images.js';
@@ -364,6 +365,8 @@ export async function createApp(
     now,
     options.screensaverFetch,
   );
+  const googlePhotos = new GooglePhotosAlbum(db, options.screensaverFetch, now);
+  if (options.timers !== false) googlePhotos.start();
   imageGeneration.onActivity((activity) => controller.setImageActivity(activity));
   const ambient = new AmbientModules(
     addonRuntime,
@@ -734,7 +737,7 @@ export async function createApp(
 
   registerHomeAssistant(app, homeAssistant, requireAdmin, () => controller.homeAssistantChanged());
   registerAgents(app, agents, requireAdmin);
-  registerScreensaver(app, screensaver, controller, requireAdmin);
+  registerScreensaver(app, screensaver, controller, requireAdmin, googlePhotos);
   const satellitePairing = new SatellitePairing(logs, now);
   registerSatellites(app, {
     store: satelliteStore,
@@ -1594,6 +1597,7 @@ export async function createApp(
   heartbeatTimer?.unref();
   controllerTimer?.unref();
   app.addHook('onClose', async () => {
+    await googlePhotos.dispose();
     logs.write('info', 'local', 'Arrêt du serveur');
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     if (controllerTimer) clearInterval(controllerTimer);
