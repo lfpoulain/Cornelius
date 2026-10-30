@@ -6,6 +6,7 @@ import {
 import { api, errorMessage } from '../../api';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { Alert, AlertDescription } from '../ui/alert';
 import { Label } from '../ui/label';
 import { ChoiceGroup } from '../ui/choice-card';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
@@ -91,6 +92,20 @@ export function GooglePhotosSettings({ run }: { run: RunAction }) {
                 ]}
                 onValueChange={(source) => change({ source })}
               />
+              {(draft.source === 'google-photos' || draft.albumUrl.trim()) && (
+                <Alert>
+                  <AlertDescription>
+                    <p className="font-medium text-foreground">
+                      Photos accessibles à toute personne possédant le lien
+                    </p>
+                    <p>
+                      Le partage par lien rend les photos de cet album consultables sans connexion à
+                      votre compte Google. Toute personne qui obtient ce lien peut les voir.
+                      Choisissez un album dont vous acceptez ce partage et ne diffusez pas son lien.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="screensaver-google-album">Lien de partage de l’album</Label>
                 <Input
@@ -106,9 +121,9 @@ export function GooglePhotosSettings({ run }: { run: RunAction }) {
                   onChange={(event) => change({ albumUrl: event.target.value })}
                 />
                 <p id="google-album-help" className="text-xs text-muted-foreground">
-                  Dans Google Photos : ouvrez l’album, puis Partager → Créer un lien. Toute personne
-                  ayant ce lien peut consulter l’album. Une adresse /album/ privée ne convient pas.
-                  Aucune clé API ni connexion à votre compte n’est demandée.
+                  Dans Google Photos : ouvrez l’album, puis Partager → Créer un lien. Une adresse
+                  /album/ privée ne convient pas. Aucune clé API ni connexion à votre compte n’est
+                  demandée.
                 </p>
               </div>
               <div className="space-y-2">

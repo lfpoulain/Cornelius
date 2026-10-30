@@ -67,6 +67,9 @@ test('album partagé : choix de source, validation, aperçu, actualisation et an
   await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
   await page.getByRole('button', { name: 'Écran de veille', exact: true }).click();
   await page.getByRole('radio', { name: 'Album Google Photos', exact: true }).check();
+  await expect(
+    page.getByText('Photos accessibles à toute personne possédant le lien', { exact: true }),
+  ).toBeVisible();
   const save = page
     .getByRole('region', { name: 'Source des images : modifications non enregistrées' })
     .getByRole('button', { name: 'Enregistrer', exact: true });

@@ -5,6 +5,11 @@ Il s’agit d’une connexion **expérimentale et non officielle** : Cornelius l
 sans API Google Photos, sans clé API, sans OAuth et sans accès à votre compte Google.
 Google peut changer cette page et rendre le connecteur inutilisable.
 
+L’intégration fait partie du cœur de l’écran de veille : le contrat actuel des modules ne
+permet que des présentations de texte ou de valeurs et ne fournit aucun point d’extension pour
+remplacer le diaporama plein écran. Le choix entre images locales et Google Photos reste dans
+la rubrique « Écran de veille » de l’administration.
+
 ## Choisir l’album
 
 1. Dans Google Photos, ouvrez l’album souhaité, puis choisissez **Partager → Créer un lien**.
@@ -24,6 +29,22 @@ prochaine vérification réussie, même si le miroir est déjà ouvert.
 **Toute personne possédant le lien partagé peut consulter l’album.** Utilisez un album dédié
 aux photos qui peuvent apparaître sur cet écran partagé. Désactivez la collaboration dans
 Google Photos si les visiteurs ne doivent pas ajouter de contenu.
+
+L’administration affiche cet avertissement de manière visible lors du choix de la source
+Google Photos. Un lien partagé ne doit pas être traité comme un album privé authentifié.
+
+## Évolution prévue : Google Photos Ambient API
+
+Une prochaine évolution envisagée est une connexion officielle à **Google Photos Ambient API**,
+pour choisir des albums depuis le parcours Google et afficher les photos avec l’autorisation du
+compte, sans devoir fournir de lien d’album partagé.
+
+Elle dépend d’une acceptation préalable de Cornelius dans le **programme partenaire Google
+Photos**. Avant le lancement de cette intégration, Google demande aussi la vérification OAuth
+et une revue de l’intégration Google Photos. Une simple clé API ne débloque pas cet accès.
+Cette évolution n’est pas incluse dans le connecteur expérimental actuel et son admission
+par Google n’est pas acquise. Voir les [conditions du programme partenaire](https://developers.google.com/photos/partner-program/overview)
+et le [parcours Ambient API](https://developers.google.com/photos/ambient/guides/get-started).
 
 ## Affichage et limites
 
