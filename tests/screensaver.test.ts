@@ -361,3 +361,85 @@ test('retrait groupé : une seule demande pour plusieurs images, les autres rest
   assert.equal(readdirSync(f.root).length, 1);
   assert.equal((await f.state()).screensaver?.imageCount, 1);
 });
+
+test('album Google Photos : administration protégée, validation et lien réservé à l’administration', async (t) => {
+  const html =
+    '<script>AF_initDataCallback({data:[["synthetic-photo",["https://lh3.googleusercontent.com/pw/synthetic-photo",1600,1200]]]});</script>';
+
+  const f = await fixture(t, async (input) =>
+    String(input).includes('googleusercontent.com') ? new Response(jpeg) : new Response(html),
+  );
+
+  const url = '/api/admin/screensaver/google-photos';
+
+  assert.equal((await f.app.inject({ url })).statusCode, 401);
+
+  assert.equal(
+    (await f.app.inject({ method: 'PUT', url, headers: { origin }, payload: {} })).statusCode,
+    401,
+  );
+
+  assert.equal(
+    (
+      await f.app.inject({
+        method: 'PUT',
+        url,
+        headers: f.headers,
+        payload: { source: 'google-photos', albumUrl: 'http://localhost', refreshMinutes: 30 },
+      })
+    ).statusCode,
+    400,
+  );
+
+  const saved = await f.app.inject({
+    method: 'PUT',
+    url,
+    headers: f.headers,
+
+    payload: {
+      source: 'google-photos',
+      albumUrl: 'https://photos.app.goo.gl/synthetic-album',
+      refreshMinutes: 30,
+    },
+  });
+
+  assert.equal(saved.statusCode, 200);
+
+  assert.equal(saved.json().count, 1);
+
+  assert.equal(saved.headers['cache-control'], 'no-store');
+
+  const list = await f.app.inject({ url: '/api/screensaver' });
+
+  assert.equal(list.json().images.length, 1);
+
+  assert.ok(!list.body.includes('photos.app.goo.gl'));
+
+  assert.ok(!list.body.includes('googleusercontent.com'));
+
+  const photo = await f.app.inject({ url: list.json().images[0].url });
+
+  assert.equal(photo.statusCode, 200);
+
+  assert.equal(photo.headers['content-type'], 'image/jpeg');
+
+  assert.equal(photo.headers['cache-control'], 'no-store');
+
+  assert.ok(!JSON.stringify(await f.state()).includes('synthetic-album'));
+
+  const logs = await f.app.inject({ url: '/api/admin/logs', headers: f.headers });
+
+  assert.ok(!logs.body.includes('synthetic-album'));
+
+  await f.app.inject({
+    method: 'PUT',
+    url,
+    headers: f.headers,
+
+    payload: { source: 'local', albumUrl: '', refreshMinutes: 30 },
+  });
+
+  assert.equal((await f.app.inject({ url: '/api/screensaver' })).json().images.length, 0);
+
+  assert.equal((await f.app.inject({ url: list.json().images[0].url })).statusCode, 404);
+});

@@ -105,6 +105,8 @@ Les prénoms des personnes reconnues sont donc visibles par tous ceux qui voient
 
 ### L’écran de veille
 
+La source peut aussi être un [album Google Photos partagé](../fonctionnalites/google-photos.md), choisi dans l’administration. Les photos sont chargées depuis Google et le contenu de l’album est relu périodiquement. Cette connexion expérimentale demande Internet et ne prend pas en charge la pagination des grands albums.
+
 Plutôt que de rester noir, le miroir peut afficher des peintures et vos photos quand personne n’est devant lui, comme un cadre d’art. Il est désactivé par défaut ; il s’active et se remplit dans l’administration, rubrique « Écran de veille ».
 
 - **Quand.** Les images arrivent après un délai sans personne devant le miroir (30 s par défaut), sans conversation ni carte affichée. Elles changent à intervalle régulier (toutes les 5 minutes par défaut), par un long fondu, dans un ordre mélangé.
