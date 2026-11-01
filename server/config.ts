@@ -35,6 +35,18 @@ export interface AppConfig {
   tlsKeyFingerprint?: string;
   /** Machine détectée ; absente (tests), elle compte comme un PC sans restriction. */
   machine?: MachineStatus;
+  /**
+   * Un superviseur relance le serveur quand il s’arrête : systemd (INVOCATION_ID) ou
+   * CORNELIUS_SUPERVISED=1 (add-on Home Assistant). Un redémarrage n’a alors qu’à quitter.
+   */
+  supervised?: boolean;
+  /**
+   * Un appel venu de 127.0.0.1 compte comme l’ordinateur du miroir (miroir sans autorisation,
+   * mot de passe par défaut accepté) ; vrai par défaut. CORNELIUS_TRUST_LOOPBACK=0 quand la
+   * boucle locale est partagée avec d’autres programmes (add-on Home Assistant sur le réseau de
+   * l’hôte) : seules la perception et le générateur d’images, avec leur jeton, y restent servis.
+   */
+  trustLoopback?: boolean;
 }
 
 /** Mot de passe écrit par `npm run setup` et `.env.example`, à changer après l’installation. */
@@ -81,6 +93,14 @@ export function loadConfig(): AppConfig & { port: number } {
     modulesDir: externalAddonsRoot(),
     timeZone: process.env.CORNELIUS_TIMEZONE?.trim() || undefined,
     machine: detectMachine(),
+    supervised:
+      Boolean(process.env.INVOCATION_ID) ||
+      ['1', 'true', 'oui', 'yes'].includes(
+        (process.env.CORNELIUS_SUPERVISED ?? '').trim().toLowerCase(),
+      ),
+    trustLoopback: !['0', 'false', 'non', 'no'].includes(
+      (process.env.CORNELIUS_TRUST_LOOPBACK ?? '1').trim().toLowerCase(),
+    ),
     adminPassword,
     databasePath:
       process.env.CORNELIUS_DATABASE === ':memory:'

@@ -58,13 +58,14 @@ try {
     await Promise.race([app.close(), new Promise((resolve) => setTimeout(resolve, 4000))]);
   };
   /**
-   * Redémarrage demandé par l’administration. Sous systemd (Restart=always), il suffit de
-   * quitter. Sinon, une nouvelle instance est lancée avec les mêmes arguments, journaux dans
-   * data/run/logs comme avec les scripts, puis celle-ci s’arrête ; la nouvelle relit .env.
+   * Redémarrage demandé par l’administration. Sous un superviseur (systemd avec
+   * Restart=always, add-on Home Assistant), il suffit de quitter. Sinon, une nouvelle instance
+   * est lancée avec les mêmes arguments, journaux dans data/run/logs comme avec les scripts,
+   * puis celle-ci s’arrête ; la nouvelle relit .env.
    */
   const restart = async () => {
     await stop();
-    if (!process.env.INVOCATION_ID) {
+    if (!config.supervised) {
       const logs = join('data', 'run', 'logs');
       const output = (name: string) =>
         existsSync(logs) ? openSync(join(logs, `backend.${name}.log`), 'a') : 'ignore';

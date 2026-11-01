@@ -604,12 +604,20 @@ export async function createApp(
   };
 
   /**
-   * La requête vient de l'ordinateur lui-même. Une requête sans socket ne vient pas du réseau :
+   * La requête vient de la boucle locale. Une requête sans socket ne vient pas du réseau :
    * elle est injectée dans le processus (tests, WebSocket simulés).
    */
-  function fromMachine(request: FastifyRequest): boolean {
+  function fromLoopback(request: FastifyRequest): boolean {
     const socket = request.raw.socket as { remoteAddress?: string } | undefined;
     return !socket || isLoopback(socket.remoteAddress);
+  }
+  /**
+   * La requête vient de l'ordinateur du miroir, qui n'a besoin d'aucune autorisation. Sans
+   * confiance dans la boucle locale (CORNELIUS_TRUST_LOOPBACK=0), elle est traitée comme un
+   * appareil du réseau local.
+   */
+  function fromMachine(request: FastifyRequest): boolean {
+    return config.trustLoopback !== false && fromLoopback(request);
   }
   const lanPairingMessage =
     'Appareil non autorisé : connectez-vous une fois avec le mot de passe administrateur pour en faire un miroir.';
@@ -641,14 +649,14 @@ export async function createApp(
     // Clients : la machine elle-même, et le réseau local quand il est ouvert. Une adresse
     // publique (port redirigé par un routeur) est toujours refusée.
     const lan = config.lan === true;
-    if (!fromMachine(request) && !(lan && isPrivateAddress(request.raw.socket?.remoteAddress)))
+    if (!fromLoopback(request) && !(lan && isPrivateAddress(request.raw.socket?.remoteAddress)))
       return reply.code(403).send({ error: 'Accès réservé au réseau local.' });
     if (!allowedHostname(request.hostname, lan, config.allowedHosts ?? []))
       return reply.code(403).send({ error: 'Hôte non autorisé.' });
     // La perception et le générateur d'images tournent sur la machine : jamais par le réseau.
     if (
       (request.url.startsWith('/perception') || request.url.startsWith('/image-generation')) &&
-      !fromMachine(request)
+      !fromLoopback(request)
     )
       return reply.code(403).send({ error: 'Réservé à cet ordinateur.' });
     // Le miroir n'a pas de mot de passe sur la machine. Depuis un autre appareil, ses données

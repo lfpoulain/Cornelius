@@ -6,6 +6,14 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-01 : add-on Home Assistant
+
+**Ajouté**
+
+- Cornelius tourne comme add-on de Home Assistant OS, dans le dépôt séparé [cornelius-ha](https://github.com/lfpoulain/cornelius-ha) : serveur et perception sur la box, miroir sur un autre appareil. Page [Installer dans Home Assistant](docs/installation/home-assistant.md).
+- `CORNELIUS_SUPERVISED=1` : sous un superviseur autre que systemd, un redémarrage demandé par l’administration quitte simplement au lieu de relancer le serveur en arrière-plan.
+- `CORNELIUS_TRUST_LOOPBACK=0` : une requête venue de `127.0.0.1` n’est plus traitée comme l’ordinateur du miroir (miroir sans autorisation, mot de passe par défaut accepté). L’add-on s’en sert, car sur le réseau de l’hôte la boucle locale est partagée avec Home Assistant et ses autres applications. Sans la variable, rien ne change.
+
 ### 2026-10-29 : ARM64 et Raspberry Pi
 
 **Ajouté**
