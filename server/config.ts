@@ -44,13 +44,21 @@ export interface AppConfig {
    * Un appel venu de 127.0.0.1 compte comme l’ordinateur du miroir (miroir sans autorisation,
    * mot de passe par défaut accepté) ; vrai par défaut. CORNELIUS_TRUST_LOOPBACK=0 quand la
    * boucle locale est partagée avec d’autres programmes (add-on Home Assistant sur le réseau de
-   * l’hôte) : seules la perception et le générateur d’images, avec leur jeton, y restent servis.
+   * l’hôte) : 127.0.0.1 a alors les droits d’un appareil du réseau local, et la perception et le
+   * générateur d’images y restent servis, avec leur jeton.
    */
   trustLoopback?: boolean;
 }
 
 /** Mot de passe écrit par `npm run setup` et `.env.example`, à changer après l’installation. */
 export const DEFAULT_ADMIN_PASSWORD = 'cornelius';
+
+/** CORNELIUS_SUPERVISED=1 : un superviseur autre que systemd (add-on Home Assistant) relance le serveur. */
+export function explicitlySupervised(env: NodeJS.ProcessEnv = process.env): boolean {
+  return ['1', 'true', 'oui', 'yes'].includes(
+    (env.CORNELIUS_SUPERVISED ?? '').trim().toLowerCase(),
+  );
+}
 
 export function loadConfig(): AppConfig & { port: number } {
   const adminPassword = process.env.CORNELIUS_ADMIN_PASSWORD ?? '';
@@ -93,11 +101,7 @@ export function loadConfig(): AppConfig & { port: number } {
     modulesDir: externalAddonsRoot(),
     timeZone: process.env.CORNELIUS_TIMEZONE?.trim() || undefined,
     machine: detectMachine(),
-    supervised:
-      Boolean(process.env.INVOCATION_ID) ||
-      ['1', 'true', 'oui', 'yes'].includes(
-        (process.env.CORNELIUS_SUPERVISED ?? '').trim().toLowerCase(),
-      ),
+    supervised: Boolean(process.env.INVOCATION_ID) || explicitlySupervised(),
     trustLoopback: !['0', 'false', 'non', 'no'].includes(
       (process.env.CORNELIUS_TRUST_LOOPBACK ?? '1').trim().toLowerCase(),
     ),

@@ -3,7 +3,7 @@ import { existsSync, openSync } from 'node:fs';
 import { createServer } from 'node:https';
 import { dirname, join } from 'node:path';
 import { createApp } from './app.js';
-import { loadConfig } from './config.js';
+import { explicitlySupervised, loadConfig } from './config.js';
 import { announceSatellites } from './discovery.js';
 import {
   allowedHostname,
@@ -124,4 +124,7 @@ try {
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'Démarrage impossible.');
   process.exitCode = 1;
+  // Un démarrage à moitié fait (port HTTPS déjà pris…) laisserait le serveur HTTP local en vie :
+  // sous l’add-on, le superviseur doit voir l’arrêt pour le signaler et relancer.
+  if (explicitlySupervised()) process.exit(1);
 }

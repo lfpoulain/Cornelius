@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadConfig } from '../server/config.js';
+import { explicitlySupervised, loadConfig } from '../server/config.js';
 
 /** Lit la configuration avec ces seules variables de supervision, puis rend l’environnement. */
 function supervisedWith(env: { INVOCATION_ID?: string; CORNELIUS_SUPERVISED?: string }) {
@@ -45,4 +45,11 @@ test('la boucle locale reste de confiance, sauf CORNELIUS_TRUST_LOOPBACK=0', () 
     for (const key of Object.keys(process.env)) if (!(key in saved)) delete process.env[key];
     Object.assign(process.env, saved);
   }
+});
+
+test('CORNELIUS_SUPERVISED seul arrête le serveur à un démarrage incomplet', () => {
+  assert.equal(explicitlySupervised({}), false);
+  assert.equal(explicitlySupervised({ INVOCATION_ID: 'b5c1a7' }), false);
+  assert.equal(explicitlySupervised({ CORNELIUS_SUPERVISED: '0' }), false);
+  assert.equal(explicitlySupervised({ CORNELIUS_SUPERVISED: ' Oui ' }), true);
 });

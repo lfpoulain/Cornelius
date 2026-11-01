@@ -31,13 +31,13 @@ Le dépôt `cornelius-ha` est privé pour l’instant, et Home Assistant ne sait
 
 1. Installez l’application **Samba share** (ou **Terminal & SSH**) dans Home Assistant.
 2. Copiez le dossier `cornelius` du dépôt dans le partage **`local_apps`** de la box (`\\homeassistant.local\local_apps\cornelius`).
-3. Dans **Paramètres → Applications → Boutique des applications**, menu **⋮ → Rechercher des mises à jour** : **Cornelius** apparaît dans « Applications locales ».
+3. Dans **Paramètres → Applications**, ouvrez la boutique (bouton d’installation d’une application), puis menu **⋮ → Rechercher des mises à jour** : **Cornelius** apparaît dans la section « Local apps ».
 4. Installez-le. Home Assistant construit l’image sur la box : comptez plusieurs minutes, davantage sur un Raspberry Pi.
 5. Dans l’onglet **Configuration**, choisissez le **mot de passe de l’administration** (8 caractères au moins, autre que `cornelius`). Collez la **clé OpenAI** ici ou plus tard dans l’administration.
 6. Démarrez l’application et activez **Chien de garde**, qui la relance si elle s’arrête.
 7. **Ouvrir l’interface web** : l’administration s’ouvre en HTTPS sur le port `3443` de la box.
 
-Après une modification du dossier `cornelius`, **Reconstruire** sur la page de l’application.
+Après une modification du `Dockerfile` ou des scripts, **Reconstruire** sur la page de l’application. Après une modification de `config.yaml`, d’abord **⋮ → Rechercher des mises à jour** dans la boutique, puis **Mettre à jour** si la version a changé, sinon **Reconstruire**.
 
 ### Les options
 
@@ -45,7 +45,7 @@ Après une modification du dossier `cornelius`, **Reconstruire** sur la page de 
 |---|---|
 | Mot de passe de l’administration | `CORNELIUS_ADMIN_PASSWORD`. Un mot de passe choisi ensuite dans l’administration le remplace : l’option n’a alors plus d’effet. |
 | Clé OpenAI | `OPENAI_API_KEY`, facultative : celle collée dans l’administration passe avant. |
-| Petite machine | `auto`, `oui` ou `non` : voir [Raspberry Pi](raspberry-pi.md#ce-qui-change-sur-un-raspberry-pi). `auto` vaut `oui` sur Raspberry Pi, Home Assistant Green et Yellow (type de machine donné par Home Assistant). |
+| Petite machine | `auto`, `oui` ou `non` : voir [Raspberry Pi](raspberry-pi.md#ce-qui-change-sur-un-raspberry-pi). `auto` vaut `oui` sur Raspberry Pi, Home Assistant Green et Yellow, ODROID et Khadas (type de machine donné par Home Assistant), `non` ailleurs. |
 | Port interne | `PORT`, `3000` par défaut, sur la boucle locale de la box. À changer s’il est déjà pris par une autre application. |
 | Numéro de la caméra USB | `CORNELIUS_CAMERA_INDEX`, pour une caméra branchée sur la box. |
 | Noms d’hôte acceptés | `CORNELIUS_ALLOWED_HOSTS`, en plus du nom de la box (`homeassistant`, `homeassistant.local`), toujours accepté. |
@@ -59,7 +59,23 @@ Le fuseau horaire est celui de Home Assistant. Le port HTTPS se change dans la r
 3. Dans l’administration, **Caméra et reconnaissance → Emplacement de la caméra**, choisissez **Sur l’appareil qui affiche le miroir**, sauf si une caméra USB est branchée sur la box.
 4. Touchez **Activer la voix** sur le miroir.
 
-Pour un Raspberry Pi dédié au miroir, sans Cornelius installé dessus, suivez seulement la partie kiosque de [Raspberry Pi](raspberry-pi.md) en remplaçant l’adresse locale par celle de la box.
+### Un Raspberry Pi comme miroir de la box
+
+Un Raspberry Pi peut afficher le miroir sans faire tourner Cornelius. Suivez [Sans bureau (Raspberry Pi OS Lite)](raspberry-pi.md#sans-bureau-raspberry-pi-os-lite), avec quatre différences, car le miroir vient alors de la box, en HTTPS, avec le certificat de Cornelius :
+
+1. Dans la règle de Chromium, remplacez `http://127.0.0.1:3000` par `https://homeassistant.local:3443`.
+2. Relevez l’empreinte de la clé du certificat, que Chromium acceptera sans avertissement :
+
+   ```sh
+   openssl s_client -connect homeassistant.local:3443 </dev/null 2>/dev/null \
+     | openssl x509 -pubkey -noout | openssl pkey -pubin -outform der \
+     | openssl dgst -sha256 -binary | base64
+   ```
+
+3. Dans le script du kiosque, attendez la box avec `curl -skf -o /dev/null https://homeassistant.local:3443/api/health`, et lancez Chromium sur `https://homeassistant.local:3443/` en ajoutant `--user-data-dir="$HOME/.config/cornelius-kiosk" --ignore-certificate-errors-spki-list=<empreinte>`. Chromium n’applique cette exception qu’avec son propre dossier de profil.
+4. Au premier lancement, le miroir demande le mot de passe de l’administration pour autoriser le Pi : branchez un clavier le temps de le saisir. L’autorisation est gardée dans ce profil.
+
+L’empreinte change si Cornelius recrée sa clé (dossier de l’application effacé) : relevez-la de nouveau.
 
 ## Connecter Home Assistant
 
@@ -67,13 +83,13 @@ Dans **Modules → Home Assistant**, l’adresse est `http://127.0.0.1:8123` : l
 
 ## Sécurité
 
-L’application demande le réseau de l’hôte (satellites par mDNS, HTTPS sur le réseau local, Home Assistant sur `127.0.0.1`) et l’accès vidéo (caméra USB facultative). Sur le réseau de l’hôte, `127.0.0.1` est partagé avec Home Assistant et ses autres applications : l’application lance Cornelius avec `CORNELIUS_TRUST_LOOPBACK=0`, si bien qu’aucun programme de la box n’ouvre le miroir sans autorisation. Seules la perception et ses outils internes, munis de leur jeton, y sont servis (voir [Configuration](../reference/configuration.md#variables-internes)).
+L’application demande le réseau de l’hôte (satellites par mDNS, HTTPS sur le réseau local, Home Assistant sur `127.0.0.1`) et l’accès vidéo (caméra USB facultative). Sur le réseau de l’hôte, `127.0.0.1` est partagé avec Home Assistant et ses autres applications : l’application lance Cornelius avec `CORNELIUS_TRUST_LOOPBACK=0`. Un programme de la box a alors les mêmes droits qu’un appareil du réseau local : il n’ouvre ni le miroir ni l’administration sans le mot de passe. La perception, elle, se connecte par la boucle locale avec son jeton (voir [Configuration](../reference/configuration.md#variables-internes)).
 
 ## Données et sauvegardes
 
 Tout ce qui doit durer est dans le dossier de l’application (`/data` dans le conteneur) : la base, son journal et ses copies, le certificat HTTPS, les images de l’écran de veille, les images générées, le jeton de la perception et les modèles. Les sauvegardes de Home Assistant contiennent donc le jeton Home Assistant, les signatures des visages et les options (mot de passe, clé OpenAI) : gardez-les à l’abri.
 
-Pendant une sauvegarde, l’application s’arrête le temps de copier la base, puis repart. Les modèles ne sont pas sauvegardés : ceux de l’image sont remis au démarrage, et le modèle de vision se retélécharge depuis l’administration.
+Pendant une sauvegarde, l’application s’arrête le temps de copier son dossier (base, images, journal), puis repart. Les modèles ne sont pas sauvegardés : ceux de l’image sont remis au démarrage, et le modèle de vision se retélécharge depuis l’administration.
 
 ## Mettre à jour
 
