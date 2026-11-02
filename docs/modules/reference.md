@@ -111,7 +111,7 @@ Le fichier `index.ts` DOIT exporter par défaut un objet `AddonDefinition<TConfi
 
 | Champ | Règle |
 | --- | --- |
- ; les préfixes des outils du cœur (`agents`, `home_assistant`, `http`, `image`, `mail`, `memory`, `ui`, `vision`, `web`) sont réservés |
+ ; les préfixes des outils du cœur (`agents`, `alarms`, `home_assistant`, `http`, `image`, `mail`, `memory`, `ui`, `vision`, `web`) sont réservés |
 | `apiVersion` | DOIT valoir `1` |
 | `version` | Version du code, chaîne libre (par exemple `1.0.0`) |
 | `minCoreVersion` | Facultatif : version minimale de Cornelius, `x.y.z` ; un cœur plus ancien refuse le module |

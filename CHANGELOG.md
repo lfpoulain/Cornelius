@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-02 : alarmes, minuteurs et rappels
+
+**Ajouté**
+
+- Module natif **Alarmes et rappels** (Modules → Au quotidien) : réveils à heure fixe, répétés ou non, minuteurs et rappels, pour le foyer ou une personne. Le serveur les tient dans la base, les fait sonner même sans conversation, arrête une sonnerie sans réponse après une durée réglable (5 min par défaut) et note manquée une échéance passée de plus d’un quart d’heure pendant un arrêt. La page permet de créer, arrêter et supprimer une échéance.
+
 ### 2026-11-01 : add-on Home Assistant
 
 **Ajouté**

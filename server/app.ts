@@ -66,6 +66,9 @@ import { registerAddons } from './addons-api.js';
 import { Mailer, type MailTransport } from './mail.js';
 import { registerMail } from './mail-api.js';
 import { MailRepository } from './mail-store.js';
+import { Alarms } from './alarms.js';
+import { registerAlarms } from './alarms-api.js';
+import { AlarmsRepository } from './alarms-store.js';
 import { MAIL_PASSWORD_SECRET } from '../shared/mail.js';
 import { HomeAssistant } from './home-assistant.js';
 import { HomeAssistantRepository } from './home-assistant-store.js';
@@ -286,6 +289,7 @@ export async function createApp(
     now,
     options.mailTransport,
   );
+  const alarms = new Alarms(new AlarmsRepository(db, now), timeZone, logs, now);
   const agents = new Agents(new AgentRepository(db, now), new HermesClient(http, now), now);
   const initialKey = openaiKey();
   const selectedVoiceKey = () =>
@@ -770,6 +774,7 @@ export async function createApp(
     requireAdmin,
     onChanged: mailChanged,
   });
+  registerAlarms(app, { alarms, profiles, requireAdmin });
   registerAddons(app, {
     runtime: addonRuntime,
     actions: actionExecutor,
@@ -1584,6 +1589,7 @@ export async function createApp(
           vision.tick();
           memory.tick();
           agents.tick();
+          alarms.tick();
           const state = controller.snapshot().state;
           const profileId = state.activeProfile?.id;
           if (profileId && state.session.phase === 'ready') {

@@ -40,6 +40,7 @@ const idPattern = /^[a-z][a-z0-9_]{0,31}$/;
 /** Préfixes des outils du cœur (`mail__send`, `image__recall`…) : un module n’en prend aucun. */
 export const reservedAddonIds: ReadonlySet<string> = new Set([
   'agents',
+  'alarms',
   'home_assistant',
   'http',
   'image',

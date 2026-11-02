@@ -37,6 +37,7 @@ import { addonRefsMigration } from './addons/migrations.js';
 import { adminPasswordMigration } from './admin-password.js';
 import { secretsMigration } from './secrets.js';
 import { mailMigration, mailRecipientsMigration } from './mail-store.js';
+import { alarmsMigration } from './alarms-store.js';
 import { trustedDevicesMigration } from './trusted-devices.js';
 import { satellitesMigration } from './satellites-store.js';
 import {
@@ -407,6 +408,8 @@ export const migrations: readonly string[] = [
     provider TEXT NOT NULL DEFAULT 'openai' CHECK (provider IN ('openai', 'mistral'))
   ) STRICT;
   INSERT OR IGNORE INTO voice_provider_preferences (id) VALUES (1);`,
+  // Alarmes, minuteurs et rappels : réglages du foyer et échéances, par personne.
+  alarmsMigration,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */

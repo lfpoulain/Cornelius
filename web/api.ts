@@ -39,6 +39,7 @@ import type { HomeAssistantCommand, HomeAssistantView } from '../shared/home-ass
 import type { AgentAdminView, AgentConnectionInput, AgentTaskView } from '../shared/agents';
 import type { ToolResult } from '../shared/addons';
 import type { MailRecipient, MailSettings, MailView } from '../shared/mail';
+import type { AlarmRequest, AlarmSettings, AlarmsView } from '../shared/alarms';
 import type { MemoryView, MemoryEdit } from '../shared/memory';
 import type { PersonalityView } from '../shared/personality';
 import type { PendingSatelliteView, SatelliteView } from '../shared/satellites';
@@ -385,6 +386,18 @@ export const api = {
     request<{ secrets: SecretView[] }>(`/api/admin/secrets/${encodeURIComponent(env)}`, {
       method: 'DELETE',
     }),
+  alarms: () => request<AlarmsView>('/api/admin/alarms'),
+  saveAlarmSettings: (settings: Partial<AlarmSettings>) =>
+    request<AlarmsView>('/api/admin/alarms/settings', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
+  createAlarm: (input: Omit<AlarmRequest, 'target'>) =>
+    post<AlarmsView>('/api/admin/alarms', input),
+  stopAlarm: (id: string) =>
+    post<AlarmsView>(`/api/admin/alarms/${encodeURIComponent(id)}/stop`, {}),
+  deleteAlarm: (id: string) =>
+    request<AlarmsView>(`/api/admin/alarms/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   mail: () => request<MailView>('/api/admin/mail'),
   saveMailSettings: (settings: Partial<MailSettings>) =>
     request<MailView>('/api/admin/mail/settings', {

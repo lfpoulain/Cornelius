@@ -25,6 +25,7 @@ import { HomeAssistantSettings } from './HomeAssistant';
 import { VisionSettings } from './VisionSettings';
 import { ImageGenerationSettings } from './ImageGenerationSettings';
 import { MailSettings } from './MailSettings';
+import { AlarmSettings } from './AlarmSettings';
 import { WebSearchSettings } from './WebSearchSettings';
 import { CardSettings } from './CardSettings';
 import { Label } from '../ui/label';
@@ -74,7 +75,8 @@ const moduleGroups: { id: GroupId; title: string; description: string }[] = [
   {
     id: 'daily',
     title: 'Au quotidien',
-    description: 'L’heure, la météo et les transports, à la demande ou affichés en permanence.',
+    description:
+      'L’heure, la météo, les transports, les réveils et les rappels, à la demande ou affichés en permanence.',
   },
   {
     id: 'home',
@@ -94,6 +96,14 @@ const dailyOrder = ['clock', 'weather', 'transit', 'ragator'];
 
 // Modules intégrés : ils ne dépendent pas d’une personne et se retrouvent par mots-clés.
 const builtIns = [
+  {
+    id: 'alarms',
+    group: 'daily',
+    name: 'Alarmes et rappels',
+    keywords:
+      'alarme alarmes réveil réveils minuteur minuteurs chrono rappel rappels pense-bête sonnerie',
+    householdOnly: false,
+  },
   {
     id: 'home-assistant',
     group: 'home',
@@ -300,6 +310,8 @@ export function Addons({
         return <VisionSettings key={entry.id} {...props} status={status} run={run} />;
       if (entry.id === 'mail')
         return <MailSettings key={entry.id} {...props} profiles={profiles} run={run} />;
+      if (entry.id === 'alarms')
+        return <AlarmSettings key={entry.id} {...props} profiles={profiles} run={run} />;
       return <ImageGenerationSettings key={entry.id} {...props} status={status} run={run} />;
     }
     const definition = entry.definition;
