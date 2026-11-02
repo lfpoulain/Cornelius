@@ -45,7 +45,7 @@ Le fournisseur vocal est OpenAI par défaut, ou Mistral s’il est choisi dans *
 
 Les conversations sont ouvertes avec l’option `store: false` d’OpenAI, qui demande de ne pas conserver la réponse pour la consulter ensuite. Cette option ne dit rien des autres règles de conservation d’OpenAI : voir les conditions de votre compte. Avec Mistral, chaque fermeture de conversation supprime la session chez Mistral ; ses autres règles de conservation dépendent aussi des conditions de votre compte.
 
-**Après une conversation**, si la personne était seule, reconnue, et que sa mémoire est autorisée, le texte de ce qu’elle a dit et ses souvenirs actuels sont envoyés au fournisseur vocal choisi, qui propose quoi retenir. Ce texte est ensuite effacé. Voir [La mémoire](../fonctionnalites/memoire.md).
+**Après une conversation**, si la personne était seule, reconnue, et que sa mémoire est autorisée, le texte de ce qu’elle a dit et ses souvenirs actuels sont envoyés au fournisseur mémoire choisi, qui propose quoi retenir. Ce choix est indépendant de celui de la conversation : il peut revenir à une API compatible OpenAI tenue à la maison, et alors aucun secours ne l’envoie ailleurs par défaut. Ce texte est ensuite effacé. Voir [La mémoire](../fonctionnalites/memoire.md).
 
 **À aucun moment** le fournisseur vocal ne reçoit d’image de la caméra, de signature de visage, ni le son de la veille.
 
