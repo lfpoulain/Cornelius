@@ -1,10 +1,16 @@
 # Historique des changements
 
-Cette page retrace les grandes étapes de Cornelius, de la plus récente à la plus ancienne. Elle s’appuie sur l’historique Git et sur les notes datées des anciens documents. Aucune version n’est encore publiée : tout se trouve sous « Non publié ».
+Cette page retrace les grandes étapes de Cornelius, de la plus récente à la plus ancienne. Elle s’appuie sur l’historique Git et sur les notes datées des anciens documents. Chaque version publiée porte un tag Git (`v0.2.0`) et une release sur GitHub ; ce qui est fait depuis, sur la branche principale, se trouve sous « Non publié ».
 
 Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce qui reste à faire est dans la [feuille de route](docs/developpement/feuille-de-route.md).
 
 ## Non publié
+
+Rien pour l’instant.
+
+## 0.2.0 · 2026-11-02
+
+Première version publiée : tout ce qui suit, du premier dépôt Git à la mémoire sur un serveur compatible OpenAI. C’est la version que reprend l’application [Home Assistant](https://github.com/lfpoulain/cornelius-ha).
 
 ### 2026-11-02 : mémoire sur un serveur compatible OpenAI
 
