@@ -216,6 +216,8 @@ export class Alarms {
   /** Prochain instant utile ; undefined : à relire dans la base. */
   private wake: number | null | undefined;
   private lastPurge = 0;
+  /** Satellites qui savent sonner en ce moment ; les autres cibles retombent sur le miroir. */
+  private ringsOn: (target: string) => boolean = () => false;
   /** Jour local du dernier passage : à minuit, l'affichage change de jour. */
   private day = '';
 
@@ -382,6 +384,30 @@ export class Alarms {
     return this.store.ringing().map((alarm) => this.present(alarm));
   }
 
+  /** Les satellites connectés qui savent sonner : leurs échéances sonnent chez eux. */
+  setRingTargets(available: (target: string) => boolean): void {
+    this.ringsOn = available;
+    this.changed();
+  }
+
+  /** Où sonne une échéance : son satellite s'il sait sonner, sinon le miroir. */
+  ringTarget(alarm: Pick<Alarm, 'target'>): string {
+    return alarm.target !== 'mirror' && this.ringsOn(alarm.target) ? alarm.target : 'mirror';
+  }
+
+  /** Ce qui sonne sur ce satellite ; null : rien. Un rappel seul sonne doucement. */
+  ringingOn(target: string): { soft: boolean } | null {
+    const ringing = this.store.ringing().filter((alarm) => this.ringTarget(alarm) === target);
+    return ringing.length ? { soft: ringing.every((alarm) => alarm.kind === 'reminder') } : null;
+  }
+
+  /** Bouton du satellite : arrête ce qui y sonne. */
+  stopOn(target: string): number {
+    const ringing = this.store.ringing().filter((alarm) => this.ringTarget(alarm) === target);
+    for (const alarm of ringing) this.stop(alarm.id);
+    return ringing.length;
+  }
+
   /**
    * Ce qui sonne, pour le miroir. Un rappel personnel ne montre son texte qu'à son
    * propriétaire, seul et reconnu ; sinon « Rappel pour Sacha ».
@@ -391,30 +417,34 @@ export class Alarms {
     if (!settings.enabled) return undefined;
     const name = (profileId: string) =>
       state.profiles.find((profile) => profile.id === profileId)?.name ?? null;
-    const ringing = this.store.ringing().map((alarm): RingingAlarm => {
-      const hidden =
-        alarm.kind === 'reminder' &&
-        alarm.profileId !== null &&
-        !ownerAlone(state, alarm.profileId);
-      const owner = alarm.profileId === null ? null : name(alarm.profileId);
-      const kind = ALARM_KIND_LABELS[alarm.kind];
-      const title =
-        alarm.kind === 'reminder'
-          ? owner
-            ? `Rappel pour ${owner}`
-            : 'Rappel'
-          : alarm.kind === 'alarm'
-            ? `${kind}${alarm.time ? ` · ${alarm.time}` : ''}`
-            : kind;
-      return {
-        id: alarm.id,
-        kind: alarm.kind,
-        title,
-        text: hidden ? null : alarm.label || null,
-        firedAt: alarm.firedAt ?? this.now(),
-        soft: alarm.kind === 'reminder',
-      };
-    });
+    // Ce qui sonne sur un satellite n'occupe pas le miroir.
+    const ringing = this.store
+      .ringing()
+      .filter((alarm) => this.ringTarget(alarm) === 'mirror')
+      .map((alarm): RingingAlarm => {
+        const hidden =
+          alarm.kind === 'reminder' &&
+          alarm.profileId !== null &&
+          !ownerAlone(state, alarm.profileId);
+        const owner = alarm.profileId === null ? null : name(alarm.profileId);
+        const kind = ALARM_KIND_LABELS[alarm.kind];
+        const title =
+          alarm.kind === 'reminder'
+            ? owner
+              ? `Rappel pour ${owner}`
+              : 'Rappel'
+            : alarm.kind === 'alarm'
+              ? `${kind}${alarm.time ? ` · ${alarm.time}` : ''}`
+              : kind;
+        return {
+          id: alarm.id,
+          kind: alarm.kind,
+          title,
+          text: hidden ? null : alarm.label || null,
+          firedAt: alarm.firedAt ?? this.now(),
+          soft: alarm.kind === 'reminder',
+        };
+      });
     // Informations permanentes : seulement devant le miroir, celles du foyer et de la personne.
     const profile = ambientProfile(state);
     const waiting =

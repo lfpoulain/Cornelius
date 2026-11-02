@@ -804,6 +804,8 @@ test('une alarme qui sonne est annoncée une fois par conversation, sans se bous
   const f = fixture(t);
   assert.equal(f.live.deliverAlarmNotice('ringing:a:1', 'Le réveil sonne.'), 'busy');
   await f.ready();
+  // Ce qui sonne dans la cuisine ne se dit pas dans la conversation du miroir.
+  assert.equal(f.live.deliverAlarmNotice('ringing:c:1', 'Ça sonne.', 'cuisine'), 'busy');
   assert.equal(f.live.deliverAlarmNotice('ringing:a:1', 'Le réveil sonne.'), 'delivered');
   assert.equal(f.live.deliverAlarmNotice('ringing:a:1', 'Le réveil sonne.'), 'seen');
   // Une seconde annonce attend que la première ait été dite.

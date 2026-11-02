@@ -14,7 +14,7 @@ const origin = 'http://localhost';
 const password = 'mot-de-passe-test-1234';
 const perceptionToken = 'p'.repeat(40);
 
-async function fixture(t: TestContext) {
+async function fixture(t: TestContext, options: { now?: () => number } = {}) {
   const imageRoot = mkdtempSync(join(tmpdir(), 'cornelius-satellites-images-'));
   const services = await createApp(
     {
@@ -26,7 +26,7 @@ async function fixture(t: TestContext) {
       origins: [origin],
       secureCookies: false,
     },
-    { timers: false, imageGenerationRoot: imageRoot },
+    { timers: false, imageGenerationRoot: imageRoot, now: options.now },
   );
   await services.app.ready();
   const sockets: WebSocket[] = [];
@@ -404,4 +404,82 @@ test('association : un satellite neuf attend, clignote, puis reçoit son jeton',
     ).statusCode,
     404,
   );
+});
+
+test('alarmes : un satellite qui sait sonner sonne chez lui, son bouton l’arrête', async (t) => {
+  let clock = Date.parse('2026-11-02T08:00:00Z');
+  const f = await fixture(t, { now: () => clock });
+  const cookie = await f.admin();
+  const create = async (name: string) =>
+    (
+      await f.app.inject({
+        method: 'POST',
+        url: '/api/admin/satellites',
+        headers: { cookie, origin },
+        payload: { name },
+      })
+    ).json();
+  const kitchen = await create('Cuisine');
+  const old = await create('Garage');
+  const timer = (target: string) =>
+    f.alarms.create({
+      kind: 'timer',
+      profileId: null,
+      label: 'minuteur',
+      time: null,
+      date: null,
+      days: 0,
+      durationMs: 5_000,
+      inMinutes: null,
+      target,
+    });
+  const ring = () => {
+    clock += 5_000;
+    f.alarms.tick();
+  };
+  const device = await f.satellite(kitchen.token);
+  device.socket.send(
+    JSON.stringify({ type: 'hello', protocol: 1, firmware: '0.4.0', features: ['ring'] }),
+  );
+  await device.next((message) => message.type === 'welcome');
+  // Ancien firmware, sans « ring » : son minuteur sonne sur le miroir.
+  const garage = await f.satellite(old.token);
+  garage.socket.send(JSON.stringify({ type: 'hello', protocol: 1, firmware: '0.3.0' }));
+  await garage.next((message) => message.type === 'welcome');
+  const here = timer(kitchen.satellite.id);
+  const there = timer(old.satellite.id);
+  ring();
+  const first = await device.next((message) => message.type === 'ring');
+  assert.deepEqual(first, { type: 'ring', state: 'start', sound: 'bips', soft: false });
+  assert.deepEqual(
+    f.controller.snapshot().state.alarms!.ringing.map((alarm) => alarm.id),
+    [there.id],
+  );
+  assert.equal(
+    garage.received.some((message: any) => message?.type === 'ring'),
+    false,
+  );
+
+  // Le bouton du satellite arrête ce qui sonne chez lui, pas ailleurs.
+  device.socket.send(JSON.stringify({ type: 'ring', action: 'stop' }));
+  await device.next((message) => message.type === 'ring' && message.state === 'stop');
+  assert.equal(f.alarms.get(here.id)!.state, 'done');
+  assert.equal(f.alarms.get(there.id)!.state, 'ringing');
+
+  // Le satellite part pendant qu’un minuteur y sonne : le miroir prend le relais.
+  const again = timer(kitchen.satellite.id);
+  ring();
+  await device.next(
+    (message) => message.type === 'ring' && message.state === 'start' && message !== first,
+  );
+  assert.equal(
+    f.controller.snapshot().state.alarms!.ringing.some((alarm) => alarm.id === again.id),
+    false,
+  );
+  device.socket.terminate();
+  for (let attempt = 0; attempt < 50; attempt++) {
+    if (f.controller.snapshot().state.alarms!.ringing.some((alarm) => alarm.id === again.id)) break;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.ok(f.controller.snapshot().state.alarms!.ringing.some((alarm) => alarm.id === again.id));
 });

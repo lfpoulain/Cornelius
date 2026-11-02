@@ -1388,13 +1388,18 @@ export class LiveTransport implements SessionTransport {
   /**
    * Fait dire une alarme qui sonne ou une échéance manquée, une fois par conversation et par
    * clé. `busy` : la conversation n'est pas prête à l'entendre maintenant ; `seen` : déjà dit.
-   * Seulement sur le miroir : une conversation de satellite se tient dans une autre pièce.
+   * `target` : `mirror`, ou le satellite où l'échéance sonne ; une conversation qui se tient
+   * ailleurs n'en entend pas parler.
    */
-  deliverAlarmNotice(key: string, content: string): 'delivered' | 'seen' | 'busy' {
+  deliverAlarmNotice(
+    key: string,
+    content: string,
+    target = 'mirror',
+  ): 'delivered' | 'seen' | 'busy' {
     const active = this.active;
     if (
       !active ||
-      active.satelliteId ||
+      (active.satelliteId ?? 'mirror') !== target ||
       !active.started ||
       active.closing ||
       active.finalized ||

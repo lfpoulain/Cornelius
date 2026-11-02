@@ -27,6 +27,10 @@ interface Connection {
   firmware: string | null;
   /** Annulation d’écho annoncée par le satellite : pas de semi-duplex. */
   echoCancelled: boolean;
+  /** Le satellite sait sonner lui-même (« features » : « ring »). */
+  rings: boolean;
+  /** Dernier état de sonnerie envoyé : « start » avec la sonnerie, ou null. */
+  ringing: string | null;
   muted: boolean;
   listening: boolean | null;
   alive: boolean;
@@ -63,6 +67,17 @@ function settingsMessage(satellite: Satellite) {
   };
 }
 
+/** Ce que le satellite doit savoir des alarmes, fourni par le serveur une fois tout créé. */
+export interface SatelliteAlarms {
+  /** Ce qui sonne sur ce satellite ; null : rien. */
+  ringingOn(satelliteId: string): { soft: boolean } | null;
+  sound(): string;
+  /** Bouton du satellite : arrêter ce qui y sonne. */
+  stopOn(satelliteId: string): number;
+  /** Un satellite qui sait sonner arrive ou part : ses échéances changent d’appareil. */
+  targetsChanged(): void;
+}
+
 const object = (value: unknown): Record<string, unknown> =>
   value !== null && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 
@@ -75,6 +90,7 @@ export class SatelliteHub {
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private unsubscribe: () => void;
   private disposed = false;
+  private alarms: SatelliteAlarms | null = null;
   constructor(
     private readonly deps: {
       store: SatelliteStore;
@@ -109,6 +125,40 @@ export class SatelliteHub {
       : { online: false, firmware: null, muted: false, aec: false };
   }
 
+  attachAlarms(alarms: SatelliteAlarms): void {
+    this.alarms = alarms;
+    alarms.targetsChanged();
+  }
+
+  /** Satellite connecté qui sait sonner. */
+  rings(id: string): boolean {
+    const connection = this.connections.get(id);
+    return !!connection?.firmware && connection.rings;
+  }
+
+  /**
+   * Sonne tant qu’une échéance de ce satellite sonne et qu’aucune conversation ne s’y tient :
+   * sa conversation coupe la sonnerie, comme sur le miroir.
+   */
+  syncRing(): void {
+    if (!this.alarms) return;
+    for (const connection of this.connections.values()) {
+      if (!connection.firmware || !connection.rings) continue;
+      const ringing =
+        connection.conversation === 'idle' ? this.alarms.ringingOn(connection.satellite.id) : null;
+      const sound = ringing ? this.alarms.sound() : null;
+      const next = ringing ? `${sound}:${ringing.soft}` : null;
+      if (next === connection.ringing) continue;
+      connection.ringing = next;
+      this.send(
+        connection,
+        ringing
+          ? { type: 'ring', state: 'start', sound, soft: ringing.soft }
+          : { type: 'ring', state: 'stop' },
+      );
+    }
+  }
+
   connect(socket: WebSocket, satellite: Satellite): void {
     this.connections.get(satellite.id)?.socket.close(1008, 'Satellite reconnecté ailleurs.');
     const connection: Connection = {
@@ -117,6 +167,8 @@ export class SatelliteHub {
       streamId: randomUUID(),
       firmware: null,
       echoCancelled: false,
+      rings: false,
+      ringing: null,
       muted: false,
       listening: null,
       alive: true,
@@ -144,7 +196,14 @@ export class SatelliteHub {
         return;
       }
       if (!connection.firmware) return this.hello(connection, message);
-      if (message.type === 'mic' && typeof message.muted === 'boolean') {
+      if (message.type === 'ring' && message.action === 'stop') {
+        // Bouton du satellite pendant qu’il sonne.
+        const stopped = this.alarms?.stopOn(satellite.id) ?? 0;
+        this.deps.logs.write('info', 'alarms', 'Sonnerie arrêtée sur le satellite', {
+          satellite: satellite.name,
+          stopped,
+        });
+      } else if (message.type === 'mic' && typeof message.muted === 'boolean') {
         connection.muted = message.muted;
         this.deps.logs.write('info', 'local', 'Micro du satellite', {
           satellite: satellite.name,
@@ -213,7 +272,11 @@ export class SatelliteHub {
       typeof message.firmware !== 'string' ||
       message.firmware.length < 1 ||
       message.firmware.length > 32 ||
-      (message.aec !== undefined && typeof message.aec !== 'boolean')
+      (message.aec !== undefined && typeof message.aec !== 'boolean') ||
+      (message.features !== undefined &&
+        (!Array.isArray(message.features) ||
+          message.features.length > 16 ||
+          message.features.some((feature) => typeof feature !== 'string')))
     )
       return socket.close(
         1008,
@@ -226,11 +289,13 @@ export class SatelliteHub {
     if (!this.startWake(connection)) return socket.close(1008, 'Écoute du mot d’appel saturée.');
     connection.firmware = message.firmware;
     connection.echoCancelled = message.aec === true;
+    connection.rings = Array.isArray(message.features) && message.features.includes('ring');
     this.deps.store.seen(satellite.id);
     this.deps.logs.write('info', 'local', 'Satellite connecté', {
       satellite: satellite.name,
       firmware: message.firmware,
       aec: connection.echoCancelled,
+      rings: connection.rings,
     });
     this.send(connection, {
       type: 'welcome',
@@ -241,6 +306,7 @@ export class SatelliteHub {
     });
     this.send(connection, settingsMessage(satellite));
     this.sync();
+    if (connection.rings) this.alarms?.targetsChanged();
   }
 
   private audio(connection: Connection, data: unknown) {
@@ -317,6 +383,7 @@ export class SatelliteHub {
         this.send(connection, { type: 'listen', enabled: listening });
       }
     }
+    this.syncRing();
   }
 
   /** Flux de veille du satellite dans la perception, avec son propre état openWakeWord. */
@@ -384,6 +451,8 @@ export class SatelliteHub {
     if (!connection.firmware) return;
     this.deps.controller.satelliteGone(connection.satellite.id);
     this.deps.store.seen(connection.satellite.id);
+    // Ce qui sonnait ici retombe sur le miroir.
+    if (connection.rings) this.alarms?.targetsChanged();
     this.deps.logs.write('info', 'local', 'Satellite déconnecté', {
       satellite: connection.satellite.name,
     });

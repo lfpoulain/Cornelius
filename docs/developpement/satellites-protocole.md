@@ -2,7 +2,7 @@
 
 Cette page décrit le dialogue entre Cornelius et un satellite audio (micro et haut-parleur sur ESP32-S3, par exemple la carte Waveshare ESP32-S3-AUDIO-Board). Elle s’adresse aux personnes qui écrivent le firmware, développé dans un dépôt séparé, et à celles qui modifient le serveur. Le protocole est versionné : toute modification incompatible change son numéro.
 
-État : **version 1**. Veille (mot d’appel), conversation en voix seule, découverte mDNS, association et réglages depuis l’administration, écoute attentive avec annulation d’écho. Le guide d’installation est dans [Les satellites audio](../fonctionnalites/satellites.md).
+État : **version 1**. Veille (mot d’appel), conversation en voix seule, découverte mDNS, association et réglages depuis l’administration, écoute attentive avec annulation d’écho, sonnerie des alarmes. Les ajouts compatibles (champ ou message nouveau) gardent le numéro : un satellite les annonce dans `features`, et chaque côté ignore ce qu’il ne connaît pas. Le guide d’installation est dans [Les satellites audio](../fonctionnalites/satellites.md).
 
 ## Principe
 
@@ -47,12 +47,13 @@ Les autres messages sont des objets JSON en texte, avec un champ `type`. Un mess
 
 | Message | Quand | Effet |
 |---|---|---|
-| `{"type":"hello","protocol":1,"firmware":"0.1.0","aec":false}` | premier message, dans les 5 s | le serveur répond `welcome`, ou ferme si le protocole n’est pas pris en charge |
+| `{"type":"hello","protocol":1,"firmware":"0.4.0","aec":false,"features":["ring"]}` | premier message, dans les 5 s | le serveur répond `welcome`, ou ferme si le protocole n’est pas pris en charge |
 | binaire, 2 560 octets | tant que `listen` vaut `true` | veille : cherché pour « Cornelius » ; conversation : envoyé à Live |
 | `{"type":"mic","muted":true}` | bouton de vie privée | le serveur ignore le son tant que le micro est coupé |
+| `{"type":"ring","action":"stop"}` | bouton pendant que le satellite sonne | arrête ce qui sonne sur ce satellite |
 | `{"type":"log","message":"…"}` | mesure à suivre (niveaux d’écho…) | inscrite dans le journal de Cornelius ; 200 caractères, une par seconde au plus, jamais de son ni de conversation |
 
-`firmware` est une chaîne de 1 à 32 caractères ; `aec`, facultatif (faux par défaut), annonce l’annulation d’écho.
+`firmware` est une chaîne de 1 à 32 caractères ; `aec`, facultatif (faux par défaut), annonce l’annulation d’écho ; `features`, facultatif (16 chaînes au plus), les ajouts que le firmware connaît : `ring` pour la sonnerie des alarmes.
 
 ### Serveur → satellite
 
@@ -67,8 +68,14 @@ Les autres messages sont des objets JSON en texte, avec un champ `type`. Un mess
 | `{"type":"session","state":"connecting"}` | la conversation s’ouvre ; le son continue d’être envoyé (il est gardé, puis rejoué) |
 | `{"type":"session","state":"ready"}` | la conversation est ouverte : la voix de Cornelius arrive en binaire |
 | `{"type":"session","state":"closed"}` | la conversation est finie : arrêter la lecture |
+| `{"type":"ring","state":"start","sound":"bips","soft":false}` | seulement si `features` contient `ring` : un réveil, un minuteur ou un rappel demandé sur ce satellite sonne. Le satellite synthétise lui-même la sonnerie, en boucle, volume croissant (`sound` : `bips`, `alerte` ou un son d’ouverture ; un son inconnu joue `bips`) ; `soft` : un rappel seul, carillon doux et espacé. Un nouveau `start` remplace le précédent |
+| `{"type":"ring","state":"stop"}` | plus rien ne sonne ici, ou une conversation s’ouvre sur ce satellite : se taire |
 
 `listen` vaut `true` pendant la veille et pendant la conversation de ce satellite ; il passe à `false` quand le mot d’appel est désactivé ou pas prêt, ou qu’une conversation se tient ailleurs.
+
+### Sonnerie des alarmes
+
+Une échéance réglée à la voix sur un satellite y sonne, si ce satellite annonce `ring` et reste connecté ; sinon elle sonne sur le miroir, y compris quand le satellite se déconnecte en pleine sonnerie. Le serveur envoie `ring: stop` dès qu’une conversation s’ouvre sur ce satellite (le mot d’appel doit donc rester audible par-dessus la sonnerie), puis `ring: start` de nouveau si l’échéance sonne encore à la fin. Dans la conversation, Cornelius annonce ce qui sonne et répond à « arrête » ou « encore dix minutes ». Un appui bref sur le bouton pendant la sonnerie l’arrête (`ring: action stop`) au lieu de couper le micro. Voir [Les alarmes et les rappels](../fonctionnalites/alarmes-et-rappels.md).
 
 ### Déroulé d’une conversation
 

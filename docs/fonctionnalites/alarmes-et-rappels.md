@@ -51,7 +51,9 @@ Le miroir ne peut sonner qu’une fois la voix activée (bouton **Activer la voi
 - « Arrête », « c’est bon » : la sonnerie s’arrête. Un réveil répété repart pour sa prochaine fois.
 - « Encore dix minutes », « répète dans 5 minutes » : la sonnerie revient après ce délai (10 minutes si rien n’est précisé, une heure au plus).
 
-N’importe qui dans la pièce peut arrêter ou repousser ce qui sonne. Le serveur n’ouvre jamais seul une conversation pour une alarme : sans réponse, la sonnerie s’arrête après la **Durée de la sonnerie** (5 minutes par défaut) et l’échéance est notée manquée.
+N’importe qui dans la pièce peut arrêter ou repousser ce qui sonne.
+
+**Sur un satellite.** Une échéance réglée sur un satellite y sonne : l’anneau clignote en ambre et le haut-parleur joue la sonnerie. « Cornelius » ouvre la conversation sur ce satellite, coupe la sonnerie, et Cornelius l’annonce comme sur le miroir. Un appui bref sur le bouton du satellite arrête aussi la sonnerie (en temps normal, il coupe le micro). Le serveur n’ouvre jamais seul une conversation pour une alarme : sans réponse, la sonnerie s’arrête après la **Durée de la sonnerie** (5 minutes par défaut) et l’échéance est notée manquée.
 
 **Un rappel personnel** n’affiche et ne fait dire son texte qu’à son propriétaire, seul devant le miroir et reconnu. Sinon la carte dit seulement « Rappel pour Sacha », et Cornelius aussi.
 
@@ -83,7 +85,7 @@ Comme les informations permanentes, ce bandeau ne s’affiche que devant une per
 
 ## Limites
 
-- Un minuteur réglé sur un satellite sonne pour l’instant sur le miroir, pas dans la pièce du satellite. Cornelius n’annonce une sonnerie ou un oubli que dans une conversation du miroir.
+- Un minuteur réglé sur un satellite sonne dans sa pièce si son firmware sait sonner (0.4.0 ou plus récent) ; sinon, ou si le satellite est déconnecté, il sonne sur le miroir. Les échéances manquées ne sont dites que sur le miroir, où la caméra sait qui est là.
 - Pas de « saute le réveil de demain seulement » : supprimez-le ou réglez-le à nouveau.
 - Les heures suivent le fuseau du foyer (`CORNELIUS_TIMEZONE`, `Europe/Paris` par défaut). Une heure qui n’existe pas au passage à l’heure d’été (2 h 30) sonne une heure plus tard.
 - Pas de son propre par échéance : tous les réveils et minuteurs partagent la sonnerie choisie.

@@ -458,6 +458,14 @@ export async function createApp(
     heartbeat: options.timers !== false,
   });
   live.attachSatelliteOutput((satelliteId, pcm) => satellites.play(satelliteId, pcm));
+  // Un minuteur demandé dans la cuisine sonne dans la cuisine, si son satellite sait sonner.
+  satellites.attachAlarms({
+    ringingOn: (satelliteId) => alarms.ringingOn(satelliteId),
+    sound: () => alarms.settings().sound,
+    stopOn: (satelliteId) => alarms.stopOn(satelliteId),
+    targetsChanged: () => alarms.setRingTargets((target) => satellites.rings(target)),
+  });
+  alarms.onChange(() => satellites.syncRing());
   const devices = () => {
     const local = perception.snapshot();
     return {
@@ -1613,7 +1621,7 @@ export async function createApp(
           // Ce qui sonne, puis ce qui a été manqué : une annonce à la fois.
           if (state.session.phase === 'ready')
             for (const notice of alarmTools.notices(state)) {
-              const outcome = live.deliverAlarmNotice(notice.key, notice.content);
+              const outcome = live.deliverAlarmNotice(notice.key, notice.content, notice.target);
               if (outcome === 'delivered') notice.acknowledge?.();
               if (outcome !== 'seen') break;
             }
@@ -1653,5 +1661,5 @@ export async function createApp(
     perception.dispose();
     db.close();
   });
-  return { app, controller, profiles, logs, memory, agents };
+  return { app, controller, profiles, logs, memory, agents, alarms };
 }
