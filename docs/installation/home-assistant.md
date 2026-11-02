@@ -33,7 +33,9 @@ Rien n’est à installer dans Home Assistant lui-même : Cornelius s’y connec
 4. Démarrez l’application et activez **Chien de garde**, qui la relance si elle s’arrête.
 5. **Ouvrir l’interface web** : l’administration s’ouvre en HTTPS sur le port `3443` de la box.
 
-L’application est au stade expérimental : Home Assistant l’affiche dans la boutique avec cette mention. Pour la modifier et l’essayer comme application locale, voir le [README de cornelius-ha](https://github.com/lfpoulain/cornelius-ha#%EF%B8%8F-d%C3%A9velopper).
+Le dépôt propose deux applications. **Cornelius** suit la dernière [version publiée](https://github.com/lfpoulain/Cornelius/releases) : c’est celle d’un miroir de tous les jours. **Cornelius (bêta)** suit la branche `beta`, avec les fonctions en cours, parfois cassées. Elle a ses propres données et ses propres ports (`3444` en HTTPS, `3001` en interne) : les deux peuvent tourner ensemble, mais la base de l’une ne passe pas dans l’autre.
+
+Les deux applications sont au stade expérimental : Home Assistant les affiche dans la boutique avec cette mention. Pour la modifier et l’essayer comme application locale, voir le [README de cornelius-ha](https://github.com/lfpoulain/cornelius-ha#%EF%B8%8F-d%C3%A9velopper).
 
 Une application installée depuis la boutique et une application locale sont deux applications distinctes, chacune avec son dossier de données. Passer de l’une à l’autre repart d’un Cornelius vide : profils, visages et réglages ne suivent pas.
 
@@ -79,7 +81,7 @@ L’empreinte change si Cornelius recrée sa clé (dossier de l’application ef
 
 Les [satellites audio](../fonctionnalites/satellites.md) trouvent la box seuls par mDNS : rien n’est à ouvrir, Home Assistant OS n’a pas de pare-feu. Dans l’administration, la box apparaît sous le nom du conteneur, `local-cornelius` ou celui de l’application installée depuis la boutique.
 
-Un satellite se connecte au premier Cornelius qui répond. Si un autre ordinateur fait aussi tourner Cornelius sur le même réseau, arrêtez-le, ou donnez au satellite l’adresse de la box dans sa page de configuration, rubrique **Adresse fixe de Cornelius** (par exemple `wss://192.168.1.10:3443/satellite`).
+Un satellite se connecte au premier Cornelius qui répond. Si un autre ordinateur, ou la bêta, fait aussi tourner Cornelius sur le même réseau, arrêtez-le, ou donnez au satellite l’adresse de la box dans sa page de configuration, rubrique **Adresse fixe de Cornelius** (par exemple `wss://192.168.1.10:3443/satellite`).
 
 ## Connecter Home Assistant
 
@@ -97,7 +99,7 @@ Pendant une sauvegarde, l’application s’arrête le temps de copier son dossi
 
 ## Mettre à jour
 
-L’image contient une version précise de Cornelius et du dépôt [cornelius-modules](https://github.com/lfpoulain/cornelius-modules), fixée par la version de l’application : chaque nouvelle version indique dans son historique le commit de Cornelius qu’elle contient. Une nouvelle version apparaît dans **Paramètres → Mises à jour** ; **Mettre à jour** reconstruit l’image, et la base est migrée au démarrage, comme d’habitude. Le certificat HTTPS et sa clé sont gardés : le miroir et les satellites déjà associés n’ont rien à refaire.
+L’image contient une version précise de Cornelius et du dépôt [cornelius-modules](https://github.com/lfpoulain/cornelius-modules), fixée par la version de l’application : chaque nouvelle version indique dans son historique le commit de Cornelius qu’elle contient, et le **Journal** de l’application l’affiche au démarrage. Le dépôt vérifie chaque jour si Cornelius a publié une version ; la bêta avance quand une étape de la branche `beta` est prête à essayer. Une nouvelle version apparaît dans **Paramètres → Mises à jour** ; **Mettre à jour** reconstruit l’image, et la base est migrée au démarrage, comme d’habitude. Le certificat HTTPS et sa clé sont gardés : le miroir et les satellites déjà associés n’ont rien à refaire. Pour l’installer sans y penser, activez **Mise à jour automatique** sur la page de l’application.
 
 ## Limites
 
