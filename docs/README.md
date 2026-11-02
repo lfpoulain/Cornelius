@@ -29,7 +29,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 - [Installer sous Linux](installation/linux.md) : le script d’installation, les services systemd, les mises à jour.
 - [Installer sur Raspberry Pi](installation/raspberry-pi.md) : Raspberry Pi 4 et 5, ce qui est retiré (vision locale, images locales), le miroir au démarrage.
 - [Installer sous Windows](installation/windows.md) : l’installation manuelle dans PowerShell, le démarrage et l’arrêt.
-- [Installer dans Home Assistant](installation/home-assistant.md) : l’add-on, le miroir sur un autre appareil, les données et les sauvegardes.
+- [Installer dans Home Assistant](installation/home-assistant.md) : l’add-on depuis la boutique, le miroir sur un autre appareil, les satellites, les données et les sauvegardes.
 - [Premier démarrage](installation/premier-demarrage.md) : la rubrique « Mise en route », étape par étape.
 - [Carte graphique (GPU)](installation/gpu.md) : quel matériel convient à la vision et aux images, et comment l’installer.
 

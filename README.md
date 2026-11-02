@@ -132,7 +132,7 @@ Il n’y a pas d’installateur : l’installation se fait en une dizaine de com
 
 ### 🏠 Home Assistant
 
-Avec Home Assistant OS, Cornelius peut tourner comme add-on sur la box, le miroir s’affichant sur un autre appareil. Suivez [Installer dans Home Assistant](docs/installation/home-assistant.md).
+Avec Home Assistant OS, Cornelius peut tourner comme add-on sur la box, le miroir s’affichant sur un autre appareil. Ajoutez le dépôt [cornelius-ha](https://github.com/lfpoulain/cornelius-ha) à la boutique de Home Assistant, puis suivez [Installer dans Home Assistant](docs/installation/home-assistant.md).
 
 ### 🔑 Après l’installation
 

@@ -27,17 +27,15 @@ Rien n’est à installer dans Home Assistant lui-même : Cornelius s’y connec
 
 ## Installer l’application
 
-Le dépôt `cornelius-ha` est privé pour l’instant, et Home Assistant ne sait pas ajouter un dépôt privé à sa boutique : l’application s’installe comme application locale.
+1. Ajoutez le dépôt à la boutique de Home Assistant : ouvrez [ce lien](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Flfpoulain%2Fcornelius-ha), ou dans **Paramètres → Applications**, ouvrez la boutique (bouton d’installation d’une application), menu **⋮ → Dépôts**, et collez `https://github.com/lfpoulain/cornelius-ha`.
+2. Ouvrez **Cornelius** dans la boutique et installez-le. Home Assistant construit l’image sur la box : comptez plusieurs minutes, davantage sur un Raspberry Pi.
+3. Dans l’onglet **Configuration**, choisissez le **mot de passe de l’administration** (8 caractères au moins, autre que `cornelius`). Collez la **clé OpenAI** ici ou plus tard dans l’administration.
+4. Démarrez l’application et activez **Chien de garde**, qui la relance si elle s’arrête.
+5. **Ouvrir l’interface web** : l’administration s’ouvre en HTTPS sur le port `3443` de la box.
 
-1. Installez l’application **Samba share** (ou **Terminal & SSH**) dans Home Assistant.
-2. Copiez le dossier `cornelius` du dépôt dans le partage **`local_apps`** de la box (`\\homeassistant.local\local_apps\cornelius`).
-3. Dans **Paramètres → Applications**, ouvrez la boutique (bouton d’installation d’une application), puis menu **⋮ → Rechercher des mises à jour** : **Cornelius** apparaît dans la section « Local apps ».
-4. Installez-le. Home Assistant construit l’image sur la box : comptez plusieurs minutes, davantage sur un Raspberry Pi.
-5. Dans l’onglet **Configuration**, choisissez le **mot de passe de l’administration** (8 caractères au moins, autre que `cornelius`). Collez la **clé OpenAI** ici ou plus tard dans l’administration.
-6. Démarrez l’application et activez **Chien de garde**, qui la relance si elle s’arrête.
-7. **Ouvrir l’interface web** : l’administration s’ouvre en HTTPS sur le port `3443` de la box.
+L’application est au stade expérimental : Home Assistant l’affiche dans la boutique avec cette mention. Pour la modifier et l’essayer comme application locale, voir le [README de cornelius-ha](https://github.com/lfpoulain/cornelius-ha#-d%C3%A9veloppement).
 
-Après une modification du `Dockerfile` ou des scripts, **Reconstruire** sur la page de l’application. Après une modification de `config.yaml`, d’abord **⋮ → Rechercher des mises à jour** dans la boutique, puis **Mettre à jour** si la version a changé, sinon **Reconstruire**.
+Une application installée depuis la boutique et une application locale sont deux applications distinctes, chacune avec son dossier de données. Passer de l’une à l’autre repart d’un Cornelius vide : profils, visages et réglages ne suivent pas.
 
 ### Les options
 
@@ -77,6 +75,12 @@ Un Raspberry Pi peut afficher le miroir sans faire tourner Cornelius. Suivez [Sa
 
 L’empreinte change si Cornelius recrée sa clé (dossier de l’application effacé) : relevez-la de nouveau.
 
+## Les satellites
+
+Les [satellites audio](../fonctionnalites/satellites.md) trouvent la box seuls par mDNS : rien n’est à ouvrir, Home Assistant OS n’a pas de pare-feu. Dans l’administration, la box apparaît sous le nom du conteneur, `local-cornelius` ou celui de l’application installée depuis la boutique.
+
+Un satellite se connecte au premier Cornelius qui répond. Si un autre ordinateur fait aussi tourner Cornelius sur le même réseau, arrêtez-le, ou donnez au satellite l’adresse de la box dans sa page de configuration, rubrique **Adresse fixe de Cornelius** (par exemple `wss://192.168.1.10:3443/satellite`).
+
 ## Connecter Home Assistant
 
 Dans **Modules → Home Assistant**, l’adresse est `http://127.0.0.1:8123` : l’application partage le réseau de la box, le trafic ne sort pas. Si Home Assistant sert lui-même du HTTPS (`ssl_certificate` dans sa configuration), utilisez son adresse `https://` avec le nom de son certificat. Le jeton se crée comme d’habitude, de préférence avec un compte réservé à Cornelius (voir [Réduire le risque](../fonctionnalites/home-assistant.md#réduire-le-risque)).
@@ -93,7 +97,7 @@ Pendant une sauvegarde, l’application s’arrête le temps de copier son dossi
 
 ## Mettre à jour
 
-L’image contient une version précise de Cornelius et du dépôt [cornelius-modules](https://github.com/lfpoulain/cornelius-modules), fixée par la version de l’application : chaque nouvelle version indique dans son historique le commit de Cornelius qu’elle contient. Home Assistant reconstruit alors l’image ; la base est migrée au démarrage, comme d’habitude.
+L’image contient une version précise de Cornelius et du dépôt [cornelius-modules](https://github.com/lfpoulain/cornelius-modules), fixée par la version de l’application : chaque nouvelle version indique dans son historique le commit de Cornelius qu’elle contient. Une nouvelle version apparaît dans **Paramètres → Mises à jour** ; **Mettre à jour** reconstruit l’image, et la base est migrée au démarrage, comme d’habitude. Le certificat HTTPS et sa clé sont gardés : le miroir et les satellites déjà associés n’ont rien à refaire.
 
 ## Limites
 

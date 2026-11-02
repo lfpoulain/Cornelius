@@ -19,7 +19,7 @@ Matériel pris en charge : la carte **Waveshare ESP32-S3-AUDIO-Board**, avec le 
 - Le mot d’appel « Cornelius » doit être activé : **Quand il écoute → Ce qui l’ouvre → « Cornelius »** (voir [Le mot d’appel](mot-d-appel.md)).
 - L’accès depuis le réseau local doit être activé (il l’est par défaut, voir [Accès depuis le réseau local](../utilisation/reseau-local.md)).
 - Le satellite rejoint un Wi-Fi en **2,4 GHz**, sur le même réseau que l’ordinateur de Cornelius.
-- Le pare-feu de l’ordinateur doit laisser entrer le port `3443` (TCP) et l’annonce du réseau local (mDNS, port `5353` en UDP) pour Node.js.
+- Le pare-feu de l’ordinateur doit laisser entrer le port `3443` (TCP) et l’annonce du réseau local (mDNS, port `5353` en UDP) pour Node.js. Rien n’est à ouvrir avec l’[application Home Assistant](../installation/home-assistant.md#les-satellites).
 
 ## Installer un satellite
 
