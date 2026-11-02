@@ -79,6 +79,10 @@ Quand une réponse contient une date, un chiffre, une liste ou une comparaison, 
 
 Une carte s’efface d’elle-même au bout d’une minute environ, et toutes disparaissent à la fin de la conversation ou quand la personne change. Une carte personnelle ne s’affiche que pour la personne à qui elle est destinée.
 
+### Ce qui sonne
+
+Un réveil, un minuteur ou un rappel qui arrive s’affiche en ambre au-dessus de l’orbe, l’écran de veille se retire et le miroir sonne, de plus en plus fort, une fois la voix activée. Ouvrir une conversation coupe le son : Cornelius annonce ce qui sonne, et « arrête » ou « encore dix minutes » y répondent. Au-dessus des informations permanentes, un bandeau montre aussi le minuteur en cours avec son compte à rebours, le prochain réveil et les pense-bêtes du jour. Voir [Les alarmes et les rappels](../fonctionnalites/alarmes-et-rappels.md).
+
 ### Les informations permanentes
 
 En haut de l’écran, des informations restent visibles sans rien demander : l’heure, la météo, les prochains passages d’une ligne de transport. Elles ne demandent ni micro, ni conversation, ni OpenAI, et ne font jamais parler Cornelius.

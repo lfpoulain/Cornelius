@@ -67,6 +67,7 @@ Tout est sur l’ordinateur du miroir, dans le dossier `data/` (voir [Configurat
 |---|---|
 | Profils, signatures des visages, souvenirs, style et repères, sources et commandes, réglages | la base `data/cornelius.sqlite` |
 | Jeton Home Assistant et jeton de connexion de chaque agent | la base, **sans chiffrement** |
+| Réveils, minuteurs et rappels, avec leur texte | la base ; supprimer un profil supprime ses échéances. Le texte d’un rappel personnel n’est affiché et dit qu’à son propriétaire reconnu. |
 | Réglages d’envoi d’e-mail et adresses des destinataires | la base ; jamais diffusées au miroir ni données à la conversation. Supprimer un profil supprime son adresse. |
 | Copies de sécurité de la base | à côté de la base, `cornelius.sqlite.backup-v…sqlite` |
 | Journal technique | `data/logs/cornelius.log` |

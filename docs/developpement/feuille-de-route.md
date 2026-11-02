@@ -7,6 +7,7 @@ Cette page fait le point sur ce qui reste à faire dans Cornelius : les fonction
 Ces fonctions sont en place et couvertes par les tests automatiques. Il manque une validation sur le miroir final (mini-PC, verre, caméra, micro et haut-parleurs prévus), avec la [recette guidée](tests-et-recette.md#recette-guidée) :
 
 - **Critères de livraison.** Aucun n’a encore été mesuré en conditions réelles (registre ci-dessous).
+- **Alarmes et rappels.** Réglage, liste et annulation à la voix avec de vraies formulations (« demain », « en semaine », « dans 20 minutes ») ; sonnerie audible du miroir, montée du volume, coupure à l’ouverture d’une conversation, « arrête » et « encore dix minutes » ; annonce d’un rappel manqué à son propriétaire.
 - **Conversation et modules.** Météo, transports, heure et commandes HTTP à la voix, avec l’affichage de la carte du module et la même information à l’oral.
 - **Ouverture et présence.** Les six réglages d’ouverture, le mode vie privée, la fin de parole, le maintien de l’identité et la réouverture après un départ. Les gains de l’ouverture plus rapide, les faux déclenchements et la charge du processeur restent à mesurer avec `npm run mesures`.
 - **Mot d’appel.** Détection de « Cornelius » avec un modèle produit par le générateur, et reconnaissance de la personne au mot d’appel.

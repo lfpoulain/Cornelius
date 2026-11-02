@@ -18,6 +18,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 | parler à Cornelius depuis une autre pièce | [Les satellites audio](fonctionnalites/satellites.md) |
 | ajouter la météo, les transports ou une commande | [Les modules](modules/README.md) |
 | recevoir une image du miroir sur mon téléphone | [L’envoi par e-mail](fonctionnalites/envoi-par-e-mail.md) |
+| régler un réveil, un minuteur ou un rappel | [Les alarmes et les rappels](fonctionnalites/alarmes-et-rappels.md) |
 | écrire mon propre module | [Créer un module](https://github.com/lfpoulain/cornelius-modules/blob/main/docs/creer-un-module.md), dans le dépôt cornelius-modules |
 | comprendre pourquoi rien ne se passe | [Dépannage](utilisation/depannage.md) |
 | converser avec Mistral plutôt qu’OpenAI | [Le fournisseur vocal](fonctionnalites/fournisseur-vocal.md) |
@@ -50,6 +51,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 - [La vision locale](fonctionnalites/vision-locale.md) : décrire ce qui se trouve devant le miroir, sans envoyer d’image.
 - [La génération d’images](fonctionnalites/generation-d-images.md) : dessiner une image à la voix, sur l’ordinateur.
 - [L’envoi par e-mail](fonctionnalites/envoi-par-e-mail.md) : envoyer une image ou un message sur le téléphone d’une personne du foyer.
+- [Les alarmes et les rappels](fonctionnalites/alarmes-et-rappels.md) : réveils, minuteurs et pense-bêtes, qui sonnent sur le miroir et sont dits à la bonne personne.
 - [Home Assistant](fonctionnalites/home-assistant.md) : lumières, prises et capteurs de la maison.
 - [Les agents Hermes](fonctionnalites/agents-hermes.md) : confier des demandes longues à un agent personnel.
 - [Le fournisseur vocal](fonctionnalites/fournisseur-vocal.md) : converser avec OpenAI (par défaut) ou Mistral, coût et limites.

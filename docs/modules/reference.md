@@ -24,6 +24,7 @@ Cette page vit avec le code qu’elle décrit : toute évolution du contrat la m
 | Afficher une information sans la demander | Le champ `ambient` d’un module, plus bas |
 | Toucher à la caméra, au son ou à l’analyse d’image | Le cœur de Cornelius ; Vision et Génération d’image ne sont pas des modules de ce contrat |
 | Envoyer une image ou un message à quelqu’un du foyer | Le module natif [E-mail](../fonctionnalites/envoi-par-e-mail.md), dans le cœur |
+| Un réveil, un minuteur, un rappel | La fonction native [Alarmes et rappels](../fonctionnalites/alarmes-et-rappels.md), dans le cœur |
 | Un nouveau type de carte, ou un outil qui agit | Une évolution du cœur, à concevoir à part |
 
 ## Vocabulaire
