@@ -48,6 +48,7 @@ Voir [Accès depuis le réseau local](../utilisation/reseau-local.md).
 | Variable | Défaut | Effet | Lue par |
 |---|---|---|---|
 | `CORNELIUS_LAN` | `1` | `0`, `false`, `non` ou `no` : seul l’ordinateur lui-même ouvre le miroir et l’administration. Sinon, les appareils du réseau local y accèdent en HTTPS. | serveur |
+| `CORNELIUS_DEV_PORT` | `5173` | Port de l’interface de développement (Vite), de 1024 à 65535 et différent de `PORT`. Le serveur accepte cette origine. | serveur, Vite, scripts dev et stop |
 | `CORNELIUS_HTTPS_PORT` | `PORT` + 443 (`3443`) | Port HTTPS ouvert au réseau local, de 1024 à 65535 et différent de `PORT`. | serveur |
 | `CORNELIUS_TLS_CERT`, `CORNELIUS_TLS_KEY` | vides | Certificat et clé (fichiers PEM) à utiliser. Sans eux, Cornelius crée un certificat dans `data/tls` et le recrée quand l’adresse de la machine change, en gardant la même clé (celle que retiennent les satellites audio). | serveur |
 | `CORNELIUS_MDNS` | `1` | `0`, `false`, `non` ou `no` : Cornelius ne s’annonce plus sur le réseau local (mDNS, service `_cornelius._tcp`) ; les [satellites audio](../fonctionnalites/satellites.md) ont alors besoin d’une adresse fixe. | serveur |
@@ -122,7 +123,7 @@ Ces variables existent dans le code, mais ne se mettent pas dans `.env` en usage
 |---|---|---|
 | `3000` | Le serveur sur cet ordinateur : miroir (`/`), administration (`/admin`), API et liaison avec la perception. | `PORT` dans `.env` |
 | `3443` | Le même serveur en HTTPS, pour les autres appareils du réseau local. | `CORNELIUS_HTTPS_PORT` (désactivé par `CORNELIUS_LAN=0`) |
-| `5173` | L’interface en développement (Vite), avec rechargement à chaud. Lancée seulement par `scripts/dev.sh` ou `scripts\dev.ps1`. | fixe, dans `vite.config.ts` |
+| `5173` | L’interface en développement (Vite), avec rechargement à chaud. Lancée seulement par `scripts/dev.sh` ou `scripts\dev.ps1`. | `CORNELIUS_DEV_PORT` |
 | `3101` | Le serveur des tests navigateur. | `CORNELIUS_E2E_PORT` |
 | `5353` (UDP) | L’annonce mDNS de Cornelius, pour que les satellites audio le trouvent. | `CORNELIUS_MDNS` |
 

@@ -118,7 +118,7 @@ powershell -ExecutionPolicy Bypass -File scripts\stop.ps1
 powershell -ExecutionPolicy Bypass -File scripts\restart.ps1
 ```
 
-`stop.ps1` arrête le serveur, la perception et le générateur d’images. Il arrête aussi tout programme qui écoute sur le port de Cornelius (3000 par défaut) ou sur le port 5173 : si une autre application utilise le port 3000, choisissez un autre `PORT` dans `.env` (de 1024 à 65535). `restart.ps1` enchaîne `stop.ps1` et `start.ps1`, avec les mêmes options que ce dernier. Redémarrez après chaque modification de `.env`.
+`stop.ps1` arrête le serveur, la perception et le générateur d’images. Il arrête aussi tout programme qui écoute sur le port de Cornelius (3000 par défaut) ou sur le port de l’interface de développement (5173, ou `CORNELIUS_DEV_PORT`) : si une autre application utilise le port 3000, choisissez un autre `PORT` dans `.env` (de 1024 à 65535). `restart.ps1` enchaîne `stop.ps1` et `start.ps1`, avec les mêmes options que ce dernier. Redémarrez après chaque modification de `.env`.
 
 `scripts\dev.ps1` lance en plus l’interface de développement sur le port 5173 : il sert à modifier le code, pas au miroir. Voir [Développement](../developpement/README.md).
 

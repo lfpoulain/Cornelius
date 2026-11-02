@@ -55,6 +55,9 @@ export function loadConfig(): AppConfig & { port: number } {
   const httpsPort = Number(process.env.CORNELIUS_HTTPS_PORT ?? port + 443);
   if (!Number.isInteger(httpsPort) || httpsPort < 1024 || httpsPort > 65535 || httpsPort === port)
     throw new Error('CORNELIUS_HTTPS_PORT invalide.');
+  const devPort = Number(process.env.CORNELIUS_DEV_PORT ?? 5173);
+  if (!Number.isInteger(devPort) || devPort < 1024 || devPort > 65535 || devPort === port)
+    throw new Error('CORNELIUS_DEV_PORT invalide.');
   return {
     port,
     loginRateLimit,
@@ -89,8 +92,8 @@ export function loadConfig(): AppConfig & { port: number } {
     origins: [
       `http://127.0.0.1:${port}`,
       `http://localhost:${port}`,
-      'http://127.0.0.1:5173',
-      'http://localhost:5173',
+      `http://127.0.0.1:${devPort}`,
+      `http://localhost:${devPort}`,
     ],
     secureCookies: false,
     staticRoot: resolve('dist/web'),

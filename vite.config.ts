@@ -5,7 +5,8 @@ import tailwind from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => {
   // Le serveur suit PORT de .env : le proxy de développement doit viser le même port.
-  const server = 'http://127.0.0.1:' + (loadEnv(mode, process.cwd(), '').PORT || '3000');
+  const env = loadEnv(mode, process.cwd(), '');
+  const server = 'http://127.0.0.1:' + (env.PORT || '3000');
   return {
     root: 'web',
     resolve: { alias: { '@': fileURLToPath(new URL('./web', import.meta.url)) } },
@@ -23,7 +24,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      port: 5173,
+      // CORNELIUS_DEV_PORT : le serveur n'accepte que cette origine pour l'interface de dev.
+      port: Number(env.CORNELIUS_DEV_PORT || 5173),
       strictPort: true,
       // Anchored patterns: /api/, /events and /audio are also module paths
       // (web/api.ts, web/audio/*), a plain prefix would swallow them.

@@ -159,7 +159,7 @@ Options de `start.sh` et `restart.sh` :
 
 Les journaux de ces scripts sont dans `data/run/logs/` : `backend.out.log` et `backend.err.log` pour le serveur, `perception.out.log` et `perception.err.log` pour la perception. Le serveur écrit aussi son journal détaillé dans `data/logs/cornelius.log`, que l’administration affiche dans la rubrique « Journal ».
 
-`scripts/stop.sh` arrête aussi tout programme qui écoute sur le port de Cornelius (3000 par défaut) ou sur le port 5173, et toute perception ou tout générateur d’images de Cornelius encore actif, même lancé depuis un autre dossier. Si une autre application utilise le port 3000, choisissez un autre `PORT` dans `.env` (de 1024 à 65535), puis relancez : les adresses deviennent alors `http://127.0.0.1:PORT/admin` et `http://127.0.0.1:PORT/`.
+`scripts/stop.sh` arrête aussi tout programme qui écoute sur le port de Cornelius (3000 par défaut) ou sur le port de l’interface de développement (5173, ou `CORNELIUS_DEV_PORT`), et toute perception ou tout générateur d’images de Cornelius encore actif, même lancé depuis un autre dossier. Si une autre application utilise le port 3000, choisissez un autre `PORT` dans `.env` (de 1024 à 65535), puis relancez : les adresses deviennent alors `http://127.0.0.1:PORT/admin` et `http://127.0.0.1:PORT/`.
 
 ## Afficher le miroir
 
