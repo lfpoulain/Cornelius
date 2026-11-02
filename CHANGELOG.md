@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-03 : fermeture après la première réponse
+
+**Ajouté**
+
+- **Fin de parole → Fermer après la première réponse** (désactivée par défaut) : la conversation se ferme dès que Cornelius a fini de répondre à la première demande, l’accueil ne comptant pas. Fonctionne dans toutes les ouvertures et sur les satellites ; après la fermeture, on rouvre comme après un silence. Réglage `PATCH /api/admin/reply-close` et champ `replyClose` de l’état.
+
 ### 2026-11-02 : alarmes, minuteurs et rappels
 
 **Ajouté**

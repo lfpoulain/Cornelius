@@ -59,6 +59,32 @@ test('la fin de parole se choisit dans une liste, enregistrée au clic', async (
   }
 });
 
+test('« Fermer après la première réponse » s’enregistre au clic', async ({ page }) => {
+  await login(page, '/admin#voice');
+  const option = page.getByRole('checkbox', { name: 'Fermer après la première réponse' });
+  await expect(option).not.toBeChecked();
+  try {
+    await option.click();
+    await expect(
+      page.getByText('Fin de parole : après la première réponse.', { exact: true }),
+    ).toBeVisible();
+    await expect(option).toBeChecked();
+    expect((await (await page.request.get('/api/state')).json()).state.replyClose).toBe(true);
+    await page
+      .locator('[data-slot="card"]')
+      .filter({ has: page.getByRole('heading', { name: 'Fin de parole', exact: true }) })
+      .screenshot({ path: `${screenshots}/fin-de-parole-reponse.png` });
+    await option.click();
+    await expect(option).not.toBeChecked();
+    expect((await (await page.request.get('/api/state')).json()).state.replyClose).toBe(false);
+  } finally {
+    await page.request.patch('/api/admin/reply-close', {
+      headers: { origin },
+      data: { enabled: false },
+    });
+  }
+});
+
 test('l’ouverture dit ce qui l’empêche de fonctionner, avec où agir', async ({ page }) => {
   await login(page, '/admin#voice');
   const card = page

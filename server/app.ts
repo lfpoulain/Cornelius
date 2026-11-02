@@ -1441,6 +1441,12 @@ export async function createApp(
     controller.setSilenceClose(request.body);
     return controller.snapshot();
   });
+  app.patch('/api/admin/reply-close', { preHandler: requireAdmin }, async (request, reply) => {
+    if (!enabledSchema(request.body))
+      return reply.code(400).send({ error: 'Fermeture après la réponse invalide.' });
+    controller.setReplyClose(request.body.enabled);
+    return controller.snapshot();
+  });
   const greetingSchema = compile<{ mode: GreetingMode }>({
     type: 'object',
     additionalProperties: false,

@@ -412,6 +412,12 @@ export const migrations: readonly string[] = [
   customProviderMigration,
   // Alarmes, minuteurs et rappels : réglages du foyer et échéances, par personne.
   alarmsMigration,
+  // Fermeture après la première réponse : désactivée, le comportement existant reste.
+  `CREATE TABLE IF NOT EXISTS reply_close_preferences (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1))
+  ) STRICT;
+  INSERT OR IGNORE INTO reply_close_preferences (id) VALUES (1);`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */
@@ -776,6 +782,18 @@ export class SessionPreferences {
         'UPDATE listening_preferences SET silence_close = ?, silence_close_ms = ? WHERE id = 1',
       )
       .run(Number(settings.enabled), settings.delayMs);
+  }
+  /** Fermeture dès la fin de la première réponse de Cornelius. */
+  getReplyClose(): boolean {
+    return (
+      this.db.prepare('SELECT enabled FROM reply_close_preferences WHERE id = 1').get()?.enabled ===
+      1
+    );
+  }
+  setReplyClose(enabled: boolean): void {
+    this.db
+      .prepare('UPDATE reply_close_preferences SET enabled = ? WHERE id = 1')
+      .run(Number(enabled));
   }
   /** Mode voix : la caméra reconnaît la personne qui a dit « Cornelius ». */
   getVoiceRecognition(): boolean {

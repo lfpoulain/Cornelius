@@ -79,6 +79,8 @@ export interface SessionPreferencesStore {
   setKnownPeopleOnly?(enabled: boolean): void;
   getSilenceClose?(): SilenceClose;
   setSilenceClose?(settings: SilenceClose): void;
+  getReplyClose?(): boolean;
+  setReplyClose?(enabled: boolean): void;
   getVoiceRecognition?(): boolean;
   setVoiceRecognition?(enabled: boolean): void;
   getScreensaver?(): ScreensaverSettings;
@@ -110,6 +112,11 @@ const limits = {
 // Une deuxième personne doit être vue sur deux observations consécutives (mode vie privée).
 const privacyConfirmFrames = 2;
 const voiceOutputGraceMs = 900;
+/**
+ * Fermeture après la première réponse : calme à attendre une fois la réponse finie, pour qu’un
+ * outil qui se termine ne ferme pas la conversation avant la suite de la réponse.
+ */
+const replyCloseGraceMs = 2_000;
 // Mode voix : délai laissé à la caméra pour reconnaître la personne après le mot d’appel.
 const voiceIdentityWindowMs = 8000;
 
@@ -241,6 +248,10 @@ export class SessionController {
   private knownPeopleOnly = false;
   private silenceClose: SilenceClose = { ...DEFAULT_SILENCE_CLOSE };
   private voiceRecognition = false;
+  private replyClose = false;
+  // Fermeture après la première réponse : la personne a parlé, puis Cornelius lui a répondu.
+  private userTurnHeard = false;
+  private replyHeard = false;
   // Fin sur silence devant le miroir : seul un regard détourné puis revenu rouvre la conversation.
   private gazeBreakRequired = false;
   // Mode voix : fin de la fenêtre pendant laquelle la caméra peut rattacher un profil.
@@ -286,6 +297,7 @@ export class SessionController {
     this.knownPeopleOnly = preferences?.getKnownPeopleOnly?.() ?? false;
     this.silenceClose = { ...(preferences?.getSilenceClose?.() ?? DEFAULT_SILENCE_CLOSE) };
     this.voiceRecognition = preferences?.getVoiceRecognition?.() ?? false;
+    this.replyClose = preferences?.getReplyClose?.() ?? false;
     this.delegationMode = preferences?.getDelegationMode?.() ?? DEFAULT_DELEGATION_MODE;
     this.timings = { ...(preferences?.getPresenceTimings?.() ?? DEFAULT_PRESENCE_TIMINGS) };
   }
@@ -423,6 +435,7 @@ export class SessionController {
       greeting: this.greeting,
       knownPeopleOnly: this.knownPeopleOnly,
       silenceClose: { ...this.silenceClose },
+      replyClose: this.replyClose,
       voiceRecognition: this.voiceRecognition,
       opening: this.opening(),
       wakeWord: {
@@ -1084,6 +1097,12 @@ export class SessionController {
     this.publish();
   }
 
+  setReplyClose(enabled: boolean): void {
+    this.preferences?.setReplyClose?.(enabled);
+    this.replyClose = enabled;
+    this.publish();
+  }
+
   /**
    * Applique l’ouverture choisie (déclencheur et public) en une fois. L’ordre évite une
    * ouverture intermédiaire : le public est fixé avant que le mot d’appel ne soit retiré.
@@ -1386,6 +1405,8 @@ export class SessionController {
 
   private resetSilence(): void {
     this.silenceSince = null;
+    this.userTurnHeard = false;
+    this.replyHeard = false;
     this.userSpeaking = false;
     this.assistantBusy = false;
     this.assistantOutputUntil = null;
@@ -1635,8 +1656,13 @@ export class SessionController {
     return true;
   }
 
-  /** Minuterie de silence : toujours en mode voix, sur option dans les modes caméra. */
+  /** Suivi de la parole : pour la fin sur silence ou la fermeture après la première réponse. */
   silenceTracking(): boolean {
+    return this.silenceClosing() || this.replyClose;
+  }
+
+  /** Fin sur silence : toujours en mode voix, sur option dans les modes caméra. */
+  private silenceClosing(): boolean {
     return (
       this.session.mode === 4 ||
       this.silenceClose.enabled ||
@@ -1655,8 +1681,10 @@ export class SessionController {
       return false;
     if (this.userSpeaking === speaking) return true;
     this.userSpeaking = speaking;
-    if (speaking) this.silenceSince = null;
-    else if (!this.assistantBusy && this.assistantOutputUntil === null)
+    if (speaking) {
+      this.silenceSince = null;
+      this.userTurnHeard = true;
+    } else if (!this.assistantBusy && this.assistantOutputUntil === null)
       this.silenceSince = this.now();
     return true;
   }
@@ -1664,6 +1692,7 @@ export class SessionController {
   setAssistantBusy(scope: Scope, busy: boolean): boolean {
     if (!this.current(scope) || this.session.phase !== 'ready' || !this.silenceTracking())
       return false;
+    if (busy && this.userTurnHeard) this.replyHeard = true;
     if (this.assistantBusy === busy) return true;
     this.assistantBusy = busy;
     if (!busy && !this.userSpeaking && this.assistantOutputUntil === null)
@@ -1677,6 +1706,7 @@ export class SessionController {
       return false;
     this.assistantOutputUntil = this.now() + voiceOutputGraceMs;
     this.silenceSince = null;
+    if (this.userTurnHeard) this.replyHeard = true;
     return true;
   }
 
@@ -1684,6 +1714,7 @@ export class SessionController {
   noteUserTranscript(scope: Scope): boolean {
     if (!this.current(scope) || this.session.phase !== 'ready' || !this.silenceTracking())
       return false;
+    this.userTurnHeard = true;
     if (!this.userSpeaking && !this.assistantBusy && this.assistantOutputUntil === null)
       this.silenceSince = this.now();
     return true;
@@ -1708,16 +1739,24 @@ export class SessionController {
     return true;
   }
 
-  private silenceExpired(now: number): boolean {
+  private quietFor(now: number, delayMs: number): boolean {
     return (
       this.session.phase === 'ready' &&
-      this.silenceTracking() &&
       !this.userSpeaking &&
       !this.assistantBusy &&
       this.assistantOutputUntil === null &&
       this.silenceSince !== null &&
-      now - this.silenceSince >= this.silenceDelay()
+      now - this.silenceSince >= delayMs
     );
+  }
+
+  private silenceExpired(now: number): boolean {
+    return this.silenceClosing() && this.quietFor(now, this.silenceDelay());
+  }
+
+  /** La personne a parlé, Cornelius a répondu, et plus rien ne se dit depuis. */
+  private replyFinished(now: number): boolean {
+    return this.replyClose && this.replyHeard && this.quietFor(now, replyCloseGraceMs);
   }
 
   /**
@@ -1725,7 +1764,7 @@ export class SessionController {
    * « Cornelius » suffit à rouvrir ; sinon il faut détourner le regard puis regarder à nouveau
    * le miroir (ou partir et revenir), pour ne pas rouvrir en boucle devant le même visage.
    */
-  private closeAfterSilence(): void {
+  private closeAfterSilence(reason = 'Fin de conversation après silence.'): void {
     if (!this.wakeWordEnabled) {
       this.engagedSince = null;
       this.engagementId = null;
@@ -1734,7 +1773,7 @@ export class SessionController {
       this.gazeBreakRequired = true;
       this.consumedTrigger = null;
     }
-    this.close('Fin de conversation après silence.');
+    this.close(reason);
   }
 
   tick(): void {
@@ -1745,10 +1784,9 @@ export class SessionController {
       if (!this.userSpeaking && !this.assistantBusy) this.silenceSince = outputEndedAt;
     }
     // Satellite : ni caméra ni navigateur dans sa pièce, seul le silence termine la conversation.
-    if (this.satelliteSession()) {
-      if (this.silenceExpired(now)) this.close('Fin de conversation après silence.');
-    } else if (this.session.mode === 4) {
-      if (this.silenceExpired(now)) this.close('Fin de conversation après silence.');
+    if (this.satelliteSession() || this.session.mode === 4) {
+      if (this.replyFinished(now)) this.close('Fin de conversation après la réponse.');
+      else if (this.silenceExpired(now)) this.close('Fin de conversation après silence.');
     } else {
       if (!this.sensorHealthy()) {
         this.resetPresence();
@@ -1773,7 +1811,9 @@ export class SessionController {
         this.reengagementRequired = true;
         this.consumedTrigger = null;
         this.close('Fin d’engagement.');
-      } else if (this.silenceExpired(now)) this.closeAfterSilence();
+      } else if (this.replyFinished(now))
+        this.closeAfterSilence('Fin de conversation après la réponse.');
+      else if (this.silenceExpired(now)) this.closeAfterSilence();
     }
     if (!this.satelliteSession() && !this.browserHealthy())
       this.close('Le navigateur ne répond plus.');

@@ -84,7 +84,9 @@ La carte **Quand il écoute → Fin de parole** ferme la conversation après un 
 
 Avec « Cornelius » pour tout le monde, la fin de parole est toujours active : **Jamais** n’est pas disponible, puisque rien d’autre ne peut terminer la conversation.
 
-Après une fin sur silence, la conversation ne se rouvre pas toute seule devant la même personne. Pour reprendre : regarder à nouveau le miroir après avoir détourné les yeux, s’éloigner puis revenir, ou dire « Cornelius » si c’est lui qui ouvre la conversation.
+La case **Fermer après la première réponse** (désactivée par défaut) donne une question et une réponse : la conversation se ferme 2 secondes après la fin de la première réponse de Cornelius. L’accueil (« Bonjour Prénom ») ne compte pas, seule une réponse à ce que la personne a dit ferme. Une réponse qui passe par un outil ou un agent attend la fin de la réponse complète. Si personne ne parle, seul le silence réglé au-dessus ferme la conversation.
+
+Après une fin sur silence ou après la réponse, la conversation ne se rouvre pas toute seule devant la même personne. Pour reprendre : regarder à nouveau le miroir après avoir détourné les yeux, s’éloigner puis revenir, ou dire « Cornelius » si c’est lui qui ouvre la conversation.
 
 ## Mode vie privée
 

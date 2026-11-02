@@ -331,6 +331,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(settings),
     }),
+  replyClose: (enabled: boolean) =>
+    request<StateEvent>('/api/admin/reply-close', {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    }),
   visionMode: (mode: VisionMode) =>
     request<{ ok: boolean }>('/api/admin/vision', {
       method: 'PATCH',

@@ -94,6 +94,35 @@ export function SilenceCloseSettings({ state, run }: { state: MirrorState; run: 
             ? '« Jamais » n’est pas disponible avec « Cornelius » pour tout le monde : la caméra éteinte ne voit pas la personne partir, seul le silence termine la conversation.'
             : 'Pour reprendre après la fermeture : regarder à nouveau le miroir, s’éloigner puis revenir, ou dire « Cornelius » s’il ouvre la conversation.'}
         </p>
+        <label className="admin-mode-option admin-wake-option">
+          <input
+            type="checkbox"
+            aria-label="Fermer après la première réponse"
+            aria-describedby="reply-close-detail"
+            checked={state.replyClose === true}
+            onChange={(event) => {
+              const enabled = event.target.checked;
+              void run(
+                enabled
+                  ? 'Fin de parole : après la première réponse.'
+                  : 'Fin de parole : la conversation continue après la réponse.',
+                () => api.replyClose(enabled),
+                { key: 'reply-close', payload: { enabled } },
+              );
+            }}
+          />
+          <span className="admin-mode-card">
+            <span className="admin-mode-top">
+              <strong>Fermer après la première réponse</strong>
+              <span className="admin-checkbox" aria-hidden="true" />
+            </span>
+            <span className="admin-mode-detail" id="reply-close-detail">
+              Une question, une réponse : la conversation se ferme dès que Cornelius a fini de
+              répondre à la première demande. L’accueil ne compte pas comme une réponse. Si personne
+              ne parle, seul le silence réglé ci-dessus ferme la conversation.
+            </span>
+          </span>
+        </label>
         <FineTuning hint="Délai personnalisé" defaultOpen={choice === 'custom'}>
           <Field
             id="silence-close-delay"

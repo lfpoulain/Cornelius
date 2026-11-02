@@ -1654,6 +1654,59 @@ test('fin de parole : réglage validé, conservé et appliqué à une conversati
   assert.equal(f.state().session.phase, 'closing');
 });
 
+test('fermeture après la réponse : l’accueil ne compte pas, la fin de la première réponse ferme', (t) => {
+  const f = fixture(t);
+  assert.equal(f.state().replyClose, false);
+  f.controller.setReplyClose(true);
+  assert.equal(new SessionPreferences(f.db).getReplyClose(), true);
+  assert.equal(f.state().replyClose, true);
+  f.engage();
+  const scope = f.ready();
+  // L’accueil de Cornelius, avant que la personne parle, ne ferme pas la conversation.
+  assert.equal(f.controller.noteAssistantOutput(scope), true);
+  f.advance(10_000);
+  assert.equal(f.state().session.phase, 'ready');
+  f.controller.setUserSpeech(scope, true);
+  f.advance(2000);
+  f.controller.setUserSpeech(scope, false);
+  // La personne se tait sans réponse encore : rien ne ferme, la fin sur silence est désactivée.
+  f.advance(1000);
+  f.controller.setAssistantBusy(scope, true);
+  f.advance(3000);
+  f.controller.noteAssistantOutput(scope);
+  f.controller.setAssistantBusy(scope, false);
+  // Le son fini, il reste un court délai : un outil terminé ne coupe pas la suite de la réponse.
+  f.advance(1000);
+  assert.equal(f.state().session.phase, 'ready');
+  f.advance(1000);
+  assert.equal(f.state().session.phase, 'closing');
+  assert.equal(f.state().session.reason, 'Fin de conversation après la réponse.');
+  f.acknowledgeClose();
+  // Toujours devant le miroir : il faut un nouveau regard pour rouvrir.
+  f.advance(5000);
+  assert.equal(f.transport.opened.length, 1);
+});
+
+test('fermeture après la réponse en mode voix : le silence ferme toujours sans question', (t) => {
+  const f = fixture(t);
+  f.controller.setSessionMode(4);
+  f.controller.setReplyClose(true);
+  f.controller.setWakeWordAvailability(true, null);
+  f.controller.heartbeat();
+  assert.equal(f.controller.wakeDetected(), true);
+  const scope = f.ready();
+  assert.equal(f.controller.noteUserTranscript(scope), true);
+  f.controller.noteAssistantOutput(scope);
+  f.advance(3000);
+  assert.equal(f.state().session.phase, 'closing');
+  assert.equal(f.state().session.reason, 'Fin de conversation après la réponse.');
+  f.acknowledgeClose();
+  assert.equal(f.controller.wakeDetected(), true);
+  f.ready();
+  f.advance(20_000);
+  assert.equal(f.state().session.reason, 'Fin de conversation après silence.');
+});
+
 function voiceFixture(t: TestContext, recognition = true) {
   const f = fixture(t);
   f.controller.setSessionMode(4);
