@@ -1,3 +1,4 @@
+import type { CustomProviderSettings, CustomProviderView } from '../shared/custom-provider';
 import type { Opening } from '../shared/opening';
 import type {
   DevicesStatus,
@@ -375,6 +376,14 @@ export const api = {
   enrollFace: (id: string, mode: EnrollmentMode) =>
     post<{ ok: boolean }>(`/api/admin/profiles/${encodeURIComponent(id)}/enroll`, { mode }),
   cancelEnrollment: () => request<{ ok: boolean }>('/api/admin/enrollment', { method: 'DELETE' }),
+  customProvider: () => request<CustomProviderView>('/api/admin/custom-provider'),
+  saveCustomProvider: (settings: CustomProviderSettings) =>
+    request<CustomProviderView>('/api/admin/custom-provider', {
+      method: 'PATCH',
+      body: JSON.stringify(settings),
+    }),
+  discoverCustomProviderModels: () =>
+    post<CustomProviderView>('/api/admin/custom-provider/models', {}),
   secrets: () => request<{ secrets: SecretView[] }>('/api/admin/secrets'),
   saveSecret: (env: string, value: string) =>
     request<{ secrets: SecretView[] }>(`/api/admin/secrets/${encodeURIComponent(env)}`, {

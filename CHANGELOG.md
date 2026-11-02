@@ -6,6 +6,17 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-02 : mémoire sur un serveur compatible OpenAI
+
+**Ajouté**
+
+- Fournisseur de l’extraction mémoire au choix, dans **Mise en route → Clés et jetons → Mémoire personnalisée** : « OpenAI » (par défaut), « Mistral » ou un serveur compatible OpenAI de la maison, par exemple Ollama (contribution de thibautrey, #12). On y renseigne le nom, l’URL de base, la clé `CUSTOM_OPENAI_API_KEY` et le modèle, proposé par la détection des modèles ou choisi à la main. La demande passe par l’API Responses, puis par Chat Completions quand le serveur ne la connaît pas, et la réponse est vérifiée avec le schéma mémoire avant d’être appliquée. Le réglage de la voix et celui des images ne changent pas.
+- Secours mémoire au choix, quand le fournisseur personnalisé échoue : « Aucun » (par défaut avec ce fournisseur), « OpenAI » ou « Mistral ». Avec « Aucun », une extraction qui échoue n’est envoyée à aucun autre service.
+
+**Modifié**
+
+- L’extraction mémoire ne suit plus le fournisseur de la conversation : elle a son propre choix. Sans réglage, elle reste chez OpenAI, et une installation qui avait choisi Mistral comme voix garde Mistral pour la mémoire.
+
 ### 2026-11-01 : add-on Home Assistant
 
 **Ajouté**
