@@ -150,6 +150,10 @@ export class SessionController {
   setAmbientProjection(project: (state: MirrorState) => MirrorState['ambientDisplays']): void {
     this.ambientProjection = project;
   }
+  private alarmsProjection: ((state: MirrorState) => MirrorState['alarms']) | null = null;
+  setAlarmsProjection(project: (state: MirrorState) => MirrorState['alarms']): void {
+    this.alarmsProjection = project;
+  }
   private voice: VoiceActivity = { phase: 'idle', startedAt: 0, endsAt: null };
   private setup: MirrorSetup = { openaiKey: false, perception: false };
 
@@ -476,6 +480,8 @@ export class SessionController {
       diagnostic: this.diagnostic,
     };
     state.ambientDisplays = this.ambientProjection?.(state) ?? [];
+    const alarms = this.alarmsProjection?.(state);
+    if (alarms) state.alarms = alarms;
     return structuredClone({
       schemaVersion: 1,
       type: 'state',

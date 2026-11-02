@@ -9,9 +9,13 @@ import {
   type Alarm,
   type AlarmRequest,
   type AlarmSettings,
+  type AlarmsMirrorState,
   type AlarmsView,
   type AlarmView,
+  type RingingAlarm,
+  ALARM_KIND_LABELS,
 } from '../shared/alarms.js';
+import type { MirrorState } from '../shared/types.js';
 import type { AlarmChange, AlarmsRepository } from './alarms-store.js';
 import type { DiagnosticLog } from './logs.js';
 
@@ -143,6 +147,17 @@ export function formatNow(at: number, timeZone: string): string {
   return formatter.format(at);
 }
 
+const clockFormatters = new Map<string, Intl.DateTimeFormat>();
+/** « 07:00 », dans le fuseau du foyer. */
+export function formatClock(at: number, timeZone: string): string {
+  let formatter = clockFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('fr-FR', { timeZone, hour: '2-digit', minute: '2-digit' });
+    clockFormatters.set(timeZone, formatter);
+  }
+  return formatter.format(at);
+}
+
 /** Temps restant à dire : « 45 s », « 9 min », « 2 h 05 », « 3 jours ». */
 export function durationWords(ms: number): string {
   if (ms < 60_000) return `${Math.max(1, Math.round(ms / 1000))} s`;
@@ -153,6 +168,17 @@ export function durationWords(ms: number): string {
   if (hours < 24) return rest ? `${hours} h ${String(rest).padStart(2, '0')}` : `${hours} h`;
   const days = Math.round(hours / 24);
   return `${days} jour${days > 1 ? 's' : ''}`;
+}
+
+/** Le propriétaire est seul devant le miroir et reconnu : le texte de son rappel peut s'afficher. */
+export function ownerAlone(state: MirrorState, profileId: string): boolean {
+  const presence = state.presence;
+  return (
+    state.activeProfile?.id === profileId &&
+    presence.health === 'ok' &&
+    presence.peopleCount === 1 &&
+    presence.people[0]?.profileId === profileId
+  );
 }
 
 /** Demande refusée, avec le message à afficher et le champ en cause. */
@@ -319,13 +345,16 @@ export class Alarms {
     return removed;
   }
 
-  /** Échéances en cours visibles par une personne : les siennes et celles du foyer. */
-  active(profileId: string | null): AlarmView[] {
+  /**
+   * Échéances en cours visibles par une personne : les siennes et celles du foyer ; `everyone`
+   * pour toutes (ce qui sonne s'arrête par n'importe qui dans la pièce).
+   */
+  active(profileId: string | null, everyone = false): AlarmView[] {
     return this.store
       .list()
       .filter(
         (alarm) =>
-          (alarm.profileId === null || alarm.profileId === profileId) &&
+          (everyone || alarm.profileId === null || alarm.profileId === profileId) &&
           (alarm.state === 'scheduled' || alarm.state === 'ringing' || alarm.state === 'snoozed'),
       )
       .map((alarm) => this.present(alarm));
@@ -337,6 +366,59 @@ export class Alarms {
 
   ringing(): AlarmView[] {
     return this.store.ringing().map((alarm) => this.present(alarm));
+  }
+
+  /**
+   * Ce qui sonne, pour le miroir. Un rappel personnel ne montre son texte qu'à son
+   * propriétaire, seul et reconnu ; sinon « Rappel pour Sacha ».
+   */
+  mirrorView(state: MirrorState): AlarmsMirrorState | undefined {
+    const settings = this.store.settings();
+    if (!settings.enabled) return undefined;
+    const name = (profileId: string) =>
+      state.profiles.find((profile) => profile.id === profileId)?.name ?? null;
+    const ringing = this.store.ringing().map((alarm): RingingAlarm => {
+      const hidden =
+        alarm.kind === 'reminder' &&
+        alarm.profileId !== null &&
+        !ownerAlone(state, alarm.profileId);
+      const owner = alarm.profileId === null ? null : name(alarm.profileId);
+      const kind = ALARM_KIND_LABELS[alarm.kind];
+      const title =
+        alarm.kind === 'reminder'
+          ? owner
+            ? `Rappel pour ${owner}`
+            : 'Rappel'
+          : alarm.kind === 'alarm'
+            ? `${kind}${alarm.time ? ` · ${alarm.time}` : ''}`
+            : kind;
+      return {
+        id: alarm.id,
+        kind: alarm.kind,
+        title,
+        text: hidden ? null : alarm.label || null,
+        firedAt: alarm.firedAt ?? this.now(),
+        soft: alarm.kind === 'reminder',
+      };
+    });
+    return { ringing, sound: settings.sound };
+  }
+
+  /** Échéances manquées pas encore dites : celles du foyer, et celles de la personne. */
+  missed(profileId: string | null): AlarmView[] {
+    return this.store
+      .list()
+      .filter(
+        (alarm) =>
+          alarm.missedAt !== null && (alarm.profileId === null || alarm.profileId === profileId),
+      )
+      .sort((a, b) => (a.missedAt ?? 0) - (b.missedAt ?? 0))
+      .map((alarm) => this.present(alarm));
+  }
+
+  /** Une échéance manquée a été dite : elle ne le sera plus, même après un redémarrage. */
+  acknowledge(id: string): void {
+    if (this.store.update(id, { missedAt: null })) this.changed();
   }
 
   /** Fin d'une occurrence : la suivante pour une échéance répétée, sinon terminée. */

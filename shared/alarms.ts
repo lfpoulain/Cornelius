@@ -1,5 +1,7 @@
 /** Alarmes, minuteurs et rappels : échéances du foyer ou d'une personne, tenues par le serveur. */
 
+import { ADMISSION_SOUNDS, ADMISSION_SOUND_LABELS } from './admission-sound.js';
+
 export type AlarmKind = 'alarm' | 'timer' | 'reminder';
 
 /**
@@ -45,14 +47,57 @@ export const ALARM_RETENTION_MS = 7 * 24 * 3_600_000;
 export const ALARM_RING_MINUTES_MIN = 1;
 export const ALARM_RING_MINUTES_MAX = 30;
 
+/**
+ * Sonneries des réveils et minuteurs : deux insistantes, puis les sons d'ouverture joués en
+ * boucle. Un rappel garde un carillon doux, plus espacé.
+ */
+export const ALARM_SOUNDS = ['bips', 'alerte', ...ADMISSION_SOUNDS] as const;
+export type AlarmSoundId = (typeof ALARM_SOUNDS)[number];
+
+export const ALARM_SOUND_LABELS: Readonly<Record<AlarmSoundId, { label: string; detail: string }>> =
+  {
+    bips: { label: 'Bips', detail: 'Quatre bips rapides, comme un réveil classique.' },
+    alerte: { label: 'Alerte', detail: 'Deux tons alternés, montants, difficiles à ignorer.' },
+    ...ADMISSION_SOUND_LABELS,
+  };
+
+export function isAlarmSoundId(value: unknown): value is AlarmSoundId {
+  return typeof value === 'string' && (ALARM_SOUNDS as readonly string[]).includes(value);
+}
+
 export interface AlarmSettings {
   /** Désactivé : rien ne sonne, et Cornelius ne propose plus d'en créer. */
   enabled: boolean;
   /** Une sonnerie sans réponse s'arrête seule après ce nombre de minutes. */
   ringMinutes: number;
+  /** Sonnerie des réveils et des minuteurs. */
+  sound: AlarmSoundId;
 }
 
-export const DEFAULT_ALARM_SETTINGS: Readonly<AlarmSettings> = { enabled: true, ringMinutes: 5 };
+export const DEFAULT_ALARM_SETTINGS: Readonly<AlarmSettings> = {
+  enabled: true,
+  ringMinutes: 5,
+  sound: 'bips',
+};
+
+/** Ce qui sonne, tel que le miroir le montre. */
+export interface RingingAlarm {
+  id: string;
+  kind: AlarmKind;
+  /** « Réveil · 07:00 », « Minuteur · pâtes », « Rappel pour Sacha ». */
+  title: string;
+  /** Texte du rappel ou nom ; null quand il reste privé (propriétaire absent). */
+  text: string | null;
+  firedAt: number;
+  /** Un rappel sonne doucement ; réveils et minuteurs avec la sonnerie choisie. */
+  soft: boolean;
+}
+
+/** Part de l'état du miroir propre aux alarmes. */
+export interface AlarmsMirrorState {
+  ringing: RingingAlarm[];
+  sound: AlarmSoundId;
+}
 
 export interface Alarm {
   id: string;

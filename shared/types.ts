@@ -8,6 +8,7 @@ import type { GreetingMode, SilenceClose } from './conversation.js';
 import type { AddonIcon, AmbientDisplay, ModuleCard } from './addons.js';
 import type { Opening } from './opening.js';
 import type { ScreensaverState } from './screensaver.js';
+import type { AlarmsMirrorState } from './alarms.js';
 
 export type { ModuleCard };
 
@@ -153,6 +154,8 @@ export interface MirrorState {
   profiles: Profile[];
   cards: DisplayCard[];
   ambientDisplays: AmbientDisplay[];
+  /** Réveils, minuteurs et rappels qui sonnent ; absent des anciens serveurs : rien. */
+  alarms?: AlarmsMirrorState;
   voice: VoiceActivity;
   /** Recherche web hébergée en cours pour la conversation Live active. */
   webSearchActive?: boolean;

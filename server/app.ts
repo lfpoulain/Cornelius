@@ -379,6 +379,8 @@ export async function createApp(
     now,
   );
   controller.setAmbientProjection((state) => ambient.view(state));
+  controller.setAlarmsProjection((state) => alarms.mirrorView(state));
+  alarms.onChange(() => controller.publish());
   controller.setBrowserAudioReady(false);
   live.attach(controller);
   agents.onCapabilitiesChanged = (profileId) => live.refreshAgentTools(profileId);
@@ -1608,6 +1610,13 @@ export async function createApp(
           alarms.tick();
           const state = controller.snapshot().state;
           const profileId = state.activeProfile?.id;
+          // Ce qui sonne, puis ce qui a été manqué : une annonce à la fois.
+          if (state.session.phase === 'ready')
+            for (const notice of alarmTools.notices(state)) {
+              const outcome = live.deliverAlarmNotice(notice.key, notice.content);
+              if (outcome === 'delivered') notice.acknowledge?.();
+              if (outcome !== 'seen') break;
+            }
           if (profileId && state.session.phase === 'ready') {
             agents.resume(profileId, state.session.interactionId!);
             const task = agents.pendingDelivery(profileId);

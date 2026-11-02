@@ -4,6 +4,7 @@ import {
   ALARM_RING_MINUTES_MAX,
   ALARM_RING_MINUTES_MIN,
   ALARM_SNOOZE_MS,
+  ALARM_SOUNDS,
   TIMER_MAX_MS,
   type AlarmRequest,
   type AlarmSettings,
@@ -23,6 +24,7 @@ const settingsSchema = compile<Partial<AlarmSettings>>({
       minimum: ALARM_RING_MINUTES_MIN,
       maximum: ALARM_RING_MINUTES_MAX,
     },
+    sound: { enum: [...ALARM_SOUNDS] },
   },
 });
 

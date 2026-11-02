@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { ADMISSION_SOUNDS, isAdmissionSound } from '../shared/admission-sound.js';
 import { playAdmissionSound } from '../web/audio/admission-sound.js';
+import { ALARM_SOUNDS, isAlarmSoundId } from '../shared/alarms.js';
+import { playAlarmSound } from '../web/audio/alarm-sound.js';
 
 /** Contexte audio minimal : enregistre les nœuds, leurs démarrages et leurs arrêts. */
 function fakeContext() {
@@ -76,4 +78,18 @@ test('le réglage du son d’ouverture refuse les sons inconnus et les champs en
   assert.equal(isAdmissionSound({ enabled: true, sound: 'sirène' }), false);
   assert.equal(isAdmissionSound({ enabled: 1, sound: 'goutte' }), false);
   assert.equal(isAdmissionSound({ enabled: true, sound: 'goutte', volume: 1 }), false);
+});
+
+test('les sonneries d’alarme jouent au volume demandé et libèrent leurs sources', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  assert.equal(ALARM_SOUNDS.length, 8);
+  assert.equal(isAlarmSoundId('bips'), true);
+  assert.equal(isAlarmSoundId('sirène'), false);
+  for (const sound of ALARM_SOUNDS) {
+    const f = fakeContext();
+    const duration = playAlarmSound(f.context, sound, 0.4);
+    assert.ok(duration > 0.2 && duration < 1.5, sound + ' : ' + duration + ' s');
+    assert.equal(f.stopped.length, f.started.length, sound + ' : chaque source s’arrête');
+  }
+  t.mock.timers.tick(2000);
 });

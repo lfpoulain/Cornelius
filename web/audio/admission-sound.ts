@@ -162,10 +162,15 @@ const voices: Record<AdmissionSoundId, Voice> = {
 };
 
 /** Joue le son dans ce contexte ; renvoie sa durée en secondes. */
-export function playAdmissionSound(context: BaseAudioContext, sound: AdmissionSoundId): number {
+export function playAdmissionSound(
+  context: BaseAudioContext,
+  sound: AdmissionSoundId,
+  /** Sortie déjà réglée (sonnerie d'alarme) ; sinon un volume fixe vers les haut-parleurs. */
+  output?: AudioNode,
+): number {
   const master = context.createGain();
   master.gain.value = 0.8;
-  master.connect(context.destination);
+  master.connect(output ?? context.destination);
   const start = context.currentTime + 0.02;
   const end = voices[sound](context, master, start);
   setTimeout(() => master.disconnect(), Math.ceil((end - context.currentTime) * 1000) + 100);
@@ -173,7 +178,7 @@ export function playAdmissionSound(context: BaseAudioContext, sound: AdmissionSo
 }
 
 /** Même sortie que la voix de Cornelius, si le navigateur sait la choisir. */
-async function useSpeaker(context: AudioContext) {
+export async function useSpeaker(context: AudioContext) {
   const { speaker } = audioPreferences();
   const output = context as AudioContext & {
     sinkId?: string;

@@ -21,6 +21,7 @@ import {
   ALARMS_ACTIVE_MAX,
   type AlarmRequest,
 } from '../shared/alarms.js';
+import type { MirrorState } from '../shared/types.js';
 
 const paris = 'Europe/Paris';
 const minute = 60_000;
@@ -260,7 +261,7 @@ test('administration : réglages, création, arrêt et suppression', async (t) =
     401,
   );
   const initial = (await call('GET', '/api/admin/alarms')).json();
-  assert.deepEqual(initial.settings, { enabled: true, ringMinutes: 5 });
+  assert.deepEqual(initial.settings, { enabled: true, ringMinutes: 5, sound: 'bips' });
   assert.equal(initial.timeZone, paris);
   assert.equal(
     (await call('PUT', '/api/admin/alarms/settings', { ringMinutes: 31 })).statusCode,
@@ -374,4 +375,102 @@ test('voix : annuler par nom ou par heure ; plusieurs candidats, rien d’annul�
   f.alarms.saveSettings({ enabled: false });
   assert.deepEqual(tools.tools(null), []);
   assert.equal(tools.handles('alarms__set'), false);
+});
+
+/** Juste ce que les alarmes lisent de l'état du miroir : profils, personne active, présence. */
+function mirror(
+  profiles: { id: string; name: string }[],
+  people: (string | null)[],
+  active: string | null = people[0] ?? null,
+) {
+  return {
+    profiles,
+    activeProfile: profiles.find((profile) => profile.id === active) ?? null,
+    presence: {
+      health: 'ok',
+      peopleCount: people.length,
+      people: people.map((profileId, index) => ({ trackId: String(index), profileId })),
+    },
+  } as unknown as MirrorState;
+}
+
+test('miroir : ce qui sonne ; le texte d’un rappel personnel reste à son propriétaire seul', (t) => {
+  const f = fixture(t);
+  const sacha = f.profiles.create('Sacha');
+  const profiles = [sacha];
+  f.alarms.create(
+    ask({ kind: 'reminder', label: 'Médicament', inMinutes: 1, profileId: sacha.id }),
+  );
+  f.alarms.create(ask({ time: '09:01', label: 'travail' }));
+  assert.deepEqual(f.alarms.mirrorView(mirror(profiles, [])), { ringing: [], sound: 'bips' });
+  f.advance(minute);
+  const alone = f.alarms.mirrorView(mirror(profiles, [sacha.id]))!;
+  assert.deepEqual(
+    alone.ringing.map(({ title, text, soft }) => ({ title, text, soft })),
+    [
+      { title: 'Rappel pour Sacha', text: 'Médicament', soft: true },
+      { title: 'Réveil · 09:01', text: 'travail', soft: false },
+    ],
+  );
+  // Quelqu'un d'autre devant le miroir, ou Sacha accompagnée : le texte reste privé.
+  for (const people of [[], [null], [sacha.id, null]])
+    assert.equal(f.alarms.mirrorView(mirror(profiles, people))!.ringing[0]!.text, null);
+  f.alarms.saveSettings({ sound: 'alerte' });
+  assert.equal(f.alarms.mirrorView(mirror(profiles, []))!.sound, 'alerte');
+  f.alarms.saveSettings({ enabled: false });
+  assert.equal(f.alarms.mirrorView(mirror(profiles, [])), undefined);
+});
+
+test('voix : arrêter ou repousser ce qui sonne, quel que soit son propriétaire', (t) => {
+  const f = fixture(t);
+  const tools = new AlarmTools(f.alarms, () => f.now);
+  const sacha = f.profiles.create('Sacha');
+  const visitor = { profileId: null, profileName: null, satelliteId: null };
+  const respond = (action: string, minutes: number | null = null) =>
+    tools.run(visitor, 'alarms__respond', { action, minutes });
+  assert.equal(respond('stop').tool.error?.code, 'not_found');
+  const daily = f.alarms.create(ask({ time: '09:01', days: 127, profileId: sacha.id }));
+  f.advance(minute);
+  const snoozed = respond('snooze', 5);
+  assert.equal(snoozed.tool.summary, 'Repoussé de 5 min : ça sonnera de nouveau à 09:06.');
+  assert.equal(f.alarms.get(daily.id)!.state, 'snoozed');
+  // « Arrête » pendant le répit : le réveil repart pour demain.
+  assert.equal(respond('stop').tool.summary, 'Arrêté. Prochaine fois : mardi 3 novembre à 09:01.');
+  assert.equal(f.alarms.get(daily.id)!.state, 'scheduled');
+  assert.equal(respond('snooze').tool.error?.code, 'not_found');
+});
+
+test('annonces : ce qui sonne d’abord, puis les manqués, chacun dit une fois', (t) => {
+  const f = fixture(t);
+  const tools = new AlarmTools(f.alarms, () => f.now);
+  const sacha = f.profiles.create('Sacha');
+  const profiles = [sacha];
+  const pasta = f.alarms.create(ask({ kind: 'timer', durationMs: minute, label: 'pâtes' }));
+  f.alarms.create(
+    ask({ kind: 'reminder', label: 'Médicament', inMinutes: 1, profileId: sacha.id }),
+  );
+  f.alarms.saveSettings({ ringMinutes: 1 });
+  f.advance(minute);
+  const ringing = tools.notices(mirror(profiles, [null]));
+  assert.equal(ringing.length, 2);
+  assert.match(ringing[0]!.content, /^Le minuteur « pâtes » sonne en ce moment/u);
+  assert.match(ringing[1]!.content, /^Un rappel pour Sacha sonne/u);
+  assert.doesNotMatch(ringing[1]!.content, /Médicament/u);
+  assert.equal(ringing[0]!.acknowledge, undefined);
+
+  // Personne n'a répondu : les deux sont manqués.
+  f.advance(minute);
+  const visitor = tools.notices(mirror(profiles, [null]));
+  assert.deepEqual(
+    visitor.map((notice) => notice.key.split(':')[0]),
+    ['missed'],
+  );
+  assert.match(visitor[0]!.content, /Le minuteur « pâtes » a sonné à 09:01 sans réponse/u);
+  visitor[0]!.acknowledge!();
+  assert.equal(f.alarms.get(pasta.id)!.missedAt, null);
+  const owner = tools.notices(mirror(profiles, [sacha.id]));
+  assert.equal(owner.length, 1);
+  assert.match(owner[0]!.content, /Rappel manqué de 09:01 pour Sacha .*"Médicament"/u);
+  owner[0]!.acknowledge!();
+  assert.deepEqual(tools.notices(mirror(profiles, [sacha.id])), []);
 });

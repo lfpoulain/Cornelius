@@ -6,6 +6,7 @@ import type { MirrorConnection } from '../useMirror';
 import { BrowserCamera } from '../camera/BrowserCamera';
 import { Orb } from './Orb';
 import { AmbientModules } from './AmbientModules';
+import { AlarmRinging } from './AlarmRinging';
 import { Screensaver, type ScreensaverScene } from './Screensaver';
 import { screensaverWoken } from './screensaver-wake';
 import { useVoice } from '../audio/useVoice';
@@ -341,6 +342,8 @@ export function Mirror({ connection }: { connection: MirrorConnection }) {
   // un regard (carte, image en cours). Le bouton « Activer la voix » ne sert qu’à une personne
   // présente : sa venue le fait revenir.
   const screensaver = state?.screensaver;
+  // Une échéance qui sonne réveille le miroir, même sans personne devant.
+  const alarmRinging = fresh && (state?.alarms?.ringing.length ?? 0) > 0;
   const [screensaverScene, setScreensaverScene] = useState<ScreensaverScene>('off');
   // Un glissement de souris ou de doigt sur la peinture la retire, le temps de s’en servir.
   const screensaverSwiped = useScreensaverSwipe(
@@ -357,6 +360,7 @@ export function Mirror({ connection }: { connection: MirrorConnection }) {
       !voiceOnlyActive &&
       !satelliteName &&
       !imageActivity &&
+      !alarmRinging &&
       cards.length === 0 &&
       !interrupted &&
       !connectionLost,
@@ -407,6 +411,7 @@ export function Mirror({ connection }: { connection: MirrorConnection }) {
           onSceneChange={setScreensaverScene}
         />
       )}
+      {fresh && <AlarmRinging alarms={state?.alarms} muted={phase !== 'idle'} />}
       <div className="mirror-orb-anchor" data-testid="mirror-orb" />
       <Orb
         fullscreen

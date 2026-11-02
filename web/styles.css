@@ -1149,3 +1149,56 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Ce qui sonne : réveil, minuteur ou rappel, en ambre juste au-dessus de l’orbe, au-dessus de
+ * tout le reste (l’écran de veille se retire pendant la sonnerie). Le bas de l’écran reste à
+ * l’invite d’activation et à l’état de la voix.
+ */
+.mirror-alarm {
+  position: fixed;
+  left: 50%;
+  top: calc(50% - var(--orb-clear) / 2);
+  z-index: 6;
+  width: min(calc(100% - 2 * var(--mirror-edge)), 32em);
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(10 * var(--mirror-scale));
+  text-align: center;
+  pointer-events: none;
+}
+.mirror-alarm-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(4 * var(--mirror-scale));
+}
+.mirror-page .mirror-alarm-title {
+  font-size: calc(30 * var(--mirror-scale));
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--mirror-amber);
+  animation: mirror-alarm-pulse 1.6s ease-in-out infinite;
+}
+.mirror-page .mirror-alarm-text {
+  font-size: calc(20 * var(--mirror-scale));
+  line-height: 1.3;
+  color: #f0e2c4;
+}
+.mirror-page .mirror-alarm-hint {
+  font-size: var(--mirror-text);
+  color: #bfccc3;
+}
+@keyframes mirror-alarm-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mirror-page .mirror-alarm-title {
+    animation: none;
+  }
+}

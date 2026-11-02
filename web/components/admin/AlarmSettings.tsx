@@ -1,10 +1,13 @@
 import { useCallback, useState, type ReactNode } from 'react';
-import { AlarmClock, RefreshCw } from 'lucide-react';
+import { AlarmClock, RefreshCw, Volume2 } from 'lucide-react';
 import {
   ALARM_DAYS,
   ALARM_EVERY_DAY,
   ALARM_KIND_LABELS,
   ALARM_LABEL_MAX,
+  ALARM_SOUND_LABELS,
+  ALARM_SOUNDS,
+  isAlarmSoundId,
   ALARM_WEEKDAYS,
   alarmRepeatLabel,
   type AlarmKind,
@@ -14,6 +17,7 @@ import {
 } from '../../../shared/alarms';
 import type { Profile } from '../../../shared/types';
 import { api, errorMessage } from '../../api';
+import { previewAlarmSound } from '../../audio/alarm-sound';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -258,6 +262,40 @@ export function AlarmSettings({
             </NativeSelectOption>
           ))}
         </NativeSelect>
+      </Field>
+
+      <Field
+        id="alarms-sound"
+        label="Sonnerie des réveils et minuteurs"
+        help={`${ALARM_SOUND_LABELS[current.settings.sound].detail} Elle monte en volume pendant trente secondes. Un rappel sonne toujours avec un carillon doux.`}
+      >
+        <div className="flex flex-wrap gap-2">
+          <NativeSelect
+            id="alarms-sound"
+            value={current.settings.sound}
+            onChange={(event) => {
+              const sound = event.target.value;
+              if (!isAlarmSoundId(sound)) return;
+              void run('Sonnerie enregistrée.', async () =>
+                show(await api.saveAlarmSettings({ sound })),
+              );
+            }}
+          >
+            {ALARM_SOUNDS.map((sound) => (
+              <NativeSelectOption key={sound} value={sound}>
+                {ALARM_SOUND_LABELS[sound].label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void previewAlarmSound(current.settings.sound)}
+          >
+            <Volume2 />
+            Écouter
+          </Button>
+        </div>
       </Field>
 
       <section

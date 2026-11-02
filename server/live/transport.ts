@@ -243,6 +243,11 @@ export class LiveTransport implements SessionTransport {
   private audioCatchupListeners = new Set<(scope: Scope) => void>();
   private disposed = false;
   private lastAgentAnnouncementAt = 0;
+  /** Annonces d'alarmes déjà faites dans la conversation en cours. */
+  private alarmNotices: { interactionId: string | null; keys: Set<string> } = {
+    interactionId: null,
+    keys: new Set(),
+  };
   private onClosed: (() => void) | null = null;
   private closeTimer: ReturnType<typeof setTimeout> | null = null;
   private autoIllustration: { abort: AbortController; active: ActiveSession } | null = null;
@@ -1379,6 +1384,45 @@ export class LiveTransport implements SessionTransport {
       state.presence.observedAt !== null &&
       this.now() - state.presence.observedAt < 2000
     );
+  }
+  /**
+   * Fait dire une alarme qui sonne ou une échéance manquée, une fois par conversation et par
+   * clé. `busy` : la conversation n'est pas prête à l'entendre maintenant ; `seen` : déjà dit.
+   * Seulement sur le miroir : une conversation de satellite se tient dans une autre pièce.
+   */
+  deliverAlarmNotice(key: string, content: string): 'delivered' | 'seen' | 'busy' {
+    const active = this.active;
+    if (
+      !active ||
+      active.satelliteId ||
+      !active.started ||
+      active.closing ||
+      active.finalized ||
+      active.blocked ||
+      active.pending.size ||
+      !sameScope(active.scope, this.controller.scope())
+    )
+      return 'busy';
+    if (this.alarmNotices.interactionId !== active.scope.interactionId)
+      this.alarmNotices = { interactionId: active.scope.interactionId, keys: new Set() };
+    if (this.alarmNotices.keys.has(key)) return 'seen';
+    const state = this.controller.snapshot().state;
+    if (state.voice.phase !== 'idle' || this.now() - this.lastAgentAnnouncementAt < 8000)
+      return 'busy';
+    if (
+      !this.deliver(active, {
+        type: 'session.commentary.append',
+        content,
+        delegation_id: null,
+      })
+    )
+      return 'busy';
+    this.alarmNotices.keys.add(key);
+    this.lastAgentAnnouncementAt = this.now();
+    this.logs?.write('info', 'alarms', 'Alarme annoncée', {
+      interactionId: active.scope.interactionId,
+    });
+    return 'delivered';
   }
   deliverAgentTask(profileId: string, task: AgentTaskView): boolean {
     const active = this.active;

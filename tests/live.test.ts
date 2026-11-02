@@ -800,6 +800,22 @@ test('alarms__set règle un minuteur, affiche sa carte et rend l’heure à redi
   );
 });
 
+test('une alarme qui sonne est annoncée une fois par conversation, sans se bousculer', async (t) => {
+  const f = fixture(t);
+  assert.equal(f.live.deliverAlarmNotice('ringing:a:1', 'Le réveil sonne.'), 'busy');
+  await f.ready();
+  assert.equal(f.live.deliverAlarmNotice('ringing:a:1', 'Le réveil sonne.'), 'delivered');
+  assert.equal(f.live.deliverAlarmNotice('ringing:a:1', 'Le réveil sonne.'), 'seen');
+  // Une seconde annonce attend que la première ait été dite.
+  assert.equal(f.live.deliverAlarmNotice('missed:b:2', 'Rappel manqué.'), 'busy');
+  assert.equal(
+    f.sent.filter(
+      (event) => event.type === 'session.commentary.append' && event.content === 'Le réveil sonne.',
+    ).length,
+    1,
+  );
+});
+
 test('un arrêt avant toute création distante clôture sans appel fournisseur', async (t) => {
   const f = fixture(t);
   f.controller.command({ type: 'stop' });

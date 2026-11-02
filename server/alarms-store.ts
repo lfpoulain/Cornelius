@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import {
   DEFAULT_ALARM_SETTINGS,
+  isAlarmSoundId,
   type Alarm,
   type AlarmKind,
   type AlarmSettings,
@@ -15,7 +16,8 @@ import {
 export const alarmsMigration = `CREATE TABLE IF NOT EXISTS alarm_settings (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
-  ring_minutes INTEGER NOT NULL DEFAULT 5 CHECK (ring_minutes BETWEEN 1 AND 30)
+  ring_minutes INTEGER NOT NULL DEFAULT 5 CHECK (ring_minutes BETWEEN 1 AND 30),
+  sound TEXT NOT NULL DEFAULT 'bips'
 ) STRICT;
 INSERT OR IGNORE INTO alarm_settings (id) VALUES (1);
 CREATE TABLE IF NOT EXISTS alarms (
@@ -71,13 +73,17 @@ export class AlarmsRepository {
   settings(): AlarmSettings {
     const row = this.db.prepare('SELECT * FROM alarm_settings WHERE id = 1').get();
     if (!row) return { ...DEFAULT_ALARM_SETTINGS };
-    return { enabled: row.enabled === 1, ringMinutes: Number(row.ring_minutes) };
+    return {
+      enabled: row.enabled === 1,
+      ringMinutes: Number(row.ring_minutes),
+      sound: isAlarmSoundId(row.sound) ? row.sound : DEFAULT_ALARM_SETTINGS.sound,
+    };
   }
 
   saveSettings(settings: AlarmSettings): AlarmSettings {
     this.db
-      .prepare('UPDATE alarm_settings SET enabled = ?, ring_minutes = ? WHERE id = 1')
-      .run(settings.enabled ? 1 : 0, settings.ringMinutes);
+      .prepare('UPDATE alarm_settings SET enabled = ?, ring_minutes = ?, sound = ? WHERE id = 1')
+      .run(settings.enabled ? 1 : 0, settings.ringMinutes, settings.sound);
     return this.settings();
   }
 
