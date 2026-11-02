@@ -33,7 +33,7 @@ Rien n’est à installer dans Home Assistant lui-même : Cornelius s’y connec
 4. Démarrez l’application et activez **Chien de garde**, qui la relance si elle s’arrête.
 5. **Ouvrir l’interface web** : l’administration s’ouvre en HTTPS sur le port `3443` de la box.
 
-L’application est au stade expérimental : Home Assistant l’affiche dans la boutique avec cette mention. Pour la modifier et l’essayer comme application locale, voir le [README de cornelius-ha](https://github.com/lfpoulain/cornelius-ha#-d%C3%A9veloppement).
+L’application est au stade expérimental : Home Assistant l’affiche dans la boutique avec cette mention. Pour la modifier et l’essayer comme application locale, voir le [README de cornelius-ha](https://github.com/lfpoulain/cornelius-ha#%EF%B8%8F-d%C3%A9velopper).
 
 Une application installée depuis la boutique et une application locale sont deux applications distinctes, chacune avec son dossier de données. Passer de l’une à l’autre repart d’un Cornelius vide : profils, visages et réglages ne suivent pas.
 
