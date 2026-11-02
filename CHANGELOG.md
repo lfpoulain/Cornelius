@@ -14,6 +14,10 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 - `CORNELIUS_SUPERVISED=1` : sous un superviseur autre que systemd, un redémarrage demandé par l’administration quitte simplement au lieu de relancer le serveur en arrière-plan, et un démarrage incomplet (port HTTPS déjà pris) arrête le serveur pour que le superviseur le voie.
 - `CORNELIUS_TRUST_LOOPBACK=0` : une requête venue de `127.0.0.1` n’est plus traitée comme l’ordinateur du miroir (miroir sans autorisation, mot de passe par défaut accepté). L’add-on s’en sert, car sur le réseau de l’hôte la boucle locale est partagée avec Home Assistant et ses autres applications. Sans la variable, rien ne change.
 
+**Corrigé**
+
+- Sous Linux et macOS, l’annonce mDNS des satellites répond enfin aux recherches : la socket était liée à l’adresse de l’interface et ne recevait aucun paquet multicast, si bien qu’un satellite ne trouvait pas Cornelius seul. Windows n’est pas concerné et reste inchangé.
+
 ### 2026-10-29 : ARM64 et Raspberry Pi
 
 **Ajouté**
