@@ -11,6 +11,7 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 **Ajouté**
 
 - Module natif **Alarmes et rappels** (Modules → Au quotidien) : réveils à heure fixe, répétés ou non, minuteurs et rappels, pour le foyer ou une personne. Le serveur les tient dans la base, les fait sonner même sans conversation, arrête une sonnerie sans réponse après une durée réglable (5 min par défaut) et note manquée une échéance passée de plus d’un quart d’heure pendant un arrêt. La page permet de créer, arrêter et supprimer une échéance.
+- Outils vocaux `alarms__set`, `alarms__list` et `alarms__cancel` : « réveille-moi à 7 h en semaine », « mets un minuteur de 10 minutes pour les pâtes », « rappelle-moi d’appeler le garage demain à 14 h », « annule le minuteur ». Le serveur calcule l’heure et l’affiche dans une carte ; une personne non reconnue ne règle que des échéances du foyer. Activer ou couper les alarmes relance la conversation en cours.
 
 ### 2026-11-01 : add-on Home Assistant
 

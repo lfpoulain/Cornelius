@@ -53,9 +53,11 @@ export function registerAlarms(
     alarms: Alarms;
     profiles: ProfileRepository;
     requireAdmin(request: FastifyRequest, reply: FastifyReply): Promise<void>;
+    /** Les réglages ont changé : les outils vocaux aussi, peut-être. */
+    onSettingsChanged?(): void;
   },
 ) {
-  const { alarms, profiles, requireAdmin } = services;
+  const { alarms, profiles, requireAdmin, onSettingsChanged } = services;
   const admin = { preHandler: requireAdmin };
 
   app.get('/api/admin/alarms', admin, async () => alarms.view());
@@ -67,6 +69,7 @@ export function registerAlarms(
       if (!settingsSchema(request.body))
         return reply.code(400).send({ error: 'Réglages des alarmes invalides.' });
       alarms.saveSettings(request.body);
+      onSettingsChanged?.();
       return alarms.view();
     },
   );

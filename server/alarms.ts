@@ -128,6 +128,33 @@ export function formatLocal(at: number, timeZone: string): string {
   return formatter.format(at);
 }
 
+const todayFormatters = new Map<string, Intl.DateTimeFormat>();
+/** « lundi 2 novembre 2026 à 09:00 » : la date que la voix doit connaître pour « vendredi ». */
+export function formatNow(at: number, timeZone: string): string {
+  let formatter = todayFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('fr-FR', {
+      timeZone,
+      dateStyle: 'full',
+      timeStyle: 'short',
+    });
+    todayFormatters.set(timeZone, formatter);
+  }
+  return formatter.format(at);
+}
+
+/** Temps restant à dire : « 45 s », « 9 min », « 2 h 05 », « 3 jours ». */
+export function durationWords(ms: number): string {
+  if (ms < 60_000) return `${Math.max(1, Math.round(ms / 1000))} s`;
+  const minutes = Math.round(ms / 60_000);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours < 24) return rest ? `${hours} h ${String(rest).padStart(2, '0')}` : `${hours} h`;
+  const days = Math.round(hours / 24);
+  return `${days} jour${days > 1 ? 's' : ''}`;
+}
+
 /** Demande refusée, avec le message à afficher et le champ en cause. */
 export class AlarmError extends Error {
   constructor(
@@ -290,6 +317,22 @@ export class Alarms {
     const removed = this.store.delete(id);
     if (removed) this.changed();
     return removed;
+  }
+
+  /** Échéances en cours visibles par une personne : les siennes et celles du foyer. */
+  active(profileId: string | null): AlarmView[] {
+    return this.store
+      .list()
+      .filter(
+        (alarm) =>
+          (alarm.profileId === null || alarm.profileId === profileId) &&
+          (alarm.state === 'scheduled' || alarm.state === 'ringing' || alarm.state === 'snoozed'),
+      )
+      .map((alarm) => this.present(alarm));
+  }
+
+  timeZoneName(): string {
+    return this.timeZone;
   }
 
   ringing(): AlarmView[] {

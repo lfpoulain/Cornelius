@@ -107,6 +107,20 @@ export interface MailToolBridge {
   ): Promise<ToolResult>;
 }
 
+export interface AlarmsToolBridge {
+  tools(profileId?: string | null): {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  }[];
+  handles(name: string): boolean;
+  run(
+    input: { profileId: string | null; profileName: string | null; satelliteId: string | null },
+    name: string,
+    args: unknown,
+  ): { tool: ToolResult; card: LunaCardRequest | null };
+}
+
 interface ActiveSession {
   scope: Scope;
   gateway: LiveGateway | null;
@@ -273,6 +287,7 @@ export class LiveTransport implements SessionTransport {
       agents?: Pick<Agents, 'tools' | 'handles' | 'run' | 'received'>;
       imageGeneration?: ImageGenerationToolBridge;
       mail?: MailToolBridge;
+      alarms?: AlarmsToolBridge;
       personality?: (profileId: string | null) => PersonalityPreferences;
     } = {},
     private readonly now: () => number = Date.now,
@@ -518,6 +533,7 @@ export class LiveTransport implements SessionTransport {
       ...(this.integrations.agents?.tools(profileId) ?? []),
       ...(this.integrations.imageGeneration?.tools() ?? []),
       ...(this.integrations.mail?.tools(profileId) ?? []),
+      ...(this.integrations.alarms?.tools(profileId) ?? []),
       // Mode voix compris : la caméra s’allume pendant la conversation pour regarder.
       ...(this.vision?.tools() ?? []),
       ...(this.memory?.tools() ?? []),
@@ -1231,6 +1247,11 @@ export class LiveTransport implements SessionTransport {
         void this.runMail(active, delegation, item.call_id, args);
         return;
       }
+      if (this.integrations.alarms?.handles(name)) {
+        this.beginTool(active, delegation);
+        this.runAlarms(active, delegation, item.call_id, name, args);
+        return;
+      }
       if (this.integrations.addons?.parseTool(name)) {
         this.beginTool(active, delegation);
         void this.runAddon(active, delegation, countKey, item.call_id, name, args);
@@ -1593,6 +1614,41 @@ export class LiveTransport implements SessionTransport {
         error,
       });
       tool = failureToolResult('Envoi par e-mail indisponible.');
+    }
+    this.sendItem(active, callId, tool);
+    this.finishTool(active, delegation);
+  }
+  private runAlarms(
+    active: ActiveSession,
+    delegation: string,
+    callId: string,
+    name: string,
+    args: unknown,
+  ) {
+    const state = this.controller.snapshot().state;
+    let tool: ToolResult;
+    try {
+      const outcome = this.integrations.alarms!.run(
+        {
+          profileId: state.activeProfile?.id ?? null,
+          profileName: state.activeProfile?.name ?? null,
+          satelliteId: active.satelliteId,
+        },
+        name,
+        args,
+      );
+      tool = outcome.tool;
+      // Satellite : pas d’écran, le résumé suffit à la réponse parlée.
+      if (outcome.card && !active.satelliteId && !active.closing && !active.finalized)
+        if (this.controller.showCard(active.scope, callId, outcome.card, this.now() + 60_000))
+          this.append(active, 'card-displayed', cardDisplayRule);
+    } catch (error) {
+      this.logs?.write('warn', 'alarms', 'Outil des alarmes interrompu', {
+        interactionId: active.scope.interactionId,
+        tool: name,
+        error,
+      });
+      tool = failureToolResult('Alarmes indisponibles.');
     }
     this.sendItem(active, callId, tool);
     this.finishTool(active, delegation);

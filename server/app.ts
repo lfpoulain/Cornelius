@@ -67,6 +67,7 @@ import { Mailer, type MailTransport } from './mail.js';
 import { registerMail } from './mail-api.js';
 import { MailRepository } from './mail-store.js';
 import { Alarms } from './alarms.js';
+import { AlarmTools } from './alarms-tools.js';
 import { registerAlarms } from './alarms-api.js';
 import { AlarmsRepository } from './alarms-store.js';
 import { MAIL_PASSWORD_SECRET } from '../shared/mail.js';
@@ -290,6 +291,7 @@ export async function createApp(
     options.mailTransport,
   );
   const alarms = new Alarms(new AlarmsRepository(db, now), timeZone, logs, now);
+  const alarmTools = new AlarmTools(alarms, now);
   const agents = new Agents(new AgentRepository(db, now), new HermesClient(http, now), now);
   const initialKey = openaiKey();
   const selectedVoiceKey = () =>
@@ -334,6 +336,7 @@ export async function createApp(
       agents,
       imageGeneration,
       mail: mailer,
+      alarms: alarmTools,
       personality: (id) => personality.get(id),
     },
     now,
@@ -774,7 +777,19 @@ export async function createApp(
     requireAdmin,
     onChanged: mailChanged,
   });
-  registerAlarms(app, { alarms, profiles, requireAdmin });
+  // Activer ou couper les alarmes ajoute ou retire leurs outils : la conversation est relancée.
+  let alarmsEnabled = alarms.settings().enabled;
+  registerAlarms(app, {
+    alarms,
+    profiles,
+    requireAdmin,
+    onSettingsChanged: () => {
+      const enabled = alarms.settings().enabled;
+      if (enabled === alarmsEnabled) return;
+      alarmsEnabled = enabled;
+      controller.restart('Réglage des alarmes modifié.');
+    },
+  });
   registerAddons(app, {
     runtime: addonRuntime,
     actions: actionExecutor,
@@ -1132,6 +1147,7 @@ export async function createApp(
       ...agents.tools(profileId),
       ...imageGeneration.tools(),
       ...mailer.tools(profileId),
+      ...alarmTools.tools(profileId),
       ...vision.tools(),
       ...memory.tools(),
     ];

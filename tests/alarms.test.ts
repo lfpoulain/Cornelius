@@ -10,6 +10,7 @@ import {
   zonedTime,
 } from '../server/alarms.js';
 import { AlarmsRepository } from '../server/alarms-store.js';
+import { AlarmTools } from '../server/alarms-tools.js';
 import { DiagnosticLog } from '../server/logs.js';
 import { openDatabase, ProfileRepository } from '../server/storage.js';
 import {
@@ -288,4 +289,89 @@ test('administration : réglages, création, arrêt et suppression', async (t) =
   assert.equal((await call('POST', '/api/admin/alarms/inconnue/stop')).statusCode, 404);
   assert.equal((await call('DELETE', `/api/admin/alarms/${alarm.id}`)).json().alarms.length, 0);
   assert.equal((await call('DELETE', `/api/admin/alarms/${alarm.id}`)).statusCode, 404);
+});
+
+test('voix : réveil, rappel et minuteur, pour soi ou le foyer, sans doublon', (t) => {
+  const f = fixture(t);
+  const tools = new AlarmTools(f.alarms, () => f.now);
+  const artus = f.profiles.create('Artus');
+  const me = { profileId: artus.id, profileName: 'Artus', satelliteId: null };
+  const set = (
+    input: { profileId: string | null; profileName: string | null; satelliteId: string | null },
+    args: Record<string, unknown>,
+  ) =>
+    tools.run(input, 'alarms__set', {
+      kind: 'alarm',
+      time: null,
+      date: null,
+      inMinutes: null,
+      durationSeconds: null,
+      days: [],
+      label: null,
+      owner: 'moi',
+      ...args,
+    });
+  assert.match(tools.tools(artus.id)[0]!.description, /Nous sommes lundi 2 novembre 2026 à 09:00/u);
+
+  const weekdays = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi'];
+  const alarm = set(me, { time: '07:00', days: weekdays });
+  assert.equal(alarm.tool.status, 'succeeded');
+  assert.equal(alarm.tool.result?.atLocal, 'mardi 3 novembre à 07:00');
+  assert.equal(alarm.tool.result?.inWords, '22 h');
+  assert.equal(alarm.tool.result?.repeat, 'en semaine');
+  assert.match(alarm.tool.summary, /pour Artus\.$/u);
+  assert.equal(alarm.card?.title, 'Réveil réglé');
+  // Même demande relancée : rien de neuf.
+  assert.equal(set(me, { time: '07:00', days: weekdays }).tool.result?.duplicate, true);
+  assert.equal(f.store.activeCount(artus.id), 1);
+
+  // Personne non reconnue : « moi » devient le foyer ; le satellite garde la sonnerie.
+  const anonymous = { profileId: null, profileName: null, satelliteId: 'cuisine' };
+  const timer = set(anonymous, { kind: 'timer', durationSeconds: 90, label: 'œufs' });
+  assert.equal(timer.tool.result?.owner, 'foyer');
+  assert.equal(f.alarms.get(String(timer.tool.result?.id))?.target, 'cuisine');
+
+  const reminder = set(me, { kind: 'reminder', inMinutes: 20, label: 'Appeler le garage' });
+  assert.equal(reminder.tool.result?.inWords, '20 min');
+  const refused = set(me, { kind: 'reminder', time: '08:00', date: '2026-11-01', label: 'x' });
+  assert.equal(refused.tool.status, 'failed');
+  assert.equal(refused.tool.summary, 'Cette heure est déjà passée.');
+
+  // Le foyer voit le minuteur, pas le réveil ni le rappel personnels.
+  const listed = tools.run(anonymous, 'alarms__list', { kind: null });
+  assert.equal((listed.tool.result?.items as unknown[]).length, 1);
+  const mine = tools.run(me, 'alarms__list', { kind: null });
+  assert.equal((mine.tool.result?.items as unknown[]).length, 3);
+  assert.equal(mine.card?.items.length, 3);
+});
+
+test('voix : annuler par nom ou par heure ; plusieurs candidats, rien d’annulé', (t) => {
+  const f = fixture(t);
+  const tools = new AlarmTools(f.alarms, () => f.now);
+  const input = { profileId: null, profileName: null, satelliteId: null };
+  f.alarms.create(ask({ kind: 'timer', durationMs: 10 * minute, label: 'pâtes' }));
+  f.alarms.create(ask({ kind: 'timer', durationMs: 20 * minute, label: 'gâteau' }));
+  f.alarms.create(ask({ time: '07:00' }));
+  f.alarms.create(ask({ time: '07:30' }));
+  const cancel = (args: Record<string, unknown>) =>
+    tools.run(input, 'alarms__cancel', { id: null, kind: null, match: null, all: false, ...args });
+
+  const ambiguous = cancel({ kind: 'timer', match: 'le minuteur' });
+  assert.equal(ambiguous.tool.result?.status, 'ambiguous');
+  assert.equal(f.alarms.active(null).length, 4);
+  assert.equal(
+    cancel({ kind: 'timer', match: 'le minuteur des pates' }).tool.summary,
+    'Le minuteur « pâtes » est annulé.',
+  );
+  assert.equal(cancel({ kind: 'alarm', match: '7 h 30' }).tool.status, 'succeeded');
+  assert.deepEqual(
+    f.alarms.active(null).map((alarm) => alarm.time ?? alarm.label),
+    ['gâteau', '07:00'],
+  );
+  assert.equal(cancel({ kind: 'reminder' }).tool.error?.code, 'not_found');
+  assert.equal(cancel({ all: true }).tool.summary, '2 échéances annulées.');
+
+  f.alarms.saveSettings({ enabled: false });
+  assert.deepEqual(tools.tools(null), []);
+  assert.equal(tools.handles('alarms__set'), false);
 });

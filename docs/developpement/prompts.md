@@ -25,7 +25,7 @@ Cette page explique où se trouvent les consignes que Cornelius donne aux modèl
 
 | Fichier | Contenu |
 |---|---|
-| `server/live/configuration.ts` | `liveConfiguration()` : prompt de la conversation vocale, prompt de la délégation, liste des outils (dont `web_search` et `ui__show_luna_card`), fragments ajoutés selon les outils présents (`vision__look`, `image__generate`, `mail__send`, `home_assistant__read`, `home_assistant__control`, `agents__start`), et la personnalisation (`personalityInstructions`, `personalContextInstructions`). |
+| `server/live/configuration.ts` | `liveConfiguration()` : prompt de la conversation vocale, prompt de la délégation, liste des outils (dont `web_search` et `ui__show_luna_card`), fragments ajoutés selon les outils présents (`vision__look`, `image__generate`, `mail__send`, `alarms__set`, `home_assistant__read`, `home_assistant__control`, `agents__start`), et la personnalisation (`personalityInstructions`, `personalContextInstructions`). |
 | `server/live/transport.ts` | Consignes ajoutées pendant la session : accueil selon **Quand il écoute → Accueil à l’ouverture** (« Bonjour » et le prénom, accueil libre, ou pas d’accueil), annonce d’une carte affichée, description de la caméra en contexte silencieux (découpée en fragments de 400 octets), résultats de Hermes. |
 | `server/live/card-overlap.ts` | Règle qui écarte une carte Luna répétant la carte d’un module. |
 | `perception/scene.py` | Consignes de LFM2.5-VL (`INSTRUCTIONS`) : description générale à l’ouverture (`scene`) et réponse à une question visuelle (`tool`). |

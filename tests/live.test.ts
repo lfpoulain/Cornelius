@@ -8,6 +8,9 @@ import type { MediaSessionConfig } from 'openai/resources/live/live';
 import { openDatabase, ProfileRepository, SessionPreferences } from '../server/storage.js';
 import { SessionController } from '../server/controller.js';
 import { LiveTransport } from '../server/live/transport.js';
+import { Alarms } from '../server/alarms.js';
+import { AlarmsRepository } from '../server/alarms-store.js';
+import { AlarmTools } from '../server/alarms-tools.js';
 import type { LiveGateway } from '../server/live/gateway.js';
 import { liveConfiguration } from '../server/live/configuration.js';
 import type { DelegationMode } from '../shared/delegation.js';
@@ -744,6 +747,55 @@ test('mail__send reçoit l’image affichée et la personne qui parle ; le promp
       (event) =>
         event.type === 'response.item.create' &&
         JSON.stringify(event).includes('E-mail envoyé à Baptiste'),
+    ),
+  );
+});
+
+test('alarms__set règle un minuteur, affiche sa carte et rend l’heure à redire', async (t) => {
+  const db = openDatabase(':memory:');
+  t.after(() => db.close());
+  const alarms = new Alarms(new AlarmsRepository(db), 'Europe/Paris');
+  const f = fixture(t, { integrations: { alarms: new AlarmTools(alarms) } });
+  await f.ready();
+  const config = f.configs[0]!;
+  assert.match(String(config.instructions), /Réveils, minuteurs et rappels : .*alarms__set/u);
+  const delegation = (config.delegation as MediaSessionConfig.Responses).responses;
+  assert.match(String(delegation.instructions), /Reprends atLocal et inWords tels quels/u);
+  for (const name of ['alarms__set', 'alarms__list', 'alarms__cancel'])
+    assert.ok(delegation.tools?.some((tool) => 'name' in tool && tool.name === name));
+  f.emit({
+    type: 'response.event',
+    delegation_id: 'alarms-delegation',
+    event: {
+      type: 'response.output_item.done',
+      item: {
+        type: 'function_call',
+        call_id: 'alarms-call',
+        name: 'alarms__set',
+        arguments: JSON.stringify({
+          kind: 'timer',
+          time: null,
+          date: null,
+          inMinutes: null,
+          durationSeconds: 600,
+          days: [],
+          label: 'pâtes',
+          owner: 'foyer',
+        }),
+      },
+    },
+  });
+  await setImmediate();
+  const [timer] = alarms.active(null);
+  assert.equal(timer?.label, 'pâtes');
+  assert.equal(timer?.target, 'mirror');
+  const card = f.controller.snapshot().state.cards[0]?.content;
+  assert.equal(card?.cardType === 'luna' && card.title, 'Minuteur lancé');
+  assert.ok(
+    f.sent.some(
+      (event) =>
+        event.type === 'response.item.create' &&
+        JSON.stringify(event).includes('Minuteur « pâtes » de 10 min lancé'),
     ),
   );
 });
