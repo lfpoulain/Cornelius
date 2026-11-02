@@ -22,6 +22,7 @@ import {
   type AlarmRequest,
 } from '../shared/alarms.js';
 import type { MirrorState } from '../shared/types.js';
+import { countdown } from '../web/components/AlarmBand.js';
 
 const paris = 'Europe/Paris';
 const minute = 60_000;
@@ -384,10 +385,13 @@ function mirror(
   active: string | null = people[0] ?? null,
 ) {
   return {
+    browserConnected: true,
+    privacyMode: false,
     profiles,
     activeProfile: profiles.find((profile) => profile.id === active) ?? null,
     presence: {
       health: 'ok',
+      state: people.length ? 'present' : 'absent',
       peopleCount: people.length,
       people: people.map((profileId, index) => ({ trackId: String(index), profileId })),
     },
@@ -402,7 +406,13 @@ test('miroir : ce qui sonne ; le texte d’un rappel personnel reste à son prop
     ask({ kind: 'reminder', label: 'Médicament', inMinutes: 1, profileId: sacha.id }),
   );
   f.alarms.create(ask({ time: '09:01', label: 'travail' }));
-  assert.deepEqual(f.alarms.mirrorView(mirror(profiles, [])), { ringing: [], sound: 'bips' });
+  assert.deepEqual(f.alarms.mirrorView(mirror(profiles, [])), {
+    ringing: [],
+    sound: 'bips',
+    timers: [],
+    nextAlarm: null,
+    today: [],
+  });
   f.advance(minute);
   const alone = f.alarms.mirrorView(mirror(profiles, [sacha.id]))!;
   assert.deepEqual(
@@ -473,4 +483,62 @@ test('annonces : ce qui sonne d’abord, puis les manqués, chacun dit une fois'
   assert.match(owner[0]!.content, /Rappel manqué de 09:01 pour Sacha .*"Médicament"/u);
   owner[0]!.acknowledge!();
   assert.deepEqual(tools.notices(mirror(profiles, [sacha.id])), []);
+});
+
+test('miroir : minuteurs, prochain réveil et pense-bêtes du jour, selon qui est devant', (t) => {
+  const f = fixture(t);
+  const sacha = f.profiles.create('Sacha');
+  const camille = f.profiles.create('Camille');
+  const profiles = [sacha, camille];
+  const pasta = f.alarms.create(ask({ kind: 'timer', durationMs: 10 * minute, label: 'pâtes' }));
+  f.alarms.create(ask({ time: '07:00', days: ALARM_WEEKDAYS, profileId: sacha.id }));
+  f.alarms.create(ask({ time: '06:30', profileId: camille.id }));
+  f.alarms.create(ask({ kind: 'reminder', label: 'Garage', time: '14:00', profileId: sacha.id }));
+  f.alarms.create(ask({ kind: 'reminder', label: 'Poubelles', time: '20:00' }));
+  f.alarms.create(ask({ kind: 'reminder', label: 'Dentiste', time: '10:00', date: '2026-11-04' }));
+
+  // Personne devant le miroir : rien de permanent.
+  const empty = f.alarms.mirrorView(mirror(profiles, []))!;
+  assert.deepEqual([empty.timers, empty.nextAlarm, empty.today], [[], null, []]);
+
+  const view = f.alarms.mirrorView(mirror(profiles, [sacha.id]))!;
+  assert.deepEqual(view.timers, [{ id: pasta.id, label: 'pâtes', endsAt: start + 10 * minute }]);
+  assert.deepEqual(view.nextAlarm && { time: view.nextAlarm.time, day: view.nextAlarm.day }, {
+    time: '07:00',
+    day: 'demain',
+  });
+  assert.deepEqual(
+    view.today.map((reminder) => `${reminder.time} ${reminder.text}`),
+    ['14:00 Garage', '20:00 Poubelles'],
+  );
+  // Camille voit son réveil de 6 h 30, et les rappels du foyer seulement.
+  const other = f.alarms.mirrorView(mirror(profiles, [camille.id]))!;
+  assert.equal(other.nextAlarm?.time, '06:30');
+  assert.deepEqual(
+    other.today.map((reminder) => reminder.text),
+    ['Poubelles'],
+  );
+  // Un visiteur : le minuteur et les rappels du foyer.
+  const visitor = f.alarms.mirrorView(mirror(profiles, [null]))!;
+  assert.equal(visitor.nextAlarm, null);
+  assert.equal(visitor.timers.length, 1);
+});
+
+test('minuit : l’affichage change de jour sans autre écriture', (t) => {
+  const f = fixture(t);
+  f.alarms.tick();
+  const before = f.changes;
+  f.set(Date.parse('2026-11-02T22:59:00Z'));
+  f.alarms.tick();
+  assert.equal(f.changes, before);
+  f.set(Date.parse('2026-11-02T23:00:00Z'));
+  f.alarms.tick();
+  assert.equal(f.changes, before + 1);
+});
+
+test('compte à rebours du miroir', () => {
+  assert.equal(countdown(9 * 60_000 + 5_000), '9:05');
+  assert.equal(countdown(3_600_000 + 2 * 60_000 + 30_000), '1:02:30');
+  assert.equal(countdown(400), '0:01');
+  assert.equal(countdown(-5_000), '0:00');
 });

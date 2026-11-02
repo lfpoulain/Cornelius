@@ -191,6 +191,18 @@ body {
   color: #f0e2c4;
 }
 
+/* Minuteurs, réveil et rappels (AlarmBand), puis les informations permanentes. */
+.mirror-top-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mirror-gap);
+}
+.mirror-top-info:empty {
+  display: none;
+}
+
 /*
  * Informations permanentes : typographie sur le reflet, sans surface de carte. Un quart plus
  * petites que le reste du miroir sur grand écran (1920 x 1080 et au-delà), jamais sous la taille

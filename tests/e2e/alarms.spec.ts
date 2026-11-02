@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { StateEvent } from '../../shared/types';
 import { origin, screenshots } from './env';
 
 test('un minuteur créé dans l’administration sonne sur le miroir puis s’arrête', async ({
@@ -39,5 +40,65 @@ test('un minuteur créé dans l’administration sonne sur le miroir puis s’ar
   } finally {
     await page.request.delete(`/api/admin/alarms/${timer.id}`, { headers: { origin } });
   }
+  expect(errors).toEqual([]);
+});
+
+test('bandeau : compte à rebours, prochain réveil et pense-bêtes du jour', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const sacha = { id: 'sacha-alarms', name: 'Sacha', createdAt: 1 };
+  const initial = (await (await page.request.get('/api/state')).json()) as StateEvent;
+  const now = Date.now();
+  const snapshot: StateEvent = {
+    ...initial,
+    bootId: 'alarms-browser-fixture',
+    sequence: 1,
+    sentAt: now,
+    state: {
+      ...initial.state,
+      openaiBlocked: true,
+      browserConnected: true,
+      activeProfile: sacha,
+      selection: 'automatic',
+      profiles: [sacha],
+      presence: {
+        state: 'present',
+        health: 'ok',
+        peopleCount: 1,
+        engagementId: null,
+        observedAt: now,
+        people: [{ trackId: 'one', profileId: sacha.id, engaged: false }],
+      },
+      ambientDisplays: [],
+      cards: [],
+      alarms: {
+        ringing: [],
+        sound: 'bips',
+        timers: [{ id: 'pates', label: 'pâtes', endsAt: now + 9 * 60_000 + 30_000 }],
+        nextAlarm: {
+          id: 'reveil',
+          at: now + 20 * 3_600_000,
+          time: '07:00',
+          day: 'demain',
+          label: null,
+        },
+        today: [{ id: 'garage', at: now + 3_600_000, time: '14:00', text: 'Appeler le garage' }],
+      },
+    },
+  };
+  await page.route('**/api/state', (route) => route.fulfill({ json: snapshot }));
+  await page.routeWebSocket('**/events?role=kiosk', (route) => {
+    route.send(JSON.stringify(snapshot));
+  });
+  await page.goto('/');
+  const band = page.getByRole('complementary', { name: 'Minuteurs, réveil et rappels' });
+  await expect(band).toContainText('Minuteur · pâtes');
+  await expect(band.locator('time')).toHaveText(/^9:(2\d|30)$/u);
+  const first = await band.locator('time').textContent();
+  await expect(band.locator('time')).not.toHaveText(first!, { timeout: 3_000 });
+  await expect(band).toContainText('07:00');
+  await expect(band).toContainText('demain');
+  await expect(band).toContainText('Appeler le garage');
+  await page.screenshot({ path: `${screenshots}/alarmes-bandeau.png` });
   expect(errors).toEqual([]);
 });

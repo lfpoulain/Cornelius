@@ -16,6 +16,7 @@ import {
   ALARM_KIND_LABELS,
 } from '../shared/alarms.js';
 import type { MirrorState } from '../shared/types.js';
+import { ambientProfile } from '../shared/ambient.js';
 import type { AlarmChange, AlarmsRepository } from './alarms-store.js';
 import type { DiagnosticLog } from './logs.js';
 
@@ -147,6 +148,17 @@ export function formatNow(at: number, timeZone: string): string {
   return formatter.format(at);
 }
 
+const weekdayFormatters = new Map<string, Intl.DateTimeFormat>();
+/** « lundi », dans le fuseau du foyer. */
+export function formatWeekday(at: number, timeZone: string): string {
+  let formatter = weekdayFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('fr-FR', { timeZone, weekday: 'long' });
+    weekdayFormatters.set(timeZone, formatter);
+  }
+  return formatter.format(at);
+}
+
 const clockFormatters = new Map<string, Intl.DateTimeFormat>();
 /** « 07:00 », dans le fuseau du foyer. */
 export function formatClock(at: number, timeZone: string): string {
@@ -204,6 +216,8 @@ export class Alarms {
   /** Prochain instant utile ; undefined : à relire dans la base. */
   private wake: number | null | undefined;
   private lastPurge = 0;
+  /** Jour local du dernier passage : à minuit, l'affichage change de jour. */
+  private day = '';
 
   constructor(
     private readonly store: AlarmsRepository,
@@ -401,7 +415,52 @@ export class Alarms {
         soft: alarm.kind === 'reminder',
       };
     });
-    return { ringing, sound: settings.sound };
+    // Informations permanentes : seulement devant le miroir, celles du foyer et de la personne.
+    const profile = ambientProfile(state);
+    const waiting =
+      profile === undefined
+        ? []
+        : this.store
+            .list()
+            .filter(
+              (alarm) =>
+                (alarm.state === 'scheduled' || alarm.state === 'snoozed') &&
+                alarm.nextAt !== null &&
+                (alarm.profileId === null || alarm.profileId === profile),
+            );
+    const now = this.now();
+    const date = today(now, this.timeZone);
+    const tomorrow = addDays(date, 1);
+    const sameDay = (at: number, day: LocalDate) => {
+      const local = localParts(at, this.timeZone);
+      return local.year === day.year && local.month === day.month && local.day === day.day;
+    };
+    const timers = waiting
+      .filter((alarm) => alarm.kind === 'timer')
+      .map((alarm) => ({ id: alarm.id, label: alarm.label || null, endsAt: alarm.nextAt! }));
+    const next = waiting.find((alarm) => alarm.kind === 'alarm');
+    const nextAlarm = next
+      ? {
+          id: next.id,
+          at: next.nextAt!,
+          time: formatClock(next.nextAt!, this.timeZone),
+          day: sameDay(next.nextAt!, date)
+            ? 'aujourd’hui'
+            : sameDay(next.nextAt!, tomorrow)
+              ? 'demain'
+              : formatWeekday(next.nextAt!, this.timeZone),
+          label: next.label || null,
+        }
+      : null;
+    const todayReminders = waiting
+      .filter((alarm) => alarm.kind === 'reminder' && sameDay(alarm.nextAt!, date))
+      .map((alarm) => ({
+        id: alarm.id,
+        at: alarm.nextAt!,
+        time: formatClock(alarm.nextAt!, this.timeZone),
+        text: alarm.label,
+      }));
+    return { ringing, sound: settings.sound, timers, nextAlarm, today: todayReminders };
   }
 
   /** Échéances manquées pas encore dites : celles du foyer, et celles de la personne. */
@@ -453,6 +512,13 @@ export class Alarms {
     if (now - this.lastPurge >= purgeIntervalMs) {
       this.lastPurge = now;
       if (this.store.purge(now - ALARM_RETENTION_MS)) this.changed();
+    }
+    const local = today(now, this.timeZone);
+    const day = `${local.year}-${local.month}-${local.day}`;
+    if (day !== this.day) {
+      const first = this.day === '';
+      this.day = day;
+      if (!first) this.changed();
     }
     const settings = this.store.settings();
     // Désactivé : rien ne sonne ; au retour, ce qui est trop en retard est noté manqué.

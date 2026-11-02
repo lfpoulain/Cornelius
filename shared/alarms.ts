@@ -93,10 +93,42 @@ export interface RingingAlarm {
   soft: boolean;
 }
 
-/** Part de l'état du miroir propre aux alarmes. */
+/** Un minuteur en cours, dont le miroir fait défiler le compte à rebours. */
+export interface MirrorTimer {
+  id: string;
+  label: string | null;
+  endsAt: number;
+}
+
+/** Le prochain réveil : « 07:00 », « demain ». */
+export interface MirrorNextAlarm {
+  id: string;
+  at: number;
+  time: string;
+  /** « aujourd'hui », « demain » ou le jour de la semaine. */
+  day: string;
+  label: string | null;
+}
+
+/** Un pense-bête du jour : son heure et son texte. */
+export interface MirrorReminder {
+  id: string;
+  at: number;
+  time: string;
+  text: string;
+}
+
+/**
+ * Part de l'état du miroir propre aux alarmes. Ce qui sonne s'affiche toujours ; les minuteurs,
+ * le prochain réveil et les pense-bêtes du jour suivent la présence comme les informations
+ * permanentes : rien sans personne devant le miroir, ceux du foyer et de la personne reconnue.
+ */
 export interface AlarmsMirrorState {
   ringing: RingingAlarm[];
   sound: AlarmSoundId;
+  timers: MirrorTimer[];
+  nextAlarm: MirrorNextAlarm | null;
+  today: MirrorReminder[];
 }
 
 export interface Alarm {

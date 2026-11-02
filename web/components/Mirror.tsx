@@ -7,6 +7,7 @@ import { BrowserCamera } from '../camera/BrowserCamera';
 import { Orb } from './Orb';
 import { AmbientModules } from './AmbientModules';
 import { AlarmRinging } from './AlarmRinging';
+import { AlarmBand } from './AlarmBand';
 import { Screensaver, type ScreensaverScene } from './Screensaver';
 import { screensaverWoken } from './screensaver-wake';
 import { useVoice } from '../audio/useVoice';
@@ -396,7 +397,13 @@ export function Mirror({ connection }: { connection: MirrorConnection }) {
             )}
           </p>
         </header>
-        {fresh && state && <AmbientModules state={state} now={now} />}
+        {fresh && state && (
+          // Minuteurs, réveil et rappels au-dessus des informations permanentes.
+          <div className="mirror-top-info">
+            <AlarmBand alarms={state.alarms} now={now} />
+            <AmbientModules state={state} now={now} />
+          </div>
+        )}
       </div>
 
       {/* Monté tant qu’il est activé ou encore visible : la sortie se joue jusqu’au bout. */}
