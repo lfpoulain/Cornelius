@@ -25,3 +25,5 @@ playwright-report/
 brag-output*/
 .pytest_cache/
 .venv-*/
+# Essais locaux, hors dépôt.
+experiments/
