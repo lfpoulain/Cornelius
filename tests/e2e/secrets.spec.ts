@@ -68,14 +68,23 @@ for (const width of [390, 1440]) {
     await memory.getByLabel('URL de base', { exact: true }).fill('http://127.0.0.1:11434/v1');
     await memory.getByLabel('Modèle mémoire', { exact: true }).fill('local-memory-model');
     await memory.getByLabel('Fournisseur mémoire', { exact: true }).selectOption('custom');
-    await memory.getByLabel('Secours mémoire', { exact: true }).selectOption('mistral');
+    const secours = memory.getByLabel('Secours mémoire', { exact: true });
+    // Un serveur local repart sans secours : les conversations ne sortent pas de la maison.
+    await expect(secours).toHaveValue('none');
+    await secours.selectOption('mistral');
     await memory.getByRole('button', { name: 'Enregistrer la configuration', exact: true }).click();
     await page.reload();
     await expect(memory.getByLabel('Modèle mémoire', { exact: true })).toHaveValue(
       'local-memory-model',
     );
     await expect(memory.getByLabel('Fournisseur mémoire', { exact: true })).toHaveValue('custom');
-    await expect(memory.getByLabel('Secours mémoire', { exact: true })).toHaveValue('mistral');
+    await expect(secours).toHaveValue('mistral');
+    await memory.getByLabel('Fournisseur mémoire', { exact: true }).selectOption('openai');
+    await expect(secours).toBeDisabled();
+    await memory.getByLabel('Fournisseur mémoire', { exact: true }).selectOption('custom');
+    await memory.getByRole('button', { name: 'Enregistrer la configuration', exact: true }).click();
+    await page.reload();
+    await expect(secours).toHaveValue('none');
     await memory.screenshot({ path: `.local/screenshots/pr12-memory-${width}.png` });
     await page.goto('/admin#modules');
     await page.locator('#module-weather > summary').click();

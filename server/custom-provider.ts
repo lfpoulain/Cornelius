@@ -4,11 +4,15 @@ import type { DatabaseSync } from 'node:sqlite';
 import schema from '../schemas/memory-changes.schema.json' with { type: 'json' };
 import {
   DEFAULT_CUSTOM_PROVIDER,
+  MEMORY_FALLBACKS,
+  MEMORY_PROVIDERS,
   type CustomProviderSettings,
   type CustomProviderView,
+  type MemoryFallback,
+  type MemoryProvider,
 } from '../shared/custom-provider.js';
 import { strictSchema } from './live/configuration.js';
-import { memoryExtractionInstructions } from './memory-extractor.js';
+import { memoryExtractionInstructions, memoryRequestTimeoutMs } from './memory-extractor.js';
 import type { MemoryExtractor } from './memory.js';
 
 export const customProviderMigration = `CREATE TABLE IF NOT EXISTS custom_provider_preferences (
@@ -16,8 +20,8 @@ export const customProviderMigration = `CREATE TABLE IF NOT EXISTS custom_provid
   name TEXT NOT NULL DEFAULT 'Fournisseur personnalisé',
   base_url TEXT NOT NULL DEFAULT '',
   memory_model TEXT NOT NULL DEFAULT '',
-  memory_provider TEXT NOT NULL DEFAULT 'openai',
-  memory_fallback TEXT NOT NULL DEFAULT 'openai'
+  memory_provider TEXT NOT NULL DEFAULT 'openai' CHECK (memory_provider IN ('openai', 'mistral', 'custom')),
+  memory_fallback TEXT NOT NULL DEFAULT 'openai' CHECK (memory_fallback IN ('openai', 'mistral', 'none'))
 ) STRICT;
 INSERT OR IGNORE INTO custom_provider_preferences (id, memory_provider) SELECT 1, provider FROM voice_provider_preferences;`;
 
@@ -33,11 +37,12 @@ export class CustomProviderRepository {
       name: String(row.name),
       baseUrl: String(row.base_url),
       memoryModel: String(row.memory_model),
-      memoryProvider:
-        row.memory_provider === 'custom' || row.memory_provider === 'mistral'
-          ? row.memory_provider
-          : 'openai',
-      memoryFallback: row.memory_fallback === 'mistral' ? 'mistral' : 'openai',
+      memoryProvider: MEMORY_PROVIDERS.includes(row.memory_provider as MemoryProvider)
+        ? (row.memory_provider as MemoryProvider)
+        : 'openai',
+      memoryFallback: MEMORY_FALLBACKS.includes(row.memory_fallback as MemoryFallback)
+        ? (row.memory_fallback as MemoryFallback)
+        : 'openai',
     };
   }
 
@@ -86,8 +91,15 @@ export function createCompatibleMemoryExtractor(
   baseURL: string,
   model: string,
   fetch?: typeof globalThis.fetch,
+  timeoutMs = memoryRequestTimeoutMs,
 ): MemoryExtractor {
-  const client = new OpenAI({ apiKey, baseURL, timeout: 15_000, maxRetries: 0, fetch });
+  const client = new OpenAI({
+    apiKey,
+    baseURL,
+    timeout: timeoutMs,
+    maxRetries: 0,
+    fetch,
+  });
   return async (input, signal) => {
     try {
       const response = await client.responses.create(

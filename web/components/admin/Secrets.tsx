@@ -1,6 +1,11 @@
 import { useCallback, useId, useState, type FormEvent } from 'react';
 import { Boxes, ExternalLink, KeyRound, Sparkles, type LucideIcon } from 'lucide-react';
-import type { CustomProviderSettings, CustomProviderView } from '../../../shared/custom-provider';
+import type {
+  CustomProviderSettings,
+  CustomProviderView,
+  MemoryProvider,
+} from '../../../shared/custom-provider';
+import { defaultMemoryFallback } from '../../../shared/custom-provider';
 import { NativeSelect, NativeSelectOption } from '../ui/native-select';
 import type { SecretView } from '../../../shared/types';
 import { api } from '../../api';
@@ -244,6 +249,9 @@ function CustomProviderFields({
   const [form, setForm] = useState<CustomProviderSettings>(initial);
   const field = (key: keyof CustomProviderSettings, value: string) =>
     setForm({ ...form, [key]: value });
+  // Un fournisseur personnalisé repart sans secours : rien ne sort de la maison sans choix assumé.
+  const chooseProvider = (memoryProvider: MemoryProvider) =>
+    setForm({ ...form, memoryProvider, memoryFallback: defaultMemoryFallback(memoryProvider) });
   const models = view.models;
   return (
     <section
@@ -313,7 +321,7 @@ function CustomProviderFields({
           <NativeSelect
             id="custom-memoryProvider"
             value={form.memoryProvider}
-            onChange={(event) => field('memoryProvider', event.target.value)}
+            onChange={(event) => chooseProvider(event.target.value as MemoryProvider)}
           >
             <NativeSelectOption value="openai">OpenAI</NativeSelectOption>
             <NativeSelectOption value="mistral">Mistral</NativeSelectOption>
@@ -325,16 +333,19 @@ function CustomProviderFields({
           <NativeSelect
             id="custom-memoryFallback"
             value={form.memoryFallback}
+            disabled={form.memoryProvider !== 'custom'}
             onChange={(event) => field('memoryFallback', event.target.value)}
           >
+            <NativeSelectOption value="none">Aucun</NativeSelectOption>
             <NativeSelectOption value="openai">OpenAI</NativeSelectOption>
             <NativeSelectOption value="mistral">Mistral</NativeSelectOption>
           </NativeSelect>
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Si le fournisseur personnalisé est indisponible, les données de cette extraction sont
-        envoyées au fournisseur de secours choisi, si sa clé est renseignée.
+        {form.memoryFallback === 'none'
+          ? 'Sans secours, une extraction qui échoue n’est envoyée à aucun autre service : elle reste marquée en échec.'
+          : 'Si le fournisseur personnalisé est indisponible, les données de cette extraction sont envoyées au fournisseur de secours choisi, si sa clé est renseignée.'}
       </p>
       <Button
         type="button"

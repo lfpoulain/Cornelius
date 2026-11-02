@@ -15,7 +15,7 @@ Le changement s’applique à la conversation suivante. Il est refusé pendant u
 
 - **Voix et écoute.** Voxtral transcrit et parle en français, avec la voix Marie. Le choix de la voix GPT-Live ne s’applique pas.
 - **Réponses et outils.** Mistral Small répond et appelle les mêmes outils que GPT-Live : modules, commandes, Home Assistant, agents Hermes, cartes, mémoire, e-mail. Ces outils restent exécutés par Cornelius, avec les mêmes autorisations et confirmations.
-- **Mémoire.** Après la conversation, l’extraction des souvenirs passe aussi par Mistral.
+- **Mémoire.** L’extraction des souvenirs garde le choix de Mistral après la conversation, mais ce choix devient indépendant : il se règle dans **Mise en route → Clés et jetons → Mémoire personnalisée**. Voir [La mémoire](memoire.md).
 - **Images.** La génération d’images « Avec OpenAI » garde la clé OpenAI.
 - **Recherche web.** Elle est faite par Mistral. Les sources s’affichent sur la carte quand Mistral les renvoie ; aucun lien n’est déduit du texte de sa réponse.
 - **Délégation.** La carte **Délégation : recherches et actions** disparaît : elle ne concerne que GPT-Live.

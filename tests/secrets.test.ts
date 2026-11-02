@@ -80,7 +80,7 @@ test('le fournisseur compatible se configure sans jamais renvoyer sa clé', asyn
   assert.deepEqual(saved.json().ready, { memory: true });
   assert.equal(saved.body.includes(key), false);
 
-  for (const memoryFallback of ['openai', 'mistral']) {
+  for (const memoryFallback of ['openai', 'mistral', 'none']) {
     const update = await f.app.inject({
       method: 'PATCH',
       url: '/api/admin/custom-provider',

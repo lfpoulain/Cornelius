@@ -8,7 +8,12 @@ import {
   customProviderMigration,
 } from '../server/custom-provider.js';
 import { openDatabase } from '../server/storage.js';
-import { DEFAULT_CUSTOM_PROVIDER, validCustomProviderSettings } from '../shared/custom-provider.js';
+import { memoryRequestTimeoutMs } from '../server/memory-extractor.js';
+import {
+  DEFAULT_CUSTOM_PROVIDER,
+  defaultMemoryFallback,
+  validCustomProviderSettings,
+} from '../shared/custom-provider.js';
 
 test('configuration personnalisée validée, persistée et expurgée', () => {
   const db = openDatabase(':memory:');
@@ -143,6 +148,67 @@ test('erreurs et sorties invalides déclenchent le secours, jamais une annulatio
     withMemoryFallback(failed, null)(input, new AbortController().signal),
     /unavailable/,
   );
+});
+
+test('le secours peut rester inactif, et le fournisseur personnalisé le choisit par défaut', () => {
+  const db = openDatabase(':memory:');
+  const repository = new CustomProviderRepository(db);
+  const settings = {
+    ...DEFAULT_CUSTOM_PROVIDER,
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    memoryModel: 'memory-model',
+    memoryProvider: 'custom' as const,
+    memoryFallback: 'none' as const,
+  };
+  assert.equal(validCustomProviderSettings(settings), true);
+  assert.equal(validCustomProviderSettings({ ...settings, memoryFallback: 'ailleurs' }), false);
+  repository.set(settings);
+  assert.equal(repository.get().memoryFallback, 'none');
+  assert.equal(defaultMemoryFallback('custom'), 'none');
+  assert.equal(defaultMemoryFallback('mistral'), 'openai');
+  db.close();
+});
+
+test('un fournisseur mémoire sans secours ne demande jamais un autre service', async () => {
+  const called: string[] = [];
+  const primary = createCompatibleMemoryExtractor(
+    'fixture-key',
+    'http://model.test/v1',
+    'local-model',
+    async (url) => {
+      called.push(String(url));
+      return Response.json({ error: { message: 'unavailable' } }, { status: 503 });
+    },
+  );
+  await assert.rejects(withMemoryFallback(primary, null)(input, new AbortController().signal));
+  assert.deepEqual(called, [
+    'http://model.test/v1/responses',
+    'http://model.test/v1/chat/completions',
+  ]);
+});
+
+test('le client compatible attend aussi longtemps que celui d’OpenAI avant de céder', async () => {
+  assert.ok(memoryRequestTimeoutMs >= 55_000);
+  const hanging = (_url: unknown, init?: RequestInit) =>
+    new Promise<Response>((_resolve, reject) =>
+      init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true }),
+    );
+  let fallbackCalls = 0;
+  const primary = createCompatibleMemoryExtractor(
+    'fixture-key',
+    'http://model.test/v1',
+    'local-model',
+    hanging as typeof globalThis.fetch,
+    25,
+  );
+  assert.deepEqual(
+    await withMemoryFallback(primary, async () => {
+      fallbackCalls++;
+      return proposal;
+    })(input, new AbortController().signal),
+    proposal,
+  );
+  assert.equal(fallbackCalls, 1);
 });
 
 test('la migration conserve le fournisseur mémoire des installations Mistral', () => {

@@ -1,4 +1,4 @@
-import { validCustomProviderSettings } from '../shared/custom-provider.js';
+import { validCustomProviderSettings, type MemoryFallback } from '../shared/custom-provider.js';
 import {
   CustomProviderRepository,
   createCompatibleMemoryExtractor,
@@ -315,7 +315,8 @@ export async function createApp(
           })
         : createLiveGateway(key, logs);
   };
-  const plainMemoryExtractor = (provider: 'openai' | 'mistral') => {
+  const plainMemoryExtractor = (provider: MemoryFallback) => {
+    if (provider === 'none') return null;
     const key = secretStore.get(provider === 'mistral' ? 'MISTRAL_API_KEY' : 'OPENAI_API_KEY');
     return !key
       ? null

@@ -64,7 +64,7 @@ La carte « Avant la première conversation » (« Tout est prêt » une fois fi
 8. **Mot de passe administrateur** : à changer dans la carte du même nom, plus bas, s’il vaut encore celui de départ.
 9. **Accès aux services IA** : bouton « Autoriser les services IA » s’il a été bloqué.
 
-La liste se met à jour d’elle-même. Sous elle : la carte **Clés et jetons** (clés OpenAI et Mistral, mot de passe SMTP et jetons des modules, pris en compte sans redémarrage), la carte **Voix de Cornelius**, la carte **Mot de passe administrateur** et la carte **Accès depuis le réseau local**. Le parcours complet est décrit dans [Premier démarrage](../installation/premier-demarrage.md).
+La liste se met à jour d’elle-même. Sous elle : la carte **Clés et jetons** (clés OpenAI, Mistral et mémoire personnalisée, mot de passe SMTP et jetons des modules, pris en compte sans redémarrage), la carte **Mémoire personnalisée**, la carte **Voix de Cornelius**, la carte **Mot de passe administrateur** et la carte **Accès depuis le réseau local**. Le parcours complet est décrit dans [Premier démarrage](../installation/premier-demarrage.md).
 
 Carte « Voix de Cornelius » :
 

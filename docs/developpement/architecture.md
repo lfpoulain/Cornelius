@@ -117,7 +117,9 @@ Une description vaut 10 s ; l’outil attend au plus 10 s une capture fraîche, 
 
 ## Mémoire
 
-Après une conversation, `server/memory.ts` assemble les paroles attribuables à une seule personne reconnue et `server/memory-extractor.ts` demande à un modèle séparé une proposition d’ajouts, de corrections et d’oublis (schéma `schemas/memory-changes.schema.json`). Le serveur vérifie le propriétaire, les preuves et la version, puis applique le lot une seule fois, dans une transaction (`server/memory-store.ts`). L’extraction est abandonnée après 60 s et n’est pas rejouée après un redémarrage. La restitution passe par l’outil `memory__recall`, jamais par un contexte préchargé. Les transcriptions ne sont pas écrites sur disque. Voir [Mémoire](../fonctionnalites/memoire.md).
+Après une conversation, `server/memory.ts` assemble les paroles attribuables à une seule personne reconnue et `server/memory-extractor.ts` demande à un modèle séparé une proposition d’ajouts, de corrections et d’oublis (schéma `schemas/memory-changes.schema.json`). Le serveur vérifie le propriétaire, les preuves et la version, puis applique le lot une seule fois, dans une transaction (`server/memory-store.ts`). L’extraction est abandonnée après 60 s et n’est pas rejouée après un redémarrage. La restitution passe par l’outil `memory__recall`, jamais par un contexte préchargé. Les transcriptions ne sont pas écrites sur disque.
+
+Le fournisseur de cette extraction se choisit séparément de celui de la conversation, dans la table `custom_provider_preferences` (`server/custom-provider.ts`, réglages partagés dans `shared/custom-provider.ts`). Un fournisseur personnalisé appelle l’API Responses, puis Chat Completions si le serveur ne la connaît pas, avec le même schéma et le même délai d’attente qu’OpenAI ; la proposition reste validée avant application. Le secours, lui aussi optionnel (« aucun » par défaut), n’est tenté que si la requête a échoué, jamais si la conversation a été annulée. Voir [Mémoire](../fonctionnalites/memoire.md#qui-lit-la-conversation).
 
 ## Modules
 
