@@ -3,7 +3,7 @@ import { existsSync, openSync } from 'node:fs';
 import { createServer } from 'node:https';
 import { dirname, join } from 'node:path';
 import { createApp } from './app.js';
-import { loadConfig } from './config.js';
+import { explicitlySupervised, loadConfig } from './config.js';
 import { announceSatellites } from './discovery.js';
 import {
   allowedHostname,
@@ -58,13 +58,14 @@ try {
     await Promise.race([app.close(), new Promise((resolve) => setTimeout(resolve, 4000))]);
   };
   /**
-   * Redémarrage demandé par l’administration. Sous systemd (Restart=always), il suffit de
-   * quitter. Sinon, une nouvelle instance est lancée avec les mêmes arguments, journaux dans
-   * data/run/logs comme avec les scripts, puis celle-ci s’arrête ; la nouvelle relit .env.
+   * Redémarrage demandé par l’administration. Sous un superviseur (systemd avec
+   * Restart=always, add-on Home Assistant), il suffit de quitter. Sinon, une nouvelle instance
+   * est lancée avec les mêmes arguments, journaux dans data/run/logs comme avec les scripts,
+   * puis celle-ci s’arrête ; la nouvelle relit .env.
    */
   const restart = async () => {
     await stop();
-    if (!process.env.INVOCATION_ID) {
+    if (!config.supervised) {
       const logs = join('data', 'run', 'logs');
       const output = (name: string) =>
         existsSync(logs) ? openSync(join(logs, `backend.${name}.log`), 'a') : 'ignore';
@@ -123,4 +124,7 @@ try {
 } catch (error) {
   console.error(error instanceof Error ? error.message : 'Démarrage impossible.');
   process.exitCode = 1;
+  // Un démarrage à moitié fait (port HTTPS déjà pris…) laisserait le serveur HTTP local en vie :
+  // sous l’add-on, le superviseur doit voir l’arrêt pour le signaler et relancer.
+  if (explicitlySupervised()) process.exit(1);
 }

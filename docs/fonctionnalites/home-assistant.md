@@ -4,7 +4,7 @@ Cornelius peut allumer et éteindre les lumières et les prises de la maison, et
 
 ## Ce que fait le connecteur
 
-Home Assistant est un logiciel de domotique installé à part. Cornelius s’y connecte directement : aucun module complémentaire, blueprint ni intégration n’est à installer dans Home Assistant.
+Home Assistant est un logiciel de domotique installé à part. Cornelius s’y connecte directement : aucun module complémentaire, blueprint ni intégration n’est à installer dans Home Assistant. Cornelius peut aussi tourner lui-même sur la box, comme add-on (voir [Installer dans Home Assistant](../installation/home-assistant.md)) : la connexion décrite ici reste la même.
 
 - **Lumières et prises** (`light.*` et `switch.*`) : allumer, éteindre, lire l’état, et régler la luminosité des lumières qui le permettent (de 1 à 100 %).
 - **Capteurs**, en lecture seule : capteurs et détecteurs, minuteries, dates et heures, nombres, interrupteurs virtuels, listes de choix, compteurs, thermostats, volets et serrures. Un capteur n’est jamais commandé : Cornelius peut dire si une serrure est fermée, pas l’ouvrir.
