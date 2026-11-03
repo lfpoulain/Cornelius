@@ -817,10 +817,30 @@ export class HomeAssistant {
   runManual(args: unknown, signal: AbortSignal): Promise<ToolResult> {
     return this.execute(args, signal, 'admin');
   }
+  /** Physical satellite gesture: no conversation or visual identity. The caller must
+   * resolve the authenticated satellite's configured room lights; normal selected-device
+   * and enabled checks remain enforced below. Never grant administrator privileges. */
+  runSatelliteGesture(args: unknown, signal: AbortSignal): Promise<ToolResult> {
+    if (
+      !validCommand(args) ||
+      !/^(light|switch)\.[a-z0-9_]+$/.test(args.entityId) ||
+      !['turn_on', 'turn_off'].includes(args.action) ||
+      args.brightnessPct !== null
+    )
+      return Promise.resolve(
+        tool(
+          'failed',
+          'Commande gestuelle limitée aux lampes configurées.',
+          null,
+          'invalid_params',
+        ),
+      );
+    return this.execute(args, signal, 'satellite');
+  }
   private async execute(
     args: unknown,
     signal: AbortSignal,
-    actor: 'luna' | 'admin',
+    actor: 'luna' | 'admin' | 'satellite',
   ): Promise<ToolResult> {
     if (!validCommand(args))
       return tool('failed', 'Commande Home Assistant invalide.', null, 'invalid_params');

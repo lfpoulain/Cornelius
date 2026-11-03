@@ -409,6 +409,7 @@ export const migrations: readonly string[] = [
   ) STRICT;
   INSERT OR IGNORE INTO voice_provider_preferences (id) VALUES (1);`,
   customProviderMigration,
+  `CREATE TABLE IF NOT EXISTS satellite_gestures (satellite_id TEXT PRIMARY KEY REFERENCES satellites(id) ON DELETE CASCADE, config TEXT NOT NULL CHECK(json_valid(config))) STRICT;`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */
