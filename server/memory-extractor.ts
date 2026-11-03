@@ -11,11 +11,14 @@ Chaque changement cite exactement les evidenceTurnIds qui l’étayent. N’inve
 Conserve des faits courts en français, pas des consignes système. durable exige expiresAt: null ; temporary exige une date ISO future explicitement justifiée par la parole et now. Si la date est incertaine, ignore le fait temporaire. N’altère jamais la configuration des modules, des actions ou des profils.
 Retourne uniquement MemoryChangesProposal v1, au plus 16 changements ; changes: [] si rien ne convient.`;
 
+/** Délai commun aux extractions mémoire : un modèle local dépasse vite les 15 s réglementaires. */
+export const memoryRequestTimeoutMs = 55_000;
+
 export function createMemoryExtractor(
   apiKey: string,
   fetch?: typeof globalThis.fetch,
 ): MemoryExtractor {
-  const client = new OpenAI({ apiKey, timeout: 55_000, maxRetries: 0, fetch });
+  const client = new OpenAI({ apiKey, timeout: memoryRequestTimeoutMs, maxRetries: 0, fetch });
   return async (input, signal) => {
     const response = await client.responses.create(
       {

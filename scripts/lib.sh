@@ -19,6 +19,15 @@ server_port() {
   echo "${port:-3000}"
 }
 
+# Port de l’interface de développement (Vite) : CORNELIUS_DEV_PORT de .env, sinon 5173.
+dev_port() {
+  local port=""
+  if [ -f "$ROOT/.env" ]; then
+    port="$(sed -n 's/^CORNELIUS_DEV_PORT=\([0-9][0-9]*\).*/\1/p' "$ROOT/.env" | tail -n 1)"
+  fi
+  echo "${port:-5173}"
+}
+
 # Nom de la carte donné par le device tree (« Raspberry Pi 5 Model B Rev 1.0 »), vide sur un PC.
 board_model() {
   if [ -r /proc/device-tree/model ]; then tr -d '\0' </proc/device-tree/model; fi

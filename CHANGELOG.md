@@ -1,6 +1,6 @@
 # Historique des changements
 
-Cette page retrace les grandes étapes de Cornelius, de la plus récente à la plus ancienne. Elle s’appuie sur l’historique Git et sur les notes datées des anciens documents. Aucune version n’est encore publiée : tout se trouve sous « Non publié ».
+Cette page retrace les grandes étapes de Cornelius, de la plus récente à la plus ancienne. Elle s’appuie sur l’historique Git et sur les notes datées des anciens documents. Chaque version publiée porte un tag Git (`v0.2.0`) et une release sur GitHub ; ce qui est fait depuis, sur la branche principale, se trouve sous « Non publié ».
 
 Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce qui reste à faire est dans la [feuille de route](docs/developpement/feuille-de-route.md).
 
@@ -11,6 +11,33 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 **Ajouté**
 
 - Source expérimentale Google Photos : lien d’album partagé, aperçu, actualisation réglable et retour aux images locales. Les images sont relayées depuis Google sans import sur disque, sans clé API ni connexion au compte. Le connecteur dépend du format non officiel de la page partagée et ne lit que sa page initiale (500 entrées au maximum). Voir [les réglages et limites](docs/fonctionnalites/google-photos.md).
+
+## 0.2.0 · 2026-11-02
+
+Première version publiée : tout ce qui suit, du premier dépôt Git à la mémoire sur un serveur compatible OpenAI. C’est la version que reprend l’application [Home Assistant](https://github.com/lfpoulain/cornelius-ha).
+
+### 2026-11-02 : mémoire sur un serveur compatible OpenAI
+
+**Ajouté**
+
+- Fournisseur de l’extraction mémoire au choix, dans **Mise en route → Clés et jetons → Mémoire personnalisée** : « OpenAI » (par défaut), « Mistral » ou un serveur compatible OpenAI de la maison, par exemple Ollama (contribution de thibautrey, #12). On y renseigne le nom, l’URL de base, la clé `CUSTOM_OPENAI_API_KEY` et le modèle, proposé par la détection des modèles ou choisi à la main. La demande passe par l’API Responses, puis par Chat Completions quand le serveur ne la connaît pas, et la réponse est vérifiée avec le schéma mémoire avant d’être appliquée. Le réglage de la voix et celui des images ne changent pas.
+- Secours mémoire au choix, quand le fournisseur personnalisé échoue : « Aucun » (par défaut avec ce fournisseur), « OpenAI » ou « Mistral ». Avec « Aucun », une extraction qui échoue n’est envoyée à aucun autre service.
+
+**Modifié**
+
+- L’extraction mémoire ne suit plus le fournisseur de la conversation : elle a son propre choix. Sans réglage, elle reste chez OpenAI, et une installation qui avait choisi Mistral comme voix garde Mistral pour la mémoire.
+
+### 2026-11-01 : add-on Home Assistant
+
+**Ajouté**
+
+- Cornelius tourne comme application (add-on) de Home Assistant OS, dans le dépôt séparé [cornelius-ha](https://github.com/lfpoulain/cornelius-ha), à ajouter à la boutique de Home Assistant : serveur et perception sur la box, miroir sur un autre appareil. Page [Installer dans Home Assistant](docs/installation/home-assistant.md).
+- `CORNELIUS_SUPERVISED=1` : sous un superviseur autre que systemd, un redémarrage demandé par l’administration quitte simplement au lieu de relancer le serveur en arrière-plan, et un démarrage incomplet (port HTTPS déjà pris) arrête le serveur pour que le superviseur le voie.
+- `CORNELIUS_TRUST_LOOPBACK=0` : une requête venue de `127.0.0.1` n’est plus traitée comme l’ordinateur du miroir (miroir sans autorisation, mot de passe par défaut accepté). L’add-on s’en sert, car sur le réseau de l’hôte la boucle locale est partagée avec Home Assistant et ses autres applications. Sans la variable, rien ne change.
+
+**Corrigé**
+
+- Sous Linux et macOS, l’annonce mDNS des satellites répond enfin aux recherches : la socket était liée à l’adresse de l’interface et ne recevait aucun paquet multicast, si bien qu’un satellite ne trouvait pas Cornelius seul. Windows n’est pas concerné et reste inchangé.
 
 ### 2026-10-29 : ARM64 et Raspberry Pi
 

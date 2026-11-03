@@ -15,7 +15,7 @@ for name in perception frontend backend; do
 done
 
 # Processus orphelins : ceux qui écoutent les ports, puis les workers Python.
-for port in 5173 "$(server_port)"; do
+for port in "$(dev_port)" "$(server_port)"; do
   owner="$(port_owner "$port")"
   if [ -n "$owner" ] && stop_pid "$owner"; then stopped+=("port $port (PID $owner)"); fi
 done

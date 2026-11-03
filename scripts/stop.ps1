@@ -20,7 +20,7 @@ foreach ($name in @('imageGeneration', 'perception', 'frontend', 'backend')) {
 }
 
 # Processus orphelins : ceux qui écoutent les ports, puis les workers de perception.
-foreach ($port in @(5173, (Get-CorneliusPort))) {
+foreach ($port in @((Get-CorneliusDevPort), (Get-CorneliusPort))) {
   $owner = Get-CorneliusPortOwner -Port $port
   if ($owner -gt 0 -and (Stop-CorneliusTree -ProcessId $owner)) {
     $stopped += "port $port (PID $owner)"

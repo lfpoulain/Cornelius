@@ -48,7 +48,7 @@ scripts/dev.sh
 powershell -ExecutionPolicy Bypass -File scripts\dev.ps1
 ```
 
-L’interface de développement est alors sur `http://127.0.0.1:5173` (miroir) et `http://127.0.0.1:5173/admin` (administration). Vite relaie `/api/`, `/events` et `/audio` vers le serveur, qui suit le `PORT` de `.env` (3000 par défaut). Arrêtez tout avec `scripts/stop.sh` ou `scripts\stop.ps1`.
+L’interface de développement est alors sur `http://127.0.0.1:5173` (miroir) et `http://127.0.0.1:5173/admin` (administration) ; si un autre projet occupe déjà ce port, choisissez-en un autre avec `CORNELIUS_DEV_PORT` dans `.env`. Vite relaie `/api/`, `/events` et `/audio` vers le serveur, qui suit le `PORT` de `.env` (3000 par défaut). Arrêtez tout avec `scripts/stop.sh` ou `scripts\stop.ps1`.
 
 Options : `--no-frontend`, `--no-perception` et `--timeout SECONDES` sous Linux ; `-NoFrontend`, `-NoPerception` et `-TimeoutSeconds` sous Windows.
 
@@ -69,7 +69,7 @@ Scripts npm (`package.json`) :
 | Commande | Effet |
 |---|---|
 | `npm start` | Lance le serveur (`server/index.ts`) avec `.env`, sur `127.0.0.1` et le `PORT` choisi. Sert l’interface compilée si `dist/web` existe. |
-| `npm run dev:web` | Lance Vite sur `127.0.0.1:5173`. |
+| `npm run dev:web` | Lance Vite sur `127.0.0.1:5173` (ou `CORNELIUS_DEV_PORT`). |
 | `npm run build` | Vérifie les types (`tsc --noEmit`) puis compile l’interface dans `dist/web`. |
 | `npm run check` | Vérifie les types seulement. |
 | `npm test` | Tests TypeScript (`tests/*.test.ts` et `addons/*/*.test.ts`). |

@@ -97,6 +97,17 @@ function Get-CorneliusPort {
   return 3000
 }
 
+# Port de l'interface de développement (Vite) : CORNELIUS_DEV_PORT dans .env, sinon 5173.
+function Get-CorneliusDevPort {
+  $envFile = Join-Path $Root '.env'
+  if (Test-Path -LiteralPath $envFile) {
+    foreach ($line in Get-Content -LiteralPath $envFile) {
+      if ($line -match '^\s*CORNELIUS_DEV_PORT\s*=\s*"?(\d+)"?\s*$') { return [int]$Matches[1] }
+    }
+  }
+  return 5173
+}
+
 function Resolve-CorneliusNode {
   $command = Get-Command 'node.exe' -ErrorAction SilentlyContinue
   if (-not $command) { $command = Get-Command 'node' -ErrorAction SilentlyContinue }

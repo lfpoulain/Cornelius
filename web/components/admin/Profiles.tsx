@@ -126,7 +126,7 @@ export function Profiles({
               />
               <span>
                 Laisser Cornelius retenir des souvenirs pour cette personne (extraits par le
-                fournisseur vocal choisi après la conversation)
+                fournisseur mémoire choisi après la conversation)
                 <span className="block text-xs text-muted-foreground">
                   Modifiable à tout moment dans la rubrique Mémoire.
                 </span>

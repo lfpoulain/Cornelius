@@ -130,6 +130,10 @@ Sans l’option `--systemd`, démarrez ensuite avec `scripts/start.sh`. Toutes l
 
 Il n’y a pas d’installateur : l’installation se fait en une dizaine de commandes PowerShell. Suivez [Installer sous Windows](docs/installation/windows.md).
 
+### 🏠 Home Assistant
+
+Avec Home Assistant OS, Cornelius peut tourner comme add-on sur la box, le miroir s’affichant sur un autre appareil. Ajoutez le dépôt [cornelius-ha](https://github.com/lfpoulain/cornelius-ha) à la boutique de Home Assistant, puis suivez [Installer dans Home Assistant](docs/installation/home-assistant.md).
+
 ### 🔑 Après l’installation
 
 Ouvrez l’administration et collez votre clé OpenAI dans **Mise en route → Clés et jetons** : elle compte tout de suite.
@@ -175,7 +179,7 @@ Toute la documentation part de [l’index](docs/README.md).
 
 | | |
 |---|---|
-| **Installer** | [Linux](docs/installation/linux.md) · [Raspberry Pi](docs/installation/raspberry-pi.md) · [Windows](docs/installation/windows.md) · [Carte graphique](docs/installation/gpu.md) |
+| **Installer** | [Linux](docs/installation/linux.md) · [Raspberry Pi](docs/installation/raspberry-pi.md) · [Windows](docs/installation/windows.md) · [Home Assistant](docs/installation/home-assistant.md) · [Carte graphique](docs/installation/gpu.md) |
 | **Utiliser** | [Le miroir](docs/utilisation/miroir.md) · [L’administration](docs/utilisation/administration.md) · [Dépannage](docs/utilisation/depannage.md) |
 | **Fonctionnalités** | [Ouverture et présence](docs/fonctionnalites/ouverture-et-presence.md) · [Mot d’appel](docs/fonctionnalites/mot-d-appel.md) · [Mémoire](docs/fonctionnalites/memoire.md) · [Home Assistant](docs/fonctionnalites/home-assistant.md) · [Agents Hermes](docs/fonctionnalites/agents-hermes.md) · [Vision locale](docs/fonctionnalites/vision-locale.md) · [Images](docs/fonctionnalites/generation-d-images.md) · [E-mail](docs/fonctionnalites/envoi-par-e-mail.md) |
 | **Modules** | [Les utiliser](docs/modules/README.md) · [Le contrat](docs/modules/reference.md) · [En créer un](https://github.com/lfpoulain/cornelius-modules/blob/main/docs/creer-un-module.md) (dépôt cornelius-modules) |

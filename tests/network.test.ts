@@ -298,3 +298,53 @@ test('réseau local : le miroir d’un autre appareil demande une autorisation, 
   });
   assert.equal(after.statusCode, 401);
 });
+
+test('boucle locale partagée : sans confiance, 127.0.0.1 s’autorise comme un appareil du réseau', async (t) => {
+  const app = await fixture(t, { trustLoopback: false });
+  const local = { headers: { host: '127.0.0.1:3000', origin: 'http://127.0.0.1:3000' } };
+  assert.equal((await app.inject({ url: '/api/health', ...local })).statusCode, 200);
+  const auth = await app.inject({ url: '/api/auth?role=kiosk', ...local });
+  assert.equal(auth.json().role, null);
+  const kiosk = auth.cookies.find((cookie) => cookie.name === 'cornelius_kiosk')!;
+  const kioskCookie = `${kiosk.name}=${kiosk.value}`;
+  const refused = await app.inject({
+    url: '/api/state',
+    headers: { ...local.headers, cookie: kioskCookie },
+  });
+  assert.equal(refused.statusCode, 401);
+  // La perception et le générateur d’images restent servis sur la boucle locale, avec leur jeton.
+  for (const [url, token] of [
+    ['/perception', 'p'.repeat(40)],
+    ['/image-generation', 'i'.repeat(40)],
+  ] as const) {
+    const response = await app.inject({
+      url,
+      headers: { ...local.headers, authorization: 'Bearer ' + token },
+    });
+    assert.notEqual(response.statusCode, 401, url);
+    assert.notEqual(response.statusCode, 403, url);
+  }
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/login',
+    headers: { ...local.headers, cookie: kioskCookie },
+    payload: { password: 'mot-de-passe-reseau' },
+  });
+  assert.equal(login.statusCode, 200);
+  const paired = await app.inject({
+    url: '/api/state',
+    headers: { ...local.headers, cookie: kioskCookie },
+  });
+  assert.equal(paired.statusCode, 200);
+});
+
+test('boucle locale partagée : le mot de passe par défaut y est refusé', async (t) => {
+  const app = await fixture(t, { adminPassword: 'cornelius', trustLoopback: false });
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/login',
+    headers: { host: '127.0.0.1:3000', origin: 'http://127.0.0.1:3000' },
+    payload: { password: 'cornelius' },
+  });
+  assert.equal(login.statusCode, 403);
+});

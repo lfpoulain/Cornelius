@@ -20,7 +20,17 @@ Avec « Cornelius » ouvert à tout le monde, personne n’est reconnu, sauf si 
 
 Pendant la conversation, le texte de ce que dit la personne reste en mémoire vive sur l’ordinateur. Il n’est jamais écrit sur le disque.
 
-Après la conversation, ce texte et les souvenirs actuels de la personne sont envoyés à OpenAI, qui propose quoi retenir, corriger ou oublier. La dernière phrase de Cornelius avant chaque réponse l’accompagne, pour comprendre une réponse courte. Cornelius vérifie ensuite que chaque proposition s’appuie bien sur des phrases de cette personne, puis l’enregistre. Le texte de la conversation est alors effacé : seul reste, pour chaque souvenir, le nombre de phrases à son origine.
+Après la conversation, ce texte et les souvenirs actuels de la personne sont envoyés au fournisseur mémoire choisi, qui propose quoi retenir, corriger ou oublier. La dernière phrase de Cornelius avant chaque réponse l’accompagne, pour comprendre une réponse courte. Cornelius vérifie ensuite que chaque proposition s’appuie bien sur des phrases de cette personne, puis l’enregistre. Le texte de la conversation est alors effacé : seul reste, pour chaque souvenir, le nombre de phrases à son origine.
+
+## Qui lit la conversation
+
+Le fournisseur mémoire se choisit dans **Mise en route → Clés et jetons → Mémoire personnalisée** : OpenAI (par défaut), Mistral, ou une API compatible OpenAI, par exemple un modèle installé sur une machine de la maison. On y renseigne l’URL de base, la clé `CUSTOM_OPENAI_API_KEY` et le modèle ; « Détecter les modèles » les liste depuis le serveur, ou le modèle se saisit à la main. Ce choix ne change ni le fournisseur de la conversation ni la génération d’images.
+
+Une proposition reçue est vérifiée avec le même schéma avant d’être appliquée, quel que soit le fournisseur.
+
+Le champ **Secours mémoire** décide où va l’extraction quand le serveur personnalisé ne répond pas : « Aucun » (par défaut avec ce fournisseur), OpenAI ou Mistral. Avec « Aucun », rien n’est envoyé ailleurs et la conversation concernée ne produit tout simplement aucun souvenir. Un serveur de la maison attend 55 secondes avant de céder, comme avec OpenAI.
+
+Comme avec les autres services, **Bloquer les services IA** arrête les extractions en cours et empêche les suivantes, y compris vers un serveur local.
 
 Ne sont pas retenus : les suppositions, les secrets et mots de passe, les questions, les citations, les faits sur d’autres personnes. Les paroles de Cornelius, ce que voit la caméra et les résultats des modules ne deviennent jamais des souvenirs. Une extraction ne modifie aucun autre réglage.
 

@@ -29,7 +29,8 @@ Ne publiez jamais ce fichier : il contient le mot de passe et les clés. Il est 
 | Variable | Défaut | Effet | Lue par |
 |---|---|---|---|
 | `OPENAI_API_KEY` | vide | Clé de l’API OpenAI, valeur de secours : une clé saisie dans **Mise en route → Clés et jetons** passe avant. Sans clé, aucune conversation ne s’ouvre et la mémoire ne retient rien. La rubrique **Mise en route** affiche alors l’étape **Clé OpenAI** à faire. Sert aussi aux images « Avec OpenAI ». | serveur |
-| `MISTRAL_API_KEY` | vide | Clé de l’API Mistral, avec l’accès Voice Agents, valeur de secours comme la clé OpenAI. Utilisée seulement quand **Mise en route → Voix de Cornelius → Fournisseur de la conversation** vaut « Mistral · Voxtral 3 » : conversation et mémoire. Voir [Le fournisseur vocal](../fonctionnalites/fournisseur-vocal.md). | serveur |
+| `MISTRAL_API_KEY` | vide | Clé de l’API Mistral, avec l’accès Voice Agents, valeur de secours comme la clé OpenAI. Sert à la conversation quand **Mise en route → Voix de Cornelius → Fournisseur de la conversation** vaut « Mistral · Voxtral 3 », et à la mémoire quand **Mise en route → Clés et jetons → Mémoire personnalisée** la règle sur Mistral. Voir [Le fournisseur vocal](../fonctionnalites/fournisseur-vocal.md). | serveur |
+| `CUSTOM_OPENAI_API_KEY` | vide | Clé du serveur compatible OpenAI chargé de l’extraction des souvenirs (une adresse tenue à la maison, par exemple Ollama), valeur de secours comme les deux autres. L’URL de base, le modèle et le fournisseur se règlent dans **Mise en route → Clés et jetons → Mémoire personnalisée**. Voir [La mémoire](../fonctionnalites/memoire.md#qui-lit-la-conversation). | serveur |
 | `CORNELIUS_ADMIN_PASSWORD` | `cornelius` (écrit par `npm run setup`) | Mot de passe de départ de l’administration, 4 caractères au moins. Un mot de passe choisi dans **Mise en route** ou avec `npm run password` le remplace (seule son empreinte est gardée en base). Le serveur refuse de démarrer sans lui. Tant qu’il vaut `cornelius`, la **Mise en route** demande de le changer. | serveur |
 | `CORNELIUS_LOGIN_RATE_LIMIT` | `10` | Nombre de tentatives de connexion à l’administration permises par minute. Entier de 1 ou plus. | serveur |
 
@@ -48,6 +49,7 @@ Voir [Accès depuis le réseau local](../utilisation/reseau-local.md).
 | Variable | Défaut | Effet | Lue par |
 |---|---|---|---|
 | `CORNELIUS_LAN` | `1` | `0`, `false`, `non` ou `no` : seul l’ordinateur lui-même ouvre le miroir et l’administration. Sinon, les appareils du réseau local y accèdent en HTTPS. | serveur |
+| `CORNELIUS_DEV_PORT` | `5173` | Port de l’interface de développement (Vite), de 1024 à 65535 et différent de `PORT`. Le serveur accepte cette origine. | serveur, Vite, scripts dev et stop |
 | `CORNELIUS_HTTPS_PORT` | `PORT` + 443 (`3443`) | Port HTTPS ouvert au réseau local, de 1024 à 65535 et différent de `PORT`. | serveur |
 | `CORNELIUS_TLS_CERT`, `CORNELIUS_TLS_KEY` | vides | Certificat et clé (fichiers PEM) à utiliser. Sans eux, Cornelius crée un certificat dans `data/tls` et le recrée quand l’adresse de la machine change, en gardant la même clé (celle que retiennent les satellites audio). | serveur |
 | `CORNELIUS_MDNS` | `1` | `0`, `false`, `non` ou `no` : Cornelius ne s’annonce plus sur le réseau local (mDNS, service `_cornelius._tcp`) ; les [satellites audio](../fonctionnalites/satellites.md) ont alors besoin d’une adresse fixe. | serveur |
@@ -115,6 +117,8 @@ Ces variables existent dans le code, mais ne se mettent pas dans `.env` en usage
 | `CORNELIUS_ORIGIN` | Adresse du serveur pour un générateur d’images lancé à la main. Le serveur passe déjà cette adresse au générateur qu’il lance. Défaut : `http://127.0.0.1:3000`. | générateur d’images |
 | `PYTHONUTF8` | Mis à `1` par le serveur pour les programmes Python qu’il lance, afin que leurs messages restent lisibles sous Windows. | Python |
 | `CORNELIUS_E2E_PORT` | Port du serveur lancé par les tests navigateur (`npm run test:e2e`). Défaut : `3101`. | `tests/e2e/env.ts`, `playwright.config.ts` |
+| `CORNELIUS_SUPERVISED` | `1`, `true`, `oui` ou `yes` : un superviseur relance le serveur quand il s’arrête. Un redémarrage demandé par l’administration se contente de quitter, et un démarrage incomplet (port HTTPS déjà pris) arrête le serveur au lieu de le laisser à moitié lancé. Mis par l’[add-on Home Assistant](../installation/home-assistant.md) ; sous systemd, `INVOCATION_ID` suffit. | serveur |
+| `CORNELIUS_TRUST_LOOPBACK` | `1` par défaut : une requête venue de `127.0.0.1` est celle de l’ordinateur du miroir, servie sans autorisation. `0`, `false`, `non` ou `no` : elle a les droits d’un appareil du réseau local (pages publiques, connexion, demande d’association d’un satellite ; le miroir et l’API demandent une autorisation par mot de passe). La perception et le générateur d’images restent réservés à la boucle locale, avec leur jeton. Mis à `0` par l’[add-on Home Assistant](../installation/home-assistant.md), dont la boucle locale est partagée avec Home Assistant et ses autres applications. | serveur |
 
 ## Les ports
 
@@ -122,7 +126,7 @@ Ces variables existent dans le code, mais ne se mettent pas dans `.env` en usage
 |---|---|---|
 | `3000` | Le serveur sur cet ordinateur : miroir (`/`), administration (`/admin`), API et liaison avec la perception. | `PORT` dans `.env` |
 | `3443` | Le même serveur en HTTPS, pour les autres appareils du réseau local. | `CORNELIUS_HTTPS_PORT` (désactivé par `CORNELIUS_LAN=0`) |
-| `5173` | L’interface en développement (Vite), avec rechargement à chaud. Lancée seulement par `scripts/dev.sh` ou `scripts\dev.ps1`. | fixe, dans `vite.config.ts` |
+| `5173` | L’interface en développement (Vite), avec rechargement à chaud. Lancée seulement par `scripts/dev.sh` ou `scripts\dev.ps1`. | `CORNELIUS_DEV_PORT` |
 | `3101` | Le serveur des tests navigateur. | `CORNELIUS_E2E_PORT` |
 | `5353` (UDP) | L’annonce mDNS de Cornelius, pour que les satellites audio le trouvent. | `CORNELIUS_MDNS` |
 

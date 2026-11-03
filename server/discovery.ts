@@ -9,6 +9,19 @@ export const SATELLITE_SERVICE_TYPE = 'cornelius';
 const REFRESH_MS = 30_000;
 
 /**
+ * Options de la socket mDNS d’une interface (transmises à multicast-dns, que le type de
+ * Bonjour ne déclare pas). Sans `bind`, la socket est liée à l’adresse de l’interface : sous
+ * Linux et macOS, elle ne reçoit alors aucun paquet multicast et ne répond jamais aux
+ * recherches des satellites. Windows reçoit dans les deux cas : son réglage ne change pas.
+ */
+export function mdnsSocketOptions(
+  address: string,
+  platform: NodeJS.Platform = process.platform,
+): { interface: string; bind?: string } {
+  return platform === 'win32' ? { interface: address } : { interface: address, bind: '0.0.0.0' };
+}
+
+/**
  * Annonce mDNS (`_cornelius._tcp`) du WebSocket des satellites, sur le port HTTPS du réseau
  * local. Une annonce par interface : sans cela, les réponses ne partent que par l’interface
  * par défaut (l’Ethernet, par exemple) et un satellite en Wi-Fi ne les entend pas. Le texte du
@@ -23,9 +36,8 @@ export function announceSatellites(options: {
 }): () => Promise<void> {
   let publishers = new Map<string, Bonjour>();
   const publish = (address: string) => {
-    // Options transmises à multicast-dns (son type ne les déclare pas) : l’interface d’écoute.
     const bonjour = new Bonjour(
-      { interface: address } as ConstructorParameters<typeof Bonjour>[0],
+      mdnsSocketOptions(address) as ConstructorParameters<typeof Bonjour>[0],
       (error: unknown) => options.onError?.(error),
     );
     bonjour.publish({

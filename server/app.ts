@@ -1,3 +1,9 @@
+import { validCustomProviderSettings, type MemoryFallback } from '../shared/custom-provider.js';
+import {
+  CustomProviderRepository,
+  createCompatibleMemoryExtractor,
+  withMemoryFallback,
+} from './custom-provider.js';
 import { isVoiceProvider } from '../shared/voice-provider.js';
 import { createVoiceGateway } from './voice/live-bridge.js';
 import { createMistralMemoryExtractor } from './voice/memory-extractor.js';
@@ -186,6 +192,7 @@ export async function createApp(
     logs.write('error', 'local', 'Ouverture de SQLite impossible', { error });
     throw error;
   }
+  const customProvider = new CustomProviderRepository(db);
   const profiles = new ProfileRepository(db);
   const trustedDevices = new TrustedDevices(db, now);
   const adminPassword = new AdminPassword(db, config.adminPassword, DEFAULT_ADMIN_PASSWORD, now);
@@ -197,6 +204,7 @@ export async function createApp(
   // Clés des fournisseurs et jetons des modules : administration prioritaire sur .env.
   const envSecrets: Record<string, string | undefined> = {
     OPENAI_API_KEY: config.openaiKey,
+    CUSTOM_OPENAI_API_KEY: process.env.CUSTOM_OPENAI_API_KEY,
     CORNELIUS_METEO_CONCEPT_TOKEN: config.meteoConceptToken,
     CORNELIUS_PRIM_API_KEY: config.primApiKey,
   };
@@ -207,6 +215,7 @@ export async function createApp(
   );
   for (const value of secretStore.values()) logs.addSecret(value);
   const openaiKey = () => secretStore.get('OPENAI_API_KEY');
+  const customKey = () => secretStore.get('CUSTOM_OPENAI_API_KEY');
   const eraser = new PersonalDataEraser(db, config.databasePath, logs);
   const preferences = new SessionPreferences(db);
   normalizeOpening(preferences);
@@ -224,6 +233,7 @@ export async function createApp(
   const reservedSecrets = new Set([
     'OPENAI_API_KEY',
     'MISTRAL_API_KEY',
+    'CUSTOM_OPENAI_API_KEY',
     'CORNELIUS_ADMIN_PASSWORD',
     'CORNELIUS_PERCEPTION_TOKEN',
     'CORNELIUS_IMAGE_GENERATION_TOKEN',
@@ -306,13 +316,25 @@ export async function createApp(
           })
         : createLiveGateway(key, logs);
   };
-  const voiceMemoryExtractor = () => {
-    const key = selectedVoiceKey();
+  const plainMemoryExtractor = (provider: MemoryFallback) => {
+    if (provider === 'none') return null;
+    const key = secretStore.get(provider === 'mistral' ? 'MISTRAL_API_KEY' : 'OPENAI_API_KEY');
     return !key
       ? null
-      : preferences.getVoiceProvider() === 'mistral'
+      : provider === 'mistral'
         ? createMistralMemoryExtractor(key)
         : createMemoryExtractor(key);
+  };
+  const configuredMemoryExtractor = () => {
+    const settings = customProvider.get();
+    if (settings.memoryProvider !== 'custom') return plainMemoryExtractor(settings.memoryProvider);
+    const fallback = plainMemoryExtractor(settings.memoryFallback);
+    const key = customKey();
+    if (!key || !settings.baseUrl || !settings.memoryModel) return fallback;
+    return withMemoryFallback(
+      createCompatibleMemoryExtractor(key, settings.baseUrl, settings.memoryModel),
+      fallback,
+    );
   };
   const makeImageCreator = options.openaiImageCreator ?? createOpenAIImageCreator;
   let openaiImageCreator = initialKey ? makeImageCreator(initialKey) : null;
@@ -383,7 +405,7 @@ export async function createApp(
   const memory = new PersonalMemory(
     new MemoryRepository(db, now),
     controller,
-    options.memoryExtractor ?? voiceMemoryExtractor(),
+    options.memoryExtractor ?? configuredMemoryExtractor(),
     now,
     logs,
   );
@@ -395,9 +417,11 @@ export async function createApp(
       openaiImageCreator = value ? makeImageCreator(value) : null;
       controller.setSetup({ openaiKey: !!value });
     }
+    if (name === 'CUSTOM_OPENAI_API_KEY' && !options.memoryExtractor)
+      memory.setExtractor(configuredMemoryExtractor());
     if (name === 'OPENAI_API_KEY' || name === 'MISTRAL_API_KEY') {
       live.setGateway(voiceGateway());
-      if (!options.memoryExtractor) memory.setExtractor(voiceMemoryExtractor());
+      if (!options.memoryExtractor) memory.setExtractor(configuredMemoryExtractor());
       controller.setSetup({
         mistralKey: !!secretStore.get('MISTRAL_API_KEY'),
         voiceKey: !!selectedVoiceKey(),
@@ -607,12 +631,20 @@ export async function createApp(
   };
 
   /**
-   * La requête vient de l'ordinateur lui-même. Une requête sans socket ne vient pas du réseau :
+   * La requête vient de la boucle locale. Une requête sans socket ne vient pas du réseau :
    * elle est injectée dans le processus (tests, WebSocket simulés).
    */
-  function fromMachine(request: FastifyRequest): boolean {
+  function fromLoopback(request: FastifyRequest): boolean {
     const socket = request.raw.socket as { remoteAddress?: string } | undefined;
     return !socket || isLoopback(socket.remoteAddress);
+  }
+  /**
+   * La requête vient de l'ordinateur du miroir, qui n'a besoin d'aucune autorisation. Sans
+   * confiance dans la boucle locale (CORNELIUS_TRUST_LOOPBACK=0), elle est traitée comme un
+   * appareil du réseau local.
+   */
+  function fromMachine(request: FastifyRequest): boolean {
+    return config.trustLoopback !== false && fromLoopback(request);
   }
   const lanPairingMessage =
     'Appareil non autorisé : connectez-vous une fois avec le mot de passe administrateur pour en faire un miroir.';
@@ -644,14 +676,14 @@ export async function createApp(
     // Clients : la machine elle-même, et le réseau local quand il est ouvert. Une adresse
     // publique (port redirigé par un routeur) est toujours refusée.
     const lan = config.lan === true;
-    if (!fromMachine(request) && !(lan && isPrivateAddress(request.raw.socket?.remoteAddress)))
+    if (!fromLoopback(request) && !(lan && isPrivateAddress(request.raw.socket?.remoteAddress)))
       return reply.code(403).send({ error: 'Accès réservé au réseau local.' });
     if (!allowedHostname(request.hostname, lan, config.allowedHosts ?? []))
       return reply.code(403).send({ error: 'Hôte non autorisé.' });
     // La perception et le générateur d'images tournent sur la machine : jamais par le réseau.
     if (
       (request.url.startsWith('/perception') || request.url.startsWith('/image-generation')) &&
-      !fromMachine(request)
+      !fromLoopback(request)
     )
       return reply.code(403).send({ error: 'Réservé à cet ordinateur.' });
     // Le miroir n'a pas de mot de passe sur la machine. Depuis un autre appareil, ses données
@@ -1027,6 +1059,14 @@ export async function createApp(
         note: 'Accès Voice Agents nécessaire',
       },
       {
+        ...describe('CUSTOM_OPENAI_API_KEY'),
+        group: 'providers' as const,
+        label: 'Clé mémoire personnalisée',
+        usedBy: 'Extraction de la mémoire personnelle',
+        url: null,
+        note: 'API compatible OpenAI',
+      },
+      {
         ...describe(MAIL_PASSWORD_SECRET),
         group: 'providers' as const,
         label: 'Mot de passe SMTP',
@@ -1047,6 +1087,30 @@ export async function createApp(
       })),
     ];
   }
+  app.get('/api/admin/custom-provider', { preHandler: requireAdmin }, async () =>
+    customProvider.view(!!customKey()),
+  );
+  app.patch('/api/admin/custom-provider', { preHandler: requireAdmin }, async (request, reply) => {
+    if (!validCustomProviderSettings(request.body))
+      return reply.code(400).send({ error: 'Configuration du fournisseur invalide.' });
+    customProvider.set(request.body);
+    if (!options.memoryExtractor) memory.setExtractor(configuredMemoryExtractor());
+    return customProvider.view(!!customKey());
+  });
+  app.post(
+    '/api/admin/custom-provider/models',
+    { preHandler: requireAdmin },
+    async (_request, reply) => {
+      const key = customKey();
+      if (!key) return reply.code(400).send({ error: 'Ajoutez d’abord la clé personnalisée.' });
+      try {
+        await customProvider.discover(key);
+        return customProvider.view(true);
+      } catch {
+        return reply.code(502).send({ error: 'Impossible de lire les modèles du fournisseur.' });
+      }
+    },
+  );
   const knownSecret = (env: string) => secretViews().some((secret) => secret.env === env);
   app.get('/api/admin/secrets', { preHandler: requireAdmin }, async () => ({
     secrets: secretViews(),
@@ -1386,7 +1450,6 @@ export async function createApp(
         });
       controller.setVoiceProvider(provider);
       live.setGateway(voiceGateway());
-      if (!options.memoryExtractor) memory.setExtractor(voiceMemoryExtractor());
       controller.setSetup({ voiceKey: !!selectedVoiceKey() });
       broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
       return controller.snapshot();

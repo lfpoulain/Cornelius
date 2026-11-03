@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Développement : serveur, interface Vite (port 5173, rechargement à chaud) et perception locale.
+# Développement : serveur, interface Vite (port 5173 ou CORNELIUS_DEV_PORT, rechargement à chaud) et perception locale.
 # Usage : scripts/dev.sh [--no-frontend] [--no-perception] [--timeout SECONDES]
 # Arrêt : scripts/stop.sh. Production (interface compilée, sans Vite) : scripts/start.sh.
 set -euo pipefail
@@ -29,15 +29,16 @@ cd "$ROOT"
 check_prerequisites
 sync_dependencies
 port="$(server_port)"
+web_port="$(dev_port)"
 
 # --- Serveur (Fastify, port de .env) -------------------------------------------------
 launch_server "$port"
 
-# --- Interface de développement (Vite, port 5173) ------------------------------------
+# --- Interface de développement (Vite, port CORNELIUS_DEV_PORT) ----------------------
 if [ "$frontend" = 1 ]; then
-  owner="$(port_owner 5173)"
+  owner="$(port_owner "$web_port")"
   if pid_alive "$owner"; then
-    echo "Interface Vite déjà active sur le port 5173 (PID $owner)."
+    echo "Interface Vite déjà active sur le port $web_port (PID $owner)."
   else
     start_service frontend node node_modules/vite/bin/vite.js --host 127.0.0.1
   fi
@@ -50,8 +51,8 @@ echo
 status=0
 wait_server "$port" "$timeout" || status=1
 if [ "$frontend" = 1 ]; then
-  if wait_http "http://127.0.0.1:5173/" "$timeout"; then
-    echo "Interface prête : http://127.0.0.1:5173"
+  if wait_http "http://127.0.0.1:$web_port/" "$timeout"; then
+    echo "Interface prête : http://127.0.0.1:$web_port"
   else
     echo "Interface non confirmée après $timeout s." >&2
     show_log_tail frontend

@@ -35,10 +35,30 @@ export interface AppConfig {
   tlsKeyFingerprint?: string;
   /** Machine détectée ; absente (tests), elle compte comme un PC sans restriction. */
   machine?: MachineStatus;
+  /**
+   * Un superviseur relance le serveur quand il s’arrête : systemd (INVOCATION_ID) ou
+   * CORNELIUS_SUPERVISED=1 (add-on Home Assistant). Un redémarrage n’a alors qu’à quitter.
+   */
+  supervised?: boolean;
+  /**
+   * Un appel venu de 127.0.0.1 compte comme l’ordinateur du miroir (miroir sans autorisation,
+   * mot de passe par défaut accepté) ; vrai par défaut. CORNELIUS_TRUST_LOOPBACK=0 quand la
+   * boucle locale est partagée avec d’autres programmes (add-on Home Assistant sur le réseau de
+   * l’hôte) : 127.0.0.1 a alors les droits d’un appareil du réseau local, et la perception et le
+   * générateur d’images y restent servis, avec leur jeton.
+   */
+  trustLoopback?: boolean;
 }
 
 /** Mot de passe écrit par `npm run setup` et `.env.example`, à changer après l’installation. */
 export const DEFAULT_ADMIN_PASSWORD = 'cornelius';
+
+/** CORNELIUS_SUPERVISED=1 : un superviseur autre que systemd (add-on Home Assistant) relance le serveur. */
+export function explicitlySupervised(env: NodeJS.ProcessEnv = process.env): boolean {
+  return ['1', 'true', 'oui', 'yes'].includes(
+    (env.CORNELIUS_SUPERVISED ?? '').trim().toLowerCase(),
+  );
+}
 
 export function loadConfig(): AppConfig & { port: number } {
   const adminPassword = process.env.CORNELIUS_ADMIN_PASSWORD ?? '';
@@ -55,6 +75,9 @@ export function loadConfig(): AppConfig & { port: number } {
   const httpsPort = Number(process.env.CORNELIUS_HTTPS_PORT ?? port + 443);
   if (!Number.isInteger(httpsPort) || httpsPort < 1024 || httpsPort > 65535 || httpsPort === port)
     throw new Error('CORNELIUS_HTTPS_PORT invalide.');
+  const devPort = Number(process.env.CORNELIUS_DEV_PORT ?? 5173);
+  if (!Number.isInteger(devPort) || devPort < 1024 || devPort > 65535 || devPort === port)
+    throw new Error('CORNELIUS_DEV_PORT invalide.');
   return {
     port,
     loginRateLimit,
@@ -81,6 +104,10 @@ export function loadConfig(): AppConfig & { port: number } {
     modulesDir: externalAddonsRoot(),
     timeZone: process.env.CORNELIUS_TIMEZONE?.trim() || undefined,
     machine: detectMachine(),
+    supervised: Boolean(process.env.INVOCATION_ID) || explicitlySupervised(),
+    trustLoopback: !['0', 'false', 'non', 'no'].includes(
+      (process.env.CORNELIUS_TRUST_LOOPBACK ?? '1').trim().toLowerCase(),
+    ),
     adminPassword,
     databasePath:
       process.env.CORNELIUS_DATABASE === ':memory:'
@@ -89,8 +116,8 @@ export function loadConfig(): AppConfig & { port: number } {
     origins: [
       `http://127.0.0.1:${port}`,
       `http://localhost:${port}`,
-      'http://127.0.0.1:5173',
-      'http://localhost:5173',
+      `http://127.0.0.1:${devPort}`,
+      `http://localhost:${devPort}`,
     ],
     secureCookies: false,
     staticRoot: resolve('dist/web'),

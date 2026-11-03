@@ -7,7 +7,11 @@ import {
   parseAlbum,
   googlePhotosMigration,
 } from '../server/google-photos.js';
-import { openDatabase } from '../server/storage.js';
+import { openDatabase, migrations } from '../server/storage.js';
+import { DatabaseSync } from 'node:sqlite';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { DEFAULT_GOOGLE_PHOTOS, isGooglePhotosSettings } from '../shared/google-photos.js';
 
 // Données synthétiques : aucune URL d'album, photo ou identifiant personnel réel.
@@ -422,3 +426,53 @@ test('huit téléchargements distincts au maximum, sans bloquer les doublons ni 
   finishes[8]!(new Response('photo'));
   assert.ok(await retry);
 });
+
+for (const previous of ['official', 'experimental-google-photos'] as const) {
+  test(`migration depuis ${previous} : les deux fournisseurs restent disponibles sans perte de réglages`, () => {
+    const directory = mkdtempSync(join(tmpdir(), 'cornelius-google-upgrade-'));
+    const filename = join(directory, 'database.sqlite');
+    let db: DatabaseSync | undefined;
+    try {
+      db = new DatabaseSync(filename);
+      for (const migration of migrations.slice(0, -2)) db.exec(migration);
+      if (previous === 'official') {
+        db.exec(migrations[migrations.length - 2]!);
+        db.prepare(
+          'UPDATE custom_provider_preferences SET name = ?, memory_provider = ? WHERE id = 1',
+        ).run('Serveur de test', 'custom');
+      } else {
+        db.exec(googlePhotosMigration);
+        db.prepare(
+          'UPDATE screensaver_google_photos SET source = ?, album_url = ?, refresh_minutes = ? WHERE id = 1',
+        ).run('google-photos', short, 15);
+      }
+      db.exec(`PRAGMA user_version = ${migrations.length - 1}`);
+      db.close();
+      db = undefined;
+      db = openDatabase(filename);
+      assert.equal(db.prepare('PRAGMA user_version').get()!.user_version, migrations.length);
+      const provider = db
+        .prepare('SELECT name, memory_provider FROM custom_provider_preferences WHERE id = 1')
+        .get()!;
+      const gallery = db
+        .prepare(
+          'SELECT source, album_url, refresh_minutes FROM screensaver_google_photos WHERE id = 1',
+        )
+        .get()!;
+      if (previous === 'official') {
+        assert.equal(provider.name, 'Serveur de test');
+        assert.equal(provider.memory_provider, 'custom');
+        assert.equal(gallery.source, 'local');
+      } else {
+        assert.equal(provider.memory_provider, 'openai');
+        assert.equal(gallery.source, 'google-photos');
+        assert.equal(gallery.album_url, short);
+        assert.equal(gallery.refresh_minutes, 15);
+      }
+      assert.equal(db.prepare('PRAGMA integrity_check').get()!.integrity_check, 'ok');
+    } finally {
+      db?.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
