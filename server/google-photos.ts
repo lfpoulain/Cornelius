@@ -17,6 +17,14 @@ INSERT OR IGNORE INTO screensaver_google_photos (id) VALUES (1);`;
 
 const MAX_PAGE_BYTES = 12 * 1024 * 1024;
 const MAX_IMAGES = 500;
+const IMAGE_CACHE_BYTES = 32 * 1024 * 1024;
+const IMAGE_CACHE_MS = 5 * 60000;
+
+class AlbumRequestError extends Error {
+  constructor(readonly transient: boolean) {
+    super(unavailable);
+  }
+}
 const unavailable =
   'Album inaccessible ou format Google Photos non reconnu. Vérifiez le partage par lien, puis réessayez.';
 
@@ -129,7 +137,7 @@ export function parseAlbum(html: string): AlbumPhoto[] {
 
 async function boundedBody(response: Response, limit: number): Promise<Uint8Array> {
   const reader = response.body?.getReader();
-  if (!reader) throw new Error('Réponse vide.');
+  if (!reader) throw new AlbumRequestError(false);
   const chunks: Uint8Array[] = [];
   let size = 0;
   try {
@@ -137,7 +145,7 @@ async function boundedBody(response: Response, limit: number): Promise<Uint8Arra
       const { done, value } = await reader.read();
       if (done) break;
       size += value.length;
-      if (size > limit) throw new Error('Réponse trop volumineuse.');
+      if (size > limit) throw new AlbumRequestError(false);
       chunks.push(value);
     }
     return Buffer.concat(chunks, size);
@@ -154,6 +162,9 @@ export class GooglePhotosAlbum {
   private generation = 0;
   private activeImages = 0;
   private disposed = false;
+  private retrySoon = false;
+  private imageCache = new Map<string, { bytes: Uint8Array; expires: number }>();
+  private imageRequests = new Map<string, Promise<Uint8Array | null>>();
   private listeners = new Set<() => void>();
   private timer?: ReturnType<typeof setInterval>;
   private abort = new AbortController();
@@ -188,7 +199,10 @@ export class GooglePhotosAlbum {
     if (this.timer || this.disposed) return;
     void this.refresh();
     this.timer = setInterval(() => {
-      if (this.now() - (this.checked ?? 0) >= this.settings().refreshMinutes * 60000)
+      if (
+        this.now() - (this.checked ?? 0) >=
+        (this.retrySoon ? 60000 : this.settings().refreshMinutes * 60000)
+      )
         void this.refresh();
     }, 60000);
     this.timer.unref();
@@ -209,6 +223,9 @@ export class GooglePhotosAlbum {
     this.generation++;
     this.pending = null;
     this.photos = [];
+    this.imageCache.clear();
+    this.imageRequests.clear();
+    this.retrySoon = false;
     this.checked = null;
     this.error = null;
     this.db
@@ -252,27 +269,34 @@ export class GooglePhotosAlbum {
   private async get(url: string, kind: 'album' | 'photo'): Promise<Response> {
     const signal = AbortSignal.any([this.abort.signal, AbortSignal.timeout(15000)]);
     for (let hop = 0; hop < 5; hop++) {
-      if (!(kind === 'album' ? albumUrl(url) : photoUrl(url))) throw new Error(unavailable);
-      const response = await this.fetcher(url, {
-        redirect: 'manual',
-        credentials: 'omit',
-        signal,
-        headers: { 'User-Agent': 'Cornelius (https://github.com/lfpoulain/Cornelius)' },
-      });
+      if (!(kind === 'album' ? albumUrl(url) : photoUrl(url))) throw new AlbumRequestError(false);
+      let response: Response;
+      try {
+        response = await this.fetcher(url, {
+          redirect: 'manual',
+          credentials: 'omit',
+          signal,
+          headers: { 'User-Agent': 'Cornelius (https://github.com/lfpoulain/Cornelius)' },
+        });
+      } catch {
+        throw new AlbumRequestError(true);
+      }
       if ([301, 302, 303, 307, 308].includes(response.status)) {
         await response.body?.cancel();
         const target = response.headers.get('location');
-        if (!target) throw new Error(unavailable);
+        if (!target) throw new AlbumRequestError(false);
         url = new URL(target, url).href;
         continue;
       }
       if (!response.ok) {
         await response.body?.cancel();
-        throw new Error(unavailable);
+        throw new AlbumRequestError(
+          response.status === 408 || response.status === 429 || response.status >= 500,
+        );
       }
       return response;
     }
-    throw new Error(unavailable);
+    throw new AlbumRequestError(false);
   }
 
   refresh(): Promise<void> {
@@ -287,15 +311,24 @@ export class GooglePhotosAlbum {
         const response = await this.get(url, 'album');
         const html = new TextDecoder().decode(await boundedBody(response, MAX_PAGE_BYTES));
         const photos = parseAlbum(html);
-        if (!photos.length) throw new Error(unavailable);
+        if (!photos.length) throw new AlbumRequestError(false);
         if (generation !== this.generation || this.disposed) return;
         this.photos = photos;
+        const urls = new Set(photos.map((photo) => photo.url));
+        for (const url of this.imageCache.keys()) if (!urls.has(url)) this.imageCache.delete(url);
+        this.retrySoon = false;
         this.error = null;
-      } catch {
+      } catch (error) {
         if (generation !== this.generation || this.disposed) return;
-        // Ne garde pas les photos d'un album dont le partage a pu être révoqué.
-        this.photos = [];
-        this.error = unavailable;
+        // Une coupure pendant la lecture du corps est également passagère.
+        this.retrySoon = error instanceof AlbumRequestError ? error.transient : true;
+        if (!this.retrySoon) {
+          this.photos = [];
+          this.imageCache.clear();
+        }
+        this.error = this.retrySoon
+          ? 'Google Photos temporairement indisponible. Nouvelle tentative dans environ une minute.'
+          : unavailable;
       } finally {
         if (generation === this.generation && !this.disposed) {
           this.checked = this.now();
@@ -310,33 +343,60 @@ export class GooglePhotosAlbum {
   }
 
   async image(id: string): Promise<Uint8Array | null> {
-    if (this.disposed || this.settings().source !== 'google-photos' || this.activeImages >= 8)
-      return null;
+    if (this.disposed || this.settings().source !== 'google-photos') return null;
     const generation = this.generation;
     const photo = this.photos.find(
       (entry) => createHash('sha256').update(entry.id).digest('hex') === id,
     );
     if (!photo) return null;
-    this.activeImages++;
-    try {
-      // Dimensions plafonnées pour le miroir ; aucune image écrite sur disque.
-      const response = await this.get(photo.url + '=w2560-h2560', 'photo');
-      const bytes = await boundedBody(response, SCREENSAVER_IMAGE_MAX_BYTES);
-      return generation === this.generation &&
-        !this.disposed &&
-        this.photos.some((entry) => entry.id === photo.id && entry.url === photo.url)
-        ? bytes
-        : null;
-    } catch {
-      return null;
-    } finally {
-      this.activeImages--;
+    for (const [url, cached] of this.imageCache)
+      if (cached.expires <= this.now()) this.imageCache.delete(url);
+    const cached = this.imageCache.get(photo.url);
+    if (cached) {
+      // LRU : les images les plus récemment utilisées sont conservées en priorité.
+      this.imageCache.delete(photo.url);
+      this.imageCache.set(photo.url, cached);
+      return cached.bytes;
     }
+    const pending = this.imageRequests.get(photo.url);
+    if (pending) return pending;
+    if (this.activeImages >= 8) return null;
+    this.activeImages++;
+    const task = (async () => {
+      try {
+        const response = await this.get(photo.url + '=w2560-h2560', 'photo');
+        const bytes = await boundedBody(response, SCREENSAVER_IMAGE_MAX_BYTES);
+        if (
+          generation !== this.generation ||
+          this.disposed ||
+          !this.photos.some((entry) => entry.id === photo.id && entry.url === photo.url)
+        )
+          return null;
+        let size = bytes.byteLength;
+        for (const entry of this.imageCache.values()) size += entry.bytes.byteLength;
+        for (const [url, entry] of this.imageCache) {
+          if (size <= IMAGE_CACHE_BYTES) break;
+          size -= entry.bytes.byteLength;
+          this.imageCache.delete(url);
+        }
+        this.imageCache.set(photo.url, { bytes, expires: this.now() + IMAGE_CACHE_MS });
+        return bytes;
+      } catch {
+        return null;
+      } finally {
+        this.activeImages--;
+        if (generation === this.generation) this.imageRequests.delete(photo.url);
+      }
+    })();
+    this.imageRequests.set(photo.url, task);
+    return task;
   }
 
   async dispose() {
     this.disposed = true;
     this.abort.abort();
+    this.imageCache.clear();
+    this.imageRequests.clear();
     if (this.timer) clearInterval(this.timer);
     await this.pending;
     this.listeners.clear();

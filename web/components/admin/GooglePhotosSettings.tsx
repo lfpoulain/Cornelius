@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { ImageOff } from 'lucide-react';
+import type { ScreensaverImage } from '../../../shared/screensaver';
 import {
   DEFAULT_GOOGLE_PHOTOS,
   type GooglePhotosSettings as Settings,
@@ -14,6 +16,38 @@ import { ResourceState, SaveBar } from './shared';
 import { useAdminResource } from './useAdminResource';
 import type { RunAction } from './types';
 import { plural } from './format';
+
+function MissingPreview({ label, description }: { label: string; description: string }) {
+  return (
+    <div
+      role="img"
+      aria-label={label}
+      className="flex aspect-video min-h-40 w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/40 p-4 text-center text-muted-foreground"
+    >
+      <ImageOff aria-hidden="true" className="size-8 shrink-0 opacity-60" />
+      <span className="text-sm font-medium">{label}</span>
+      <span className="text-xs">{description}</span>
+    </div>
+  );
+}
+
+function AlbumPreview({ image }: { image: ScreensaverImage }) {
+  const [failed, setFailed] = useState(false);
+  return failed ? (
+    <MissingPreview
+      label="Aperçu indisponible"
+      description={`${image.title} · Réessayé à la prochaine vérification.`}
+    />
+  ) : (
+    <img
+      src={image.url}
+      alt={image.title}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="aspect-video w-full rounded-lg bg-black object-contain"
+    />
+  );
+}
 
 export function GooglePhotosSettings({ run }: { run: RunAction }) {
   const load = useCallback(() => api.googlePhotos(), []);
@@ -194,6 +228,12 @@ export function GooglePhotosSettings({ run }: { run: RunAction }) {
                         ? 'Lecture de l’album…'
                         : plural(view.count, 'photo disponible', 'photos disponibles') + '.')}
                   </p>
+                  {view.error && view.count > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      La liste des photos est conservée ({plural(view.count, 'photo', 'photos')}).
+                      Seules les images encore en cache peuvent être affichées pendant la coupure.
+                    </p>
+                  )}
                   {view.lastCheckedAt !== null && (
                     <p className="text-xs text-muted-foreground">
                       Dernière vérification : {new Date(view.lastCheckedAt).toLocaleString('fr-FR')}
@@ -205,23 +245,32 @@ export function GooglePhotosSettings({ run }: { run: RunAction }) {
               <p className="text-xs text-muted-foreground">
                 Seules les photos présentes dans la page initiale sont accessibles, dans la limite
                 de 500. Les grands albums peuvent être incomplets. L’actualisation manuelle est
-                limitée à une fois par minute. En cas d’erreur, l’album est retiré du diaporama
-                jusqu’à une vérification réussie. Les images locales restent conservées pour pouvoir
-                revenir à cette source.
+                limitée à une fois par minute. Lors d’une panne temporaire, la liste des photos est
+                conservée et une nouvelle tentative est faite après environ une minute. L’album et
+                son cache ne sont retirés qu’en cas d’erreur définitive : album supprimé ou vide,
+                partage refusé ou format non reconnu. Les images locales restent conservées pour
+                pouvoir revenir à cette source.
               </p>
+              {view.source === 'google-photos' && view.images.length === 0 && (
+                <div className="max-w-sm">
+                  <MissingPreview
+                    label={view.refreshing ? 'Chargement de l’album…' : 'Aucune photo disponible'}
+                    description={
+                      view.error
+                        ? 'Vérifiez la connexion et le partage de l’album, puis actualisez.'
+                        : 'Les aperçus apparaîtront après une lecture réussie de l’album.'
+                    }
+                  />
+                </div>
+              )}
               {view.images.length > 0 && (
                 <ul
                   aria-label="Aperçu de l’album"
                   className="grid grid-cols-2 gap-3 sm:grid-cols-4"
                 >
                   {view.images.map((image) => (
-                    <li key={image.id}>
-                      <img
-                        src={image.url}
-                        alt={image.title}
-                        loading="lazy"
-                        className="aspect-video w-full rounded-lg bg-black object-contain"
-                      />
+                    <li key={`${image.id}:${image.url}:${view.lastCheckedAt}`}>
+                      <AlbumPreview image={image} />
                     </li>
                   ))}
                 </ul>

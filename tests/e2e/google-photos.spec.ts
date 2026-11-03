@@ -107,3 +107,85 @@ test('album partagé : choix de source, validation, aperçu, actualisation et an
   await save.click();
   await expect(page.getByRole('list', { name: 'Aperçu de l’album' })).toHaveCount(0);
 });
+
+for (const unavailableAlbum of [false, true]) {
+  test(`album partagé : ${unavailableAlbum ? 'galerie absente' : 'photos en erreur'} puis retour des aperçus`, async ({
+    page,
+  }) => {
+    let restored = false;
+    const photo = {
+      id: 'missing-photo',
+      url: '/test-missing-google-photo.png',
+      title: 'Photo 1',
+      credit: '',
+      origin: 'google-photos' as const,
+      width: 1,
+      height: 1,
+    };
+    const view = (): GooglePhotosView => ({
+      source: 'google-photos',
+      albumUrl: 'https://photos.app.goo.gl/synthetic-album',
+      refreshMinutes: 30,
+      count: unavailableAlbum && !restored ? 0 : 1,
+      images: unavailableAlbum && !restored ? [] : [photo],
+      refreshing: false,
+      lastCheckedAt: restored ? 200000 : 100000,
+      error: restored
+        ? null
+        : 'Google Photos temporairement indisponible. Nouvelle tentative dans environ une minute.',
+    });
+    await page.route('**/api/admin/screensaver/google-photos', (route) =>
+      route.fulfill({ json: view() }),
+    );
+    await page.route('**/api/admin/screensaver/google-photos/refresh', (route) => {
+      restored = true;
+      return route.fulfill({ json: view() });
+    });
+    await page.route('**/test-missing-google-photo.png', (route) =>
+      restored
+        ? route.fulfill({
+            contentType: 'image/png',
+            body: Buffer.from(
+              'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=',
+              'base64',
+            ),
+          })
+        : route.fulfill({ status: 404 }),
+    );
+    await page.goto('/admin');
+    await page
+      .getByLabel('Mot de passe administrateur')
+      .fill('admin-browser-test-only-credentials-1234');
+    await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+    await page.getByRole('button', { name: 'Écran de veille', exact: true }).click();
+    const placeholder = page.getByRole('img', {
+      name: unavailableAlbum ? 'Aucune photo disponible' : 'Aperçu indisponible',
+      exact: true,
+    });
+    await expect(placeholder).toBeVisible();
+    await expect(
+      page.getByText(/L’album et son cache ne sont retirés qu’en cas d’erreur définitive/u),
+    ).toBeVisible();
+    if (!unavailableAlbum)
+      await expect(page.getByText(/La liste des photos est conservée/u)).toBeVisible();
+    await page.screenshot({
+      path: `${screenshots}/google-photos-${unavailableAlbum ? 'empty' : 'missing'}.png`,
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(placeholder).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true,
+    );
+    await page.screenshot({
+      path: `${screenshots}/google-photos-${unavailableAlbum ? 'empty' : 'missing'}-mobile.png`,
+      fullPage: true,
+    });
+    await page.getByRole('button', { name: 'Actualiser maintenant' }).click();
+    await expect(placeholder).toHaveCount(0);
+    const preview = page
+      .getByRole('list', { name: 'Aperçu de l’album' })
+      .getByRole('img', { name: 'Photo 1' });
+    await expect(preview).toHaveJSProperty('naturalWidth', 1);
+  });
+}

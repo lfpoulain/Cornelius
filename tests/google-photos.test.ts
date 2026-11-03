@@ -241,3 +241,184 @@ test('actualisation périodique, reprise au démarrage et arrêt du minuteur', a
   assert.equal(restarted.list().length, 1);
   await restarted.dispose();
 });
+
+for (const failure of ['network', 'body', 408, 429, 500, 503] as const) {
+  test(`erreur passagère ${failure} : liste conservée et reprise après une minute`, async (t) => {
+    t.mock.timers.enable({ apis: ['setInterval'] });
+    let time = 100000,
+      calls = 0,
+      failing = false;
+    const { album } = fixture(
+      t,
+      async () => {
+        calls++;
+        if (!failing) return new Response(page());
+        if (failure === 'network') throw new TypeError('offline');
+        if (failure === 'body')
+          return new Response(
+            new ReadableStream({
+              start(controller) {
+                controller.error(new TypeError('connection reset'));
+              },
+            }),
+          );
+        return new Response(null, { status: failure });
+      },
+      () => time,
+    );
+    album.configure({ ...config, refreshMinutes: 30 });
+    album.start();
+    await album.refresh();
+    const revision = album.revision();
+    failing = true;
+    time += 30 * 60000;
+    t.mock.timers.tick(60000);
+    await album.refresh();
+    assert.equal(calls, 2);
+    assert.equal(album.list().length, 1);
+    assert.equal(album.revision(), revision);
+    assert.match(album.view().error!, /minute/u);
+    await album.refresh();
+    assert.equal(calls, 2);
+    failing = false;
+    time += 60000;
+    t.mock.timers.tick(60000);
+    await album.refresh();
+    assert.equal(calls, 3);
+    assert.equal(album.view().error, null);
+    time += 60000;
+    t.mock.timers.tick(60000);
+    assert.equal(calls, 3);
+  });
+}
+
+for (const status of [403, 404, 410, 'empty', 'format'] as const) {
+  test(`album retiré ou invalide ${status} : liste et cache retirés`, async (t) => {
+    let time = 100000,
+      removed = false,
+      downloads = 0;
+    const { album } = fixture(
+      t,
+      async (input) => {
+        if (String(input) !== short) {
+          downloads++;
+          return new Response('photo');
+        }
+        if (!removed) return new Response(page());
+        return typeof status === 'number'
+          ? new Response(null, { status })
+          : new Response(status === 'empty' ? page([]) : '<html>consent</html>');
+      },
+      () => time,
+    );
+    album.configure(config);
+    await album.refresh();
+    const id = album.list()[0]!.id;
+    assert.ok(await album.image(id));
+    removed = true;
+    time += 60000;
+    await album.refresh();
+    assert.equal(album.list().length, 0);
+    assert.equal(await album.image(id), null);
+    removed = false;
+    time += 60000;
+    await album.refresh();
+    assert.ok(await album.image(id));
+    assert.equal(downloads, 2);
+  });
+}
+
+test('cache en mémoire : téléchargements regroupés, expiration et changement de source', async (t) => {
+  let time = 100000,
+    downloads = 0;
+  let finish!: (response: Response) => void;
+  const { album } = fixture(
+    t,
+    async (input) => {
+      if (String(input) === short) return new Response(page());
+      downloads++;
+      return new Promise<Response>((resolve) => {
+        finish = resolve;
+      });
+    },
+    () => time,
+  );
+  album.configure(config);
+  await album.refresh();
+  const id = album.list()[0]!.id;
+  const requests = Array.from({ length: 12 }, () => album.image(id));
+  assert.equal(downloads, 1);
+  finish(new Response('photo'));
+  assert.ok((await Promise.all(requests)).every(Boolean));
+  assert.ok(await album.image(id));
+  assert.equal(downloads, 1);
+  time += 5 * 60000;
+  const expired = album.image(id);
+  assert.equal(downloads, 2);
+  album.configure(DEFAULT_GOOGLE_PHOTOS);
+  finish(new Response('old-photo'));
+  assert.equal(await expired, null);
+  album.configure(config);
+  await album.refresh();
+  const fresh = album.image(id);
+  assert.equal(downloads, 3);
+  finish(new Response('new-photo'));
+  assert.equal(Buffer.from((await fresh)!).toString(), 'new-photo');
+});
+
+test('cache borné à 32 Mio : éviction LRU et invalidation après suppression ou changement URL', async (t) => {
+  let time = 100000,
+    downloads = 0;
+  let urls = Array.from({ length: 6 }, (_, i) => `${image}-${i}`);
+  const { album } = fixture(
+    t,
+    async (input) => {
+      if (String(input) === short)
+        return new Response(
+          `<script>AF_initDataCallback({data:${JSON.stringify(urls.map((url, i) => [`photo-${i}`, [url, 100, 100]]))}});</script>`,
+        );
+      downloads++;
+      return new Response(new Uint8Array(8 * 1024 * 1024));
+    },
+    () => time,
+  );
+  album.configure(config);
+  await album.refresh();
+  const ids = album.list().map((photo) => photo.id);
+  for (const id of ids.slice(0, 4)) assert.ok(await album.image(id));
+  assert.ok(await album.image(ids[0]!)); // 0 devient le plus récent.
+  assert.ok(await album.image(ids[4]!)); // 1 est évincé.
+  assert.equal(downloads, 5);
+  assert.ok(await album.image(ids[0]!));
+  assert.equal(downloads, 5);
+  assert.ok(await album.image(ids[1]!));
+  assert.equal(downloads, 6);
+  urls = [urls[0]! + '-changed'];
+  time += 60000;
+  await album.refresh();
+  assert.equal(await album.image(ids[1]!), null);
+  assert.ok(await album.image(ids[0]!));
+  assert.equal(downloads, 7);
+});
+
+test('huit téléchargements distincts au maximum, sans bloquer les doublons ni les reprises', async (t) => {
+  const finishes: ((response: Response) => void)[] = [];
+  const html = `<script>AF_initDataCallback({data:${JSON.stringify(Array.from({ length: 9 }, (_, i) => [`photo-${i}`, [`${image}-${i}`, 100, 100]]))}});</script>`;
+  const { album } = fixture(t, async (input) => {
+    if (String(input) === short) return new Response(html);
+    return new Promise<Response>((resolve) => finishes.push(resolve));
+  });
+  album.configure(config);
+  await album.refresh();
+  const ids = album.list().map((photo) => photo.id);
+  const requests = ids.slice(0, 8).map((id) => album.image(id));
+  const duplicate = album.image(ids[0]!);
+  assert.equal(finishes.length, 8);
+  assert.equal(await album.image(ids[8]!), null);
+  for (const finish of finishes) finish(new Response('photo'));
+  assert.ok((await Promise.all([...requests, duplicate])).every(Boolean));
+  const retry = album.image(ids[8]!);
+  assert.equal(finishes.length, 9);
+  finishes[8]!(new Response('photo'));
+  assert.ok(await retry);
+});

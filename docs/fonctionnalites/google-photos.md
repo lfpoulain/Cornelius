@@ -48,18 +48,29 @@ et le [parcours Ambient API](https://developers.google.com/photos/ambient/guides
 
 ## Affichage et limites
 
-- Les photos sont demandées à Google au moment de l’affichage, par le serveur Cornelius.
-  Ce relais permet les transitions WebGL existantes sans ouvrir le navigateur à des domaines tiers.
+- Les photos sont demandées à Google par le serveur Cornelius. Un cache uniquement en mémoire
+  conserve les images téléchargées pendant 5 minutes au maximum, dans une limite de 32 Mio.
+  Les demandes simultanées de la même photo partagent un téléchargement ; jusqu’à 8 photos
+  distinctes peuvent être téléchargées à la fois. Une photo indisponible (y compris une réponse
+  404 lors d’une saturation) est sautée au profit de la suivante, avec ou sans WebGL.
+  Ce relais permet les transitions existantes sans ouvrir le navigateur à des domaines tiers.
 - Aucun fichier photo Google n’est ajouté à `data/screensaver/`. Le serveur garde seulement
-  la liste en mémoire et relaie les images en mémoire, avec une taille demandée de 2560 × 2560
+  la liste et le cache en mémoire, avec une taille demandée de 2560 × 2560
   au maximum. Le navigateur garde nécessairement l’image affichée en mémoire.
 - Seule la page initiale de l’album est lue, avec un maximum de 500 entrées. Les grands albums
   peuvent être incomplets : la pagination interne de Google n’est pas prise en charge.
 - Les vidéos ne sont pas lues. Une vignette peut apparaître si Google la présente comme une image.
-- Les photos demandent une connexion Internet. Un album vide, un partage révoqué, une page de
-  consentement ou une modification du format produit un message d’erreur. La liste distante est
-  alors vidée jusqu’à une lecture réussie ; une image déjà chargée dans le navigateur peut rester
-  visible pendant la transition de sortie. Il n’y a pas de retour automatique vers les images locales.
+- En cas de coupure réseau, de délai dépassé ou de réponse HTTP 408, 429 ou 5xx, la dernière
+  liste connue est conservée. L’administration signale l’erreur et une nouvelle tentative est faite
+  après environ une minute, puis le rythme configuré reprend après une lecture réussie.
+  Le cache ne garantit pas un diaporama complet hors connexion : seules les images encore en
+  cache peuvent être servies, et les autres sont sautées.
+- Un album vide, un partage refusé ou supprimé (notamment HTTP 403, 404 ou 410), une page de
+  consentement ou un format non reconnu produit une erreur et retire la liste et le cache.
+  Les suppressions et changements d’adresse de photo invalident aussi les entrées concernées
+  après une actualisation réussie. Un changement de source ou de lien vide le cache.
+  Une image déjà chargée dans le navigateur peut rester visible pendant la transition de sortie.
+  Il n’y a pas de retour automatique vers les images locales.
 - Le serveur ne détecte pas immédiatement une suppression ou la révocation du partage :
   cette détection dépend de l’actualisation. Il ne peut pas effacer une image déjà reçue par un appareil.
 
