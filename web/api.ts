@@ -1,3 +1,4 @@
+import type { GooglePhotosSettings, GooglePhotosView } from '../shared/google-photos';
 import type { CustomProviderSettings, CustomProviderView } from '../shared/custom-provider';
 import type { Opening } from '../shared/opening';
 import type {
@@ -282,6 +283,14 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ scale }),
     }),
+  googlePhotos: () => request<GooglePhotosView>('/api/admin/screensaver/google-photos'),
+  saveGooglePhotos: (settings: GooglePhotosSettings) =>
+    request<GooglePhotosView>('/api/admin/screensaver/google-photos', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
+  refreshGooglePhotos: () =>
+    post<GooglePhotosView>('/api/admin/screensaver/google-photos/refresh', {}),
   screensaverImages: () => request<{ images: ScreensaverImage[] }>('/api/screensaver'),
   screensaver: () => request<ScreensaverView>('/api/admin/screensaver'),
   screensaverSettings: (settings: ScreensaverSettings) =>

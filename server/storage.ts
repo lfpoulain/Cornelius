@@ -1,3 +1,4 @@
+import { googlePhotosMigration } from './google-photos.js';
 import { customProviderMigration } from './custom-provider.js';
 import { isVoiceProvider, type VoiceProvider } from '../shared/voice-provider.js';
 import { ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
@@ -409,6 +410,10 @@ export const migrations: readonly string[] = [
   ) STRICT;
   INSERT OR IGNORE INTO voice_provider_preferences (id) VALUES (1);`,
   customProviderMigration,
+  // L'ancienne PR Google Photos utilisait le même numéro que customProviderMigration.
+  // Les deux migrations sont rejouables : assurer les deux tables préserve aussi ces bases.
+  `${customProviderMigration}
+${googlePhotosMigration}`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */

@@ -111,7 +111,7 @@ export interface ScreensaverImage {
   title: string;
   /** Artiste et date pour une peinture de la collection ; vide pour une photo envoyée. */
   credit: string;
-  origin: 'upload' | 'collection';
+  origin: 'upload' | 'collection' | 'google-photos';
   /** Dimensions affichées (rotation des photos comprise) ; null si l’en-tête est illisible. */
   width: number | null;
   height: number | null;

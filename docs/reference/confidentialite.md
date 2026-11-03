@@ -57,7 +57,7 @@ Les conversations sont ouvertes avec l’option `store: false` d’OpenAI, qui d
 - **Les agents** (Hermes) reçoivent la demande confiée par la personne reconnue, à l’adresse de votre agent.
 - **Les e-mails** (**Modules → E-mail**) partent par le serveur de messagerie réglé (Gmail, iCloud, votre fournisseur…), vers les seuls destinataires de la liste, avec l’image demandée en pièce jointe ou le court message dicté. Une photo de la caméra n’est jamais envoyée. Voir [L’envoi par e-mail](../fonctionnalites/envoi-par-e-mail.md).
 - **Les modèles** sont téléchargés depuis leurs sites (GitHub, Hugging Face) lors de leur installation.
-- **Les peintures de l’écran de veille** sont téléchargées depuis Wikimedia Commons, seulement quand vous cliquez sur « Télécharger les peintures ». Vos photos ne quittent jamais l’ordinateur.
+- **Les peintures de l’écran de veille** sont téléchargées depuis Wikimedia Commons, seulement quand vous cliquez sur « Télécharger les peintures ». Les photos importées dans Cornelius ne quittent jamais l’ordinateur. Avec la source facultative [Google Photos](../fonctionnalites/google-photos.md), le serveur contacte Google pour lire l’album partagé et relayer les photos au miroir, sans import sur disque. Toute personne possédant le lien peut consulter cet album. Le lien reste dans la base et ses sauvegardes ; il n’est transmis ni au miroir ni aux fournisseurs IA. La liste distante reste en mémoire jusqu’à l’actualisation ou l’arrêt du serveur.
 
 ## Les données enregistrées
 
@@ -72,6 +72,7 @@ Tout est sur l’ordinateur du miroir, dans le dossier `data/` (voir [Configurat
 | Journal technique | `data/logs/cornelius.log` |
 | Trois dernières images créées | `data/generated-images/`, vidé à chaque démarrage |
 | Images de l’écran de veille (vos photos et les peintures) | `data/screensaver/` ; leur titre dans la base |
+| Source Google Photos de l’écran de veille | lien partagé et réglages dans la base et ses sauvegardes ; liste et images relayées uniquement en mémoire |
 | Mot de passe de l’administration | le fichier `.env` au départ ; s’il est changé dans **Mise en route**, une empreinte (scrypt) dans la base, jamais le mot de passe lui-même |
 | Secrets des commandes (`CORNELIUS_SECRET_*`) | le fichier `.env`, jamais dans la base |
 | Clés OpenAI et Mistral, jetons Météo et Transports, mot de passe SMTP | la base locale s’ils sont saisis dans l’administration (ils y passent avant ceux de `.env`), sinon le fichier `.env`. L’administration n’en montre que les quatre derniers caractères, et le journal les masque. |

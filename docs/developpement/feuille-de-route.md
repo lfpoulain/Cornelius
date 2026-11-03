@@ -33,6 +33,17 @@ Les critères complets et les scénarios à jouer sont dans [Tests et recette](t
 
 ## À faire
 
+### Connexion officielle Google Photos Ambient
+
+Remplacer à terme la lecture expérimentale des albums partagés de l’écran de veille par
+une intégration Google Photos Ambient API, avec choix des albums dans Google et autorisation
+du compte. Le connecteur actuel impose un lien consultable par toute personne qui le possède.
+
+Prérequis : admission au [programme partenaire Google Photos](https://developers.google.com/photos/partner-program/overview),
+puis vérification OAuth et revue de l’intégration avant lancement. Cet accès n’est pas acquis ;
+la fonctionnalité reste conditionnée à la validation de Google. Il faudra ensuite développer
+l’association de l’écran, le choix des albums, la gestion des autorisations et leur révocation.
+
 ### Interpellation
 
 Cornelius ne parle aujourd’hui que lorsqu’on s’adresse à lui (en dehors de l’accueil par le prénom). L’interpellation lui permettrait d’annoncer de lui-même une information utile et fraîche (un bus qui arrive, une minuterie terminée), une fois qu’une personne le regarde et que la conversation est prête :

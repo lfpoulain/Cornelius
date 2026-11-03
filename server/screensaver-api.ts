@@ -1,26 +1,40 @@
 import { readFileSync } from 'node:fs';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { isGooglePhotosSettings } from '../shared/google-photos.js';
+import type { GooglePhotosAlbum } from './google-photos.js';
 import {
   SCREENSAVER_IMAGE_MAX_BYTES,
   SCREENSAVER_IMAGE_TYPES,
   isScreensaverSettings,
 } from '../shared/screensaver.js';
 import type { SessionController } from './controller.js';
-import { titleFromName, type ScreensaverLibrary } from './screensaver.js';
+import { imageType, titleFromName, type ScreensaverLibrary } from './screensaver.js';
 
 export function registerScreensaver(
   app: FastifyInstance,
   library: ScreensaverLibrary,
   controller: SessionController,
   requireAdmin: (req: FastifyRequest, reply: FastifyReply) => Promise<void>,
+  googlePhotos: GooglePhotosAlbum,
 ) {
   const admin = { preHandler: requireAdmin };
-  const publish = () => controller.setScreensaverImages(library.list().length, library.revision());
+  const images = () =>
+    googlePhotos.settings().source === 'google-photos' ? googlePhotos.list() : library.list();
+  const publish = () =>
+    controller.setScreensaverImages(
+      images().length,
+      googlePhotos.settings().source === 'google-photos'
+        ? googlePhotos.revision()
+        : library.revision(),
+    );
+  googlePhotos.onChange(publish);
   library.onChange(publish);
   publish();
 
   // Lu par le miroir, comme ses autres données : réservé à la machine et aux appareils autorisés.
-  app.get('/api/screensaver', async () => ({ images: library.list() }));
+  app.get('/api/screensaver', async (_request, reply) =>
+    reply.header('Cache-Control', 'no-store').send({ images: images() }),
+  );
   app.get<{ Params: { id: string } }>('/api/screensaver/images/:id', async (request, reply) => {
     const file = library.file(request.params.id);
     if (!file) return reply.code(404).send({ error: 'Image introuvable.' });
@@ -30,6 +44,45 @@ export function registerScreensaver(
       .header('Cache-Control', 'private, max-age=604800, immutable')
       .send(readFileSync(file.path));
   });
+
+  app.get('/api/admin/screensaver/google-photos', admin, async (_request, reply) =>
+    reply.header('Cache-Control', 'no-store').send(googlePhotos.view()),
+  );
+
+  app.put('/api/admin/screensaver/google-photos', admin, async (request, reply) => {
+    if (!isGooglePhotosSettings(request.body))
+      return reply.code(400).send({ error: 'Réglages de l’album invalides.' });
+    try {
+      googlePhotos.configure(request.body);
+    } catch {
+      return reply.code(400).send({ error: 'Indiquez un lien de partage Google Photos valide.' });
+    }
+    await googlePhotos.refresh();
+    return reply.header('Cache-Control', 'no-store').send(googlePhotos.view());
+  });
+
+  app.post('/api/admin/screensaver/google-photos/refresh', admin, async (_request, reply) => {
+    await googlePhotos.refresh();
+    return reply.header('Cache-Control', 'no-store').send(googlePhotos.view());
+  });
+
+  app.get<{ Params: { id: string } }>(
+    '/api/screensaver/google-photos/images/:id',
+    async (request, reply) => {
+      const bytes = await googlePhotos.image(request.params.id);
+      const type = bytes && imageType(bytes);
+      if (!bytes || !type)
+        return reply
+          .code(404)
+          .header('Cache-Control', 'no-store')
+          .send({ error: 'Photo indisponible.' });
+      return reply
+        .type(type)
+        .header('Cache-Control', 'no-store')
+        .header('X-Content-Type-Options', 'nosniff')
+        .send(Buffer.from(bytes));
+    },
+  );
 
   app.get('/api/admin/screensaver', admin, async () => library.view());
   app.patch('/api/admin/screensaver', admin, async (request, reply) => {

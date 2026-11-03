@@ -6,7 +6,11 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
-Rien pour l’instant.
+### Album Google Photos dans l’écran de veille
+
+**Ajouté**
+
+- Source expérimentale Google Photos : lien d’album partagé, aperçu, actualisation réglable et retour aux images locales. Les images sont relayées depuis Google sans import sur disque, sans clé API ni connexion au compte. Le connecteur dépend du format non officiel de la page partagée et ne lit que sa page initiale (500 entrées au maximum). Voir [les réglages et limites](docs/fonctionnalites/google-photos.md).
 
 ## 0.2.0 · 2026-11-02
 

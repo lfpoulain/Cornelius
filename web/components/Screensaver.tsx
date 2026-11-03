@@ -229,7 +229,8 @@ export function Screensaver({
     };
     const load = async (slot: ScreensaverSlot): Promise<ScreensaverImage | null> => {
       // Une image illisible est sautée ; au plus un tour complet de la liste.
-      for (let attempt = 0; attempt < Math.max(1, images.length); attempt++) {
+      const attempts = images.length;
+      for (let attempt = 0; attempt < attempts; attempt++) {
         const image = pick();
         if (!image) return null;
         try {

@@ -1,3 +1,4 @@
+import { GooglePhotosSettings } from './GooglePhotosSettings';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Download, ImagePlus, Trash2 } from 'lucide-react';
 import {
@@ -290,6 +291,7 @@ export function ScreensaverSettings({ state, run }: { state: MirrorState; run: R
           </p>
         </CardContent>
       </Card>
+      <GooglePhotosSettings run={run} />
       <ScreensaverImages run={run} />
     </div>
   );
@@ -431,7 +433,7 @@ function ScreensaverImages({ run }: { run: RunAction }) {
         {collection && collection.installed < collection.total && !downloading && (
           <p className="text-xs leading-relaxed text-muted-foreground" role="status">
             {collection.error ??
-              'Les peintures viennent de Wikimedia Commons : la seule connexion à Internet de cette rubrique, faite quand vous cliquez.'}
+              'Les peintures viennent de Wikimedia Commons et sont téléchargées quand vous cliquez.'}
           </p>
         )}
         <ResourceState

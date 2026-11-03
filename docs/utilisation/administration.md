@@ -150,6 +150,8 @@ Chaque texte compte 4 000 caractères au plus. Enregistrer s’applique aussitô
 
 ## Écran de veille
 
+**Source des images** permet de choisir les images locales ou un [album Google Photos partagé](../fonctionnalites/google-photos.md). Collez le lien obtenu par **Partager → Créer un lien**, réglez la fréquence et enregistrez pour vérifier l’accès et afficher l’aperçu. Cette connexion expérimentale ne nécessite ni clé API ni accès à votre compte Google ; les photos restent sur Google. Les grands albums peuvent être incomplets.
+
 *Au quotidien.* Les peintures et les photos affichées quand personne n’est devant le miroir. Voir [L’écran de veille](miroir.md#lécran-de-veille).
 
 - **Afficher des images au repos** : désactivé par défaut. Sans image, l’écran reste noir.
