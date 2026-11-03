@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { SatelliteGestureSettings } from './SatelliteGestureSettings';
 import { KeyRound, MicOff, TriangleAlert } from 'lucide-react';
 import type { NetworkStatus, Profile } from '../../../shared/types';
 import {
@@ -320,6 +321,7 @@ function SatelliteCard({
           )}
         </form>
         <SatelliteSettingsPanel satellite={satellite} run={run} />
+        <SatelliteGestureSettings id={satellite.id} run={run} />
         {confirming === 'token' ? (
           <ConfirmAction
             message={`Créer un nouveau jeton pour « ${satellite.name} » ? L’ancien cesse aussitôt de fonctionner : il faudra saisir le nouveau dans le satellite.`}

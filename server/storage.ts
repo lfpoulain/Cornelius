@@ -1,3 +1,4 @@
+import { satelliteGesturesMigration } from './satellite-gestures.js';
 import { customProviderMigration } from './custom-provider.js';
 import { isVoiceProvider, type VoiceProvider } from '../shared/voice-provider.js';
 import { ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
@@ -436,6 +437,9 @@ export const migrations: readonly string[] = [
     satellite_id TEXT PRIMARY KEY REFERENCES satellites(id) ON DELETE CASCADE,
     delay_ms INTEGER NOT NULL CHECK (delay_ms BETWEEN 3000 AND 300000)
   ) STRICT;`,
+  // La première PR utilisait l’index désormais réservé aux alarmes.
+  `${alarmsMigration}
+${satelliteGesturesMigration}`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */

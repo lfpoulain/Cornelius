@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { GESTURES, type Gesture } from '../shared/satellite-gestures.js';
 import type { WebSocket } from 'ws';
 import type { DiagnosticLog } from './logs.js';
 import type { SessionController } from './controller.js';
@@ -31,6 +32,8 @@ interface Connection {
   rings: boolean;
   /** Dernier état de sonnerie envoyé : « start » avec la sonnerie, ou null. */
   ringing: string | null;
+  gestures: boolean;
+  micToggle: boolean;
   muted: boolean;
   listening: boolean | null;
   alive: boolean;
@@ -46,6 +49,7 @@ interface Connection {
 }
 
 export interface SatelliteStatus {
+  gestures?: boolean;
   online: boolean;
   firmware: string | null;
   muted: boolean;
@@ -86,6 +90,17 @@ const object = (value: unknown): Record<string, unknown> =>
  * l’arbitrage commun avec le miroir. Le son n’est demandé que pendant que la veille écoute.
  */
 export class SatelliteHub {
+  private gestureHandler?: (id: string, gesture: Gesture, current: () => boolean) => Promise<void>;
+  onGesture(handler: (id: string, gesture: Gesture, current: () => boolean) => Promise<void>) {
+    this.gestureHandler = handler;
+  }
+  mute(id: string): boolean {
+    const connection = this.connections.get(id);
+    if (!connection?.firmware || !connection.micToggle || connection.socket.readyState !== 1)
+      return false;
+    this.send(connection, { type: 'mute', muted: true });
+    return true;
+  }
   private connections = new Map<string, Connection>();
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private unsubscribe: () => void;
@@ -121,6 +136,7 @@ export class SatelliteHub {
           firmware: connection.firmware,
           muted: connection.muted,
           aec: connection.echoCancelled,
+          ...(connection.gestures ? { gestures: true } : {}),
         }
       : { online: false, firmware: null, muted: false, aec: false };
   }
@@ -169,6 +185,8 @@ export class SatelliteHub {
       echoCancelled: false,
       rings: false,
       ringing: null,
+      gestures: false,
+      micToggle: false,
       muted: false,
       listening: null,
       alive: true,
@@ -216,7 +234,21 @@ export class SatelliteHub {
             satellite: satellite.name,
           });
         }
-      } else if (message.type === 'mic' && typeof message.muted === 'boolean') {
+      }
+      if (
+        message.type === 'gesture' &&
+        connection.gestures &&
+        GESTURES.includes(message.gesture as Gesture)
+      ) {
+        void this.gestureHandler?.(
+          satellite.id,
+          message.gesture as Gesture,
+          () => this.connections.get(satellite.id) === connection && socket.readyState === 1,
+        ).catch(() => {});
+        return;
+      }
+
+      if (message.type === 'mic' && typeof message.muted === 'boolean') {
         connection.muted = message.muted;
         this.deps.logs.write('info', 'local', 'Micro du satellite', {
           satellite: satellite.name,
@@ -303,6 +335,9 @@ export class SatelliteHub {
     connection.firmware = message.firmware;
     connection.echoCancelled = message.aec === true;
     connection.rings = Array.isArray(message.features) && message.features.includes('ring');
+    connection.gestures = Array.isArray(message.features) && message.features.includes('gestures');
+    connection.micToggle =
+      Array.isArray(message.features) && message.features.includes('mic_toggle');
     this.deps.store.seen(satellite.id);
     this.deps.logs.write('info', 'local', 'Satellite connecté', {
       satellite: satellite.name,

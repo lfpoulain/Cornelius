@@ -6,7 +6,7 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
-Rien pour l’instant.
+- Gestes configurables des satellites compatibles. Un geste peut couper le micro, qui se rouvre au bouton.
 
 ## 0.3.0 · 2026-11-09
 

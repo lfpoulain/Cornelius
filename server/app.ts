@@ -67,6 +67,7 @@ import { registerHardware } from './hardware.js';
 import { WakeArbiter } from './wake-arbiter.js';
 import { SatelliteStore } from './satellites-store.js';
 import { SatelliteHub } from './satellites.js';
+import { SatelliteGestures } from './satellite-gestures.js';
 import { registerSatellites } from './satellites-api.js';
 import { SatellitePairing } from './satellites-pairing.js';
 import { AmbientModules } from './addons/ambient.js';
@@ -512,6 +513,14 @@ export async function createApp(
     live,
     heartbeat: options.timers !== false,
   });
+  const satelliteGestures = new SatelliteGestures({
+    db,
+    store: satelliteStore,
+    hub: satellites,
+    controller,
+    home: homeAssistant,
+  });
+  satellites.onGesture((id, gesture, current) => satelliteGestures.receive(id, gesture, current));
   live.attachSatelliteOutput((satelliteId, pcm) => satellites.play(satelliteId, pcm));
   live.attachSatelliteVolume((satelliteId, args) =>
     setSatelliteVolume(satelliteStore, satellites, satelliteId, args),
@@ -818,6 +827,7 @@ export async function createApp(
   });
 
   registerHomeAssistant(app, homeAssistant, requireAdmin, () => controller.homeAssistantChanged());
+  satelliteGestures.register(app, requireAdmin);
   registerAgents(app, agents, requireAdmin);
   registerScreensaver(app, screensaver, controller, requireAdmin);
   const satellitePairing = new SatellitePairing(logs, now);
@@ -825,6 +835,7 @@ export async function createApp(
     store: satelliteStore,
     hub: satellites,
     pairing: satellitePairing,
+    onRemove: (id) => satelliteGestures.forget(id),
     profiles,
     requireAdmin,
   });
