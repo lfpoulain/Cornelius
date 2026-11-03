@@ -520,3 +520,29 @@ test('adresse injoignable et coupure en cours d’utilisation ont chacune leur m
   await delay(1_300);
   assert.equal(home.view().error, HOME_ASSISTANT_CUT);
 });
+
+test('gestes satellite : lampes sélectionnées sans identité, protection vocale et révocation conservées', async (t) => {
+  const f = await fixture(t);
+  f.select();
+  f.home.setAccess({ knownPeopleOnly: true, revision: f.home.view().revision });
+  const voice = await f.home.run(command(), signal(), 'home_assistant__control', false);
+  assert.equal(voice.status, 'failed');
+  assert.equal(f.fake.calls.length, 0);
+  const gesture = await f.home.runSatelliteGesture(command(), signal());
+  assert.equal(gesture.result?.confirmed, true);
+  assert.equal(f.home.view().knownPeopleOnly, true);
+  const count = f.fake.calls.length;
+  for (const args of [
+    command('light.cachee'),
+    command('lock.door'),
+    command('cover.office', 'open_cover'),
+    command('light.salon', 'toggle'),
+    command('light.salon', 'turn_on', 50),
+  ]) {
+    assert.equal((await f.home.runSatelliteGesture(args, signal())).status, 'failed');
+  }
+  assert.equal(f.fake.calls.length, count);
+  f.home.setAccess({ enabled: false, revision: f.home.view().revision });
+  assert.equal((await f.home.runSatelliteGesture(command(), signal())).status, 'failed');
+  assert.equal(f.fake.calls.length, count);
+});
