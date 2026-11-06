@@ -132,6 +132,8 @@ export interface MirrorState {
   /** Image en cours de création, signalée par un petit encart sur le miroir. */
   imageGeneration?: ImageGenerationActivity | null;
   delegationMode: DelegationMode;
+  /** Modèle de délégation imposé ; vide ou absent : celui du mode (Luna ou Astra). */
+  delegationModel?: string;
   /** Outil de recherche web natif de la délégation (module « Web ») ; absent : activé. */
   webSearchEnabled?: boolean;
   /** Accueil parlé d’une personne reconnue ; absent : « Bonjour Prénom ». */

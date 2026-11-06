@@ -3,6 +3,11 @@ import { isVoiceProvider, type VoiceProvider } from '../shared/voice-provider.js
 import { ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
 import { DEFAULT_CARD_SETTINGS, type CardSettings } from '../shared/cards.js';
 import { DEFAULT_LIVE_VOICE, isLiveVoice, type LiveVoice } from '../shared/voices.js';
+import {
+  isDelegationModel,
+  liveBaseUrlError,
+  normalizeLiveBaseUrl,
+} from '../shared/live-endpoint.js';
 import { openingFromSettings, sameOpeningSettings, settingsForOpening } from '../shared/opening.js';
 import {
   DEFAULT_PRESENCE_TIMINGS,
@@ -418,6 +423,14 @@ export const migrations: readonly string[] = [
     enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1))
   ) STRICT;
   INSERT OR IGNORE INTO reply_close_preferences (id) VALUES (1);`,
+  // Serveur Live compatible (vide : .env, sinon OpenAI) et modèle de délégation imposé
+  // (vide : celui du mode). Validés par le code (shared/live-endpoint.ts).
+  `CREATE TABLE IF NOT EXISTS live_preferences (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    base_url TEXT NOT NULL DEFAULT '',
+    delegation_model TEXT NOT NULL DEFAULT ''
+  ) STRICT;
+  INSERT OR IGNORE INTO live_preferences (id) VALUES (1);`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */
@@ -648,6 +661,28 @@ export class SessionPreferences {
         'UPDATE card_preferences SET max_cards = ?, compact_secondary = ?, lifetime_ms = ? WHERE id = 1',
       )
       .run(settings.maxCards, Number(settings.compactSecondary), settings.lifetimeMs);
+  }
+  getLiveBaseUrl(): string {
+    const value = this.db
+      .prepare('SELECT base_url FROM live_preferences WHERE id = 1')
+      .get()?.base_url;
+    return typeof value === 'string' && !liveBaseUrlError(value) ? value : '';
+  }
+  setLiveBaseUrl(baseUrl: string): void {
+    if (liveBaseUrlError(baseUrl)) throw new Error('Adresse du serveur Live invalide.');
+    this.db
+      .prepare('UPDATE live_preferences SET base_url = ? WHERE id = 1')
+      .run(normalizeLiveBaseUrl(baseUrl));
+  }
+  getDelegationModel(): string {
+    const value = this.db
+      .prepare('SELECT delegation_model FROM live_preferences WHERE id = 1')
+      .get()?.delegation_model;
+    return isDelegationModel(value) ? value : '';
+  }
+  setDelegationModel(model: string): void {
+    if (!isDelegationModel(model)) throw new Error('Modèle de délégation invalide.');
+    this.db.prepare('UPDATE live_preferences SET delegation_model = ? WHERE id = 1').run(model);
   }
   getVoiceProvider(): VoiceProvider {
     const value = this.db

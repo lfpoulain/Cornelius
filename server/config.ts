@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { liveBaseUrlError, normalizeLiveBaseUrl } from '../shared/live-endpoint.js';
 import type { MachineStatus } from '../shared/types.js';
 import { externalAddonsRoot } from './addons/registry.js';
 import { detectMachine } from './machine.js';
@@ -12,6 +13,16 @@ export interface AppConfig {
   openaiKey?: string;
   perceptionToken?: string;
   imageGenerationToken?: string;
+  /**
+   * Jeton des déclencheurs externes (CORNELIUS_TRIGGER_TOKEN) : Home Assistant, baguette ou
+   * bouton démarrent une conversation par POST /api/trigger/start. Absent, la route est fermée.
+   */
+  triggerToken?: string;
+  /**
+   * Adresse de base de l’API Live (CORNELIUS_LIVE_BASE_URL), https://api.openai.com/v1 par
+   * défaut : un serveur compatible (réseau local) peut remplacer OpenAI pour la conversation.
+   */
+  liveBaseUrl?: string;
   loginRateLimit?: number;
   meteoConceptToken?: string;
   primApiKey?: string;
@@ -60,6 +71,17 @@ export function explicitlySupervised(env: NodeJS.ProcessEnv = process.env): bool
   );
 }
 
+/**
+ * CORNELIUS_LIVE_BASE_URL : http(s), sans identifiants, requête ni fragment ; la barre finale
+ * est retirée. Vide : OpenAI. Une valeur invalide arrête le démarrage plutôt que d’être ignorée.
+ */
+export function liveBaseUrl(value: string | undefined): string | undefined {
+  if (!value?.trim()) return undefined;
+  const error = liveBaseUrlError(value);
+  if (error) throw new Error(`CORNELIUS_LIVE_BASE_URL : ${error}`);
+  return normalizeLiveBaseUrl(value);
+}
+
 export function loadConfig(): AppConfig & { port: number } {
   const adminPassword = process.env.CORNELIUS_ADMIN_PASSWORD ?? '';
   if (adminPassword.length < 4) {
@@ -99,6 +121,8 @@ export function loadConfig(): AppConfig & { port: number } {
     openaiKey: process.env.OPENAI_API_KEY || undefined,
     perceptionToken: process.env.CORNELIUS_PERCEPTION_TOKEN || undefined,
     imageGenerationToken: process.env.CORNELIUS_IMAGE_GENERATION_TOKEN || undefined,
+    triggerToken: process.env.CORNELIUS_TRIGGER_TOKEN?.trim() || undefined,
+    liveBaseUrl: liveBaseUrl(process.env.CORNELIUS_LIVE_BASE_URL),
     meteoConceptToken: process.env.CORNELIUS_METEO_CONCEPT_TOKEN || undefined,
     primApiKey: process.env.CORNELIUS_PRIM_API_KEY || undefined,
     modulesDir: externalAddonsRoot(),

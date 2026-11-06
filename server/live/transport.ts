@@ -524,6 +524,7 @@ export class LiveTransport implements SessionTransport {
         webSearch: this.controller.isWebSearchEnabled(),
         voice: this.controller.getSpeechVoice(),
         voiceOnly,
+        delegationModel: this.controller.getDelegationModel(),
       },
     );
   }

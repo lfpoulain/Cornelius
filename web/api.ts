@@ -17,6 +17,7 @@ import type {
   SecretView,
 } from '../shared/types';
 import type { DelegationMode } from '../shared/delegation';
+import type { LiveEndpointView } from '../shared/live-endpoint';
 import type { CardSettings } from '../shared/cards';
 import type { AdmissionSound } from '../shared/admission-sound';
 import type { GreetingMode, SilenceClose } from '../shared/conversation';
@@ -268,6 +269,18 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(settings),
     }),
+  delegationModel: (model: string) =>
+    request<StateEvent>('/api/admin/delegation-model', {
+      method: 'PATCH',
+      body: JSON.stringify({ model }),
+    }),
+  liveEndpoint: () => request<LiveEndpointView>('/api/admin/live-endpoint'),
+  saveLiveEndpoint: (baseUrl: string) =>
+    request<LiveEndpointView>('/api/admin/live-endpoint', {
+      method: 'PATCH',
+      body: JSON.stringify({ baseUrl }),
+    }),
+  liveModels: () => post<LiveEndpointView>('/api/admin/live-endpoint/models', {}, slow),
   voiceProvider: (provider: string) =>
     request<StateEvent>('/api/admin/voice-provider', {
       method: 'PATCH',

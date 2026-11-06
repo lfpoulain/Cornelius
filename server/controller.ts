@@ -14,6 +14,7 @@ import {
   isDelegationMode,
   type DelegationMode,
 } from '../shared/delegation.js';
+import { isDelegationModel } from '../shared/live-endpoint.js';
 import {
   DEFAULT_ADMISSION_SOUND,
   isAdmissionSound,
@@ -69,6 +70,8 @@ export interface SessionPreferencesStore {
   setCardSettings?(settings: CardSettings): void;
   getDelegationMode?(): DelegationMode;
   setDelegationMode?(mode: DelegationMode): void;
+  getDelegationModel?(): string;
+  setDelegationModel?(model: string): void;
   getAdmissionSound?(): AdmissionSound;
   setAdmissionSound?(settings: AdmissionSound): void;
   getWebSearchEnabled?(): boolean;
@@ -259,6 +262,8 @@ export class SessionController {
   /** Première image de la caméra reçue depuis l’ouverture : le délai de reconnaissance part d’elle. */
   private voiceIdentityCameraSeen = false;
   private delegationMode = DEFAULT_DELEGATION_MODE;
+  /** Modèle de délégation imposé ; vide : celui du mode. */
+  private delegationModel = '';
   private wakeWordReady = false;
   private wakeWordDetail: string | null = 'Modèle Cornelius indisponible.';
   private silenceSince: number | null = null;
@@ -299,6 +304,7 @@ export class SessionController {
     this.voiceRecognition = preferences?.getVoiceRecognition?.() ?? false;
     this.replyClose = preferences?.getReplyClose?.() ?? false;
     this.delegationMode = preferences?.getDelegationMode?.() ?? DEFAULT_DELEGATION_MODE;
+    this.delegationModel = preferences?.getDelegationModel?.() ?? '';
     this.timings = { ...(preferences?.getPresenceTimings?.() ?? DEFAULT_PRESENCE_TIMINGS) };
   }
 
@@ -431,6 +437,7 @@ export class SessionController {
       cardSettings: { ...this.cardSettings },
       admissionSound: { ...this.admissionSound },
       delegationMode: this.delegationMode,
+      delegationModel: this.delegationModel,
       webSearchEnabled: this.webSearch,
       greeting: this.greeting,
       knownPeopleOnly: this.knownPeopleOnly,
@@ -1007,6 +1014,9 @@ export class SessionController {
   getSpeechVoice(): LiveVoice {
     return this.speechVoice;
   }
+  getDelegationModel(): string {
+    return this.delegationModel;
+  }
 
   setOrbScale(scale: number): void {
     if (this.orbScale === scale) return;
@@ -1149,6 +1159,20 @@ export class SessionController {
     if (['connecting', 'ready', 'closing'].includes(this.session.phase)) {
       this.reopenAfterClose = null;
       this.close('Mode de délégation modifié.');
+    }
+    this.publish();
+  }
+
+  /** Modèle de délégation imposé (vide : celui du mode) ; termine la conversation en cours. */
+  setDelegationModel(model: string): void {
+    if (!isDelegationModel(model)) throw new Error('Modèle de délégation invalide.');
+    if (this.delegationModel === model) return;
+    this.preferences?.setDelegationModel?.(model);
+    this.delegationModel = model;
+    this.session.contextVersion++;
+    if (['connecting', 'ready', 'closing'].includes(this.session.phase)) {
+      this.reopenAfterClose = null;
+      this.close('Modèle de délégation modifié.');
     }
     this.publish();
   }

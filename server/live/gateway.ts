@@ -1,3 +1,4 @@
+import { DEFAULT_LIVE_BASE_URL } from '../../shared/live-endpoint.js';
 import type { DiagnosticLog } from '../logs.js';
 import OpenAI from 'openai';
 import WebSocket from 'ws';
@@ -42,8 +43,32 @@ export interface LiveGateway {
     welcomeInstructions?: string,
   ): LiveAudioConnection;
 }
-export function createLiveGateway(apiKey: string, logs?: DiagnosticLog): LiveGateway {
-  const client = new OpenAI({ apiKey, timeout: 4000, maxRetries: 0 });
+
+/** Adresse WebSocket d’un chemin de l’API Live : http devient ws, https devient wss. */
+export function liveSocketUrl(baseUrl: string, path: string): string {
+  return baseUrl.replace(/\/+$/u, '').replace(/^http/u, 'ws') + path;
+}
+
+/** Identifiants des modèles du serveur Live (GET /models), triés ; au plus 500. */
+export async function listLiveModels(
+  apiKey: string,
+  baseUrl: string = DEFAULT_LIVE_BASE_URL,
+): Promise<string[]> {
+  const client = new OpenAI({ apiKey, baseURL: baseUrl, timeout: 10_000, maxRetries: 0 });
+  const ids = new Set<string>();
+  for await (const model of client.models.list()) {
+    if (typeof model.id === 'string' && model.id) ids.add(model.id);
+    if (ids.size >= 500) break;
+  }
+  return [...ids].sort((a, b) => a.localeCompare(b));
+}
+
+export function createLiveGateway(
+  apiKey: string,
+  logs?: DiagnosticLog,
+  baseUrl: string = DEFAULT_LIVE_BASE_URL,
+): LiveGateway {
+  const client = new OpenAI({ apiKey, baseURL: baseUrl, timeout: 4000, maxRetries: 0 });
   /** WebSocket Live authentifié : canal de contrôle d’une session WebRTC, ou session complète. */
   function socketConnection(
     url: string,
@@ -100,7 +125,7 @@ export function createLiveGateway(apiKey: string, logs?: DiagnosticLog): LiveGat
     attach(id, handlers) {
       logs?.write('info', 'openai', 'Connexion du canal de contrôle', { remoteId: id });
       const { send, dispose } = socketConnection(
-        'wss://api.openai.com/v1/live/sessions/' + encodeURIComponent(id) + '/attach',
+        liveSocketUrl(baseUrl, '/live/sessions/' + encodeURIComponent(id) + '/attach'),
         id,
         () => {
           logs?.write('info', 'openai', 'Canal de contrôle connecté', { remoteId: id });
@@ -113,7 +138,7 @@ export function createLiveGateway(apiKey: string, logs?: DiagnosticLog): LiveGat
     connect(session, handlers) {
       logs?.write('info', 'openai', 'Connexion de la session Live du satellite');
       const { socket, send, dispose } = socketConnection(
-        'wss://api.openai.com/v1/live/sessions',
+        liveSocketUrl(baseUrl, '/live/sessions'),
         undefined,
         (opened) => {
           logs?.write('info', 'openai', 'Session Live du satellite connectée');

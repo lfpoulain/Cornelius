@@ -541,6 +541,55 @@ test('administrator heartbeats cannot authorize a session without a connected ki
   assert.equal(accepted.json<StateEvent>().state.session.phase, 'connecting');
 });
 
+test('un déclencheur externe démarre la conversation avec son jeton, sans cookie ni origine', async (t) => {
+  const closedRoute = await fixture(t);
+  const disabled = await closedRoute.app.inject({ method: 'POST', url: '/api/trigger/start' });
+  assert.equal(disabled.statusCode, 503);
+
+  const token = 't'.repeat(40);
+  const f = await fixture(t, { triggerToken: token, lan: true });
+  const host = '192.168.1.20:3443';
+  const call = (headers: Record<string, string>, remoteAddress = '192.168.1.40') =>
+    f.app.inject({
+      method: 'POST',
+      url: '/api/trigger/start',
+      remoteAddress,
+      headers: { host, ...headers },
+    });
+  assert.equal((await call({})).statusCode, 401);
+  assert.equal((await call({ authorization: 'Bearer mauvais-jeton' })).statusCode, 401);
+  assert.equal((await call({ authorization: `Bearer ${token}` }, '203.0.113.9')).statusCode, 403);
+
+  // Sans personne devant le miroir, rien ne démarre : la réponse dit pourquoi.
+  const waiting = await call({ authorization: `Bearer ${token}` });
+  assert.equal(waiting.statusCode, 200, waiting.body);
+  assert.equal(waiting.json().started, false);
+  assert.equal(waiting.json().reason, 'Personne n’est détecté devant le miroir.');
+  assert.equal(waiting.body.includes(token), false);
+
+  const mirror = await f.connect('kiosk', await f.kiosk());
+  mirror.socket.send(JSON.stringify({ type: 'media_ready', ready: true }));
+  await setImmediate();
+  const observation: PerceptionObservation = {
+    schemaVersion: 1,
+    producerBootId: 'camera-test',
+    sequence: 0,
+    observedAt: f.now(),
+    health: 'ok',
+    presence: true,
+    engaged: true,
+    people: [{ trackId: 'visitor', profileId: null }],
+  };
+  f.controller.observe(observation);
+  f.advance(800);
+  f.controller.heartbeat();
+  f.controller.observe({ ...observation, sequence: 1, observedAt: f.now() });
+  const started = await call({ authorization: `Bearer ${token}` });
+  assert.equal(started.statusCode, 200, started.body);
+  assert.deepEqual(started.json(), { started: true, phase: 'connecting', reason: null });
+  assert.equal(f.controller.snapshot().state.session.phase, 'connecting');
+});
+
 test('an expired WebSocket session is revoked before processing its next message', async (t) => {
   const f = await fixture(t);
   const cookie = await f.login();

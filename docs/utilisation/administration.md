@@ -70,6 +70,7 @@ Carte « Voix de Cornelius » :
 
 - **Fournisseur de la conversation** : « OpenAI · GPT Live » (par défaut) ou « Mistral · Voxtral 3 ». Le changement est refusé pendant une conversation et tant que la clé du fournisseur manque ; il s’applique à la conversation suivante. Voir [Le fournisseur vocal](../fonctionnalites/fournisseur-vocal.md).
 - **Voix** (OpenAI seulement) : l’une des 22 voix de GPT-Live. Cedar (par défaut) et Marin sont conseillées pour le français ; les autres peuvent garder un léger accent anglais. La nouvelle voix s’entend à la conversation suivante. Avec Mistral, la voix est Marie.
+- **Serveur Live** (OpenAI seulement) : adresse de base d’un serveur compatible avec l’API Live d’OpenAI, par exemple `http://192.168.1.50:8000/v1`. Vide : celle de `CORNELIUS_LIVE_BASE_URL` dans `.env`, sinon OpenAI. Un badge indique l’adresse utilisée et son origine ; « Revenir à… » efface la valeur saisie. Le changement est refusé pendant une conversation et s’applique à la suivante. La clé OpenAI est envoyée à ce serveur. Voir [Configuration](../reference/configuration.md).
 
 ## Micro et haut-parleurs
 
@@ -125,7 +126,7 @@ L’enregistrement d’un visage demande le service caméra. Quel que soit le mo
 - **Réglages avancés** (replié) :
   - **Micro gardé prêt** (bêta) : « Garder le micro prêt » (désactivé par défaut) permet de dire « Cornelius, allume la lumière » d’une traite. Le micro reste prêt sur cet ordinateur ; le son n’est envoyé qu’une fois la conversation ouverte ;
   - **Délais de présence** : cinq délais en secondes, avec un bouton « Valeurs par défaut ». « Confirmer un départ » (1,5 s, de 0 à 30), « Terminer après la perte du regard » (8 s, de 0 à 60), « Garder l’identité sans nouvelle preuve » (8 s, de 0 à 60), « Confirmer une présence » (0,4 s, de 0 à 5) et « Confirmer le regard » (0,35 s, de 0 à 5) ;
-  - **Délégation : recherches et actions** : le modèle qui fait les recherches, les cartes et les commandes. « Normal », « Rapide » (par défaut) ou « Ultra rapide ». Changer de mode pendant une conversation la termine, après confirmation. « Ultra rapide » ne fonctionne pas si votre compte OpenAI garde ses données en Europe. Cette carte n’apparaît pas avec Mistral.
+  - **Délégation : recherches et actions** : le modèle qui fait les recherches, les cartes et les commandes. « Normal », « Rapide » (par défaut) ou « Ultra rapide ». Changer de mode pendant une conversation la termine, après confirmation. « Ultra rapide » ne fonctionne pas si votre compte OpenAI garde ses données en Europe. La liste « Modèle de délégation » vaut « Selon le mode » par défaut (GPT-6 Luna, ou GPT-6 Astra en ultra rapide) ; elle propose aussi `gpt-6-luna`, `gpt-6-astra` et, après « Charger la liste », les modèles du serveur Live (`GET /models`). Un modèle choisi remplace celui du mode, la vitesse et le raisonnement du mode restant appliqués ; le changer pendant une conversation la termine, après confirmation. Cette carte n’apparaît pas avec Mistral.
 
 ## Satellites audio
 

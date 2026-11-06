@@ -52,7 +52,13 @@ import {
 import { SessionController } from './controller.js';
 import { DEFAULT_ADMIN_PASSWORD, type AppConfig } from './config.js';
 import { LiveTransport } from './live/transport.js';
-import { createLiveGateway } from './live/gateway.js';
+import { createLiveGateway, listLiveModels } from './live/gateway.js';
+import {
+  DEFAULT_LIVE_BASE_URL,
+  isDelegationModel,
+  liveBaseUrlError,
+  type LiveEndpointView,
+} from '../shared/live-endpoint.js';
 import { PerceptionBridge } from './perception.js';
 import { ModelDownloads, type ModelLauncher } from './model-downloads.js';
 import { VisionBridge } from './vision.js';
@@ -140,6 +146,12 @@ const nameSchema = compile<{ name: string }>({
     name: profileName,
   },
 });
+/** Jeton des déclencheurs externes (Home Assistant, baguette, bouton). */
+const TRIGGER_TOKEN_SECRET = 'CORNELIUS_TRIGGER_TOKEN';
+/** Routes appelées par une machine avec un jeton : ni cookie ni en-tête Origin. */
+function triggerRoute(url: string): boolean {
+  return url.split('?')[0]!.startsWith('/api/trigger/');
+}
 function equalSecret(input: string, expected: string): boolean {
   return timingSafeEqual(
     createHash('sha256').update(input).digest(),
@@ -210,6 +222,7 @@ export async function createApp(
     CUSTOM_OPENAI_API_KEY: process.env.CUSTOM_OPENAI_API_KEY,
     CORNELIUS_METEO_CONCEPT_TOKEN: config.meteoConceptToken,
     CORNELIUS_PRIM_API_KEY: config.primApiKey,
+    [TRIGGER_TOKEN_SECRET]: config.triggerToken,
   };
   const secretStore = new SecretStore(
     db,
@@ -240,6 +253,7 @@ export async function createApp(
     'CORNELIUS_ADMIN_PASSWORD',
     'CORNELIUS_PERCEPTION_TOKEN',
     'CORNELIUS_IMAGE_GENERATION_TOKEN',
+    TRIGGER_TOKEN_SECRET,
     MAIL_PASSWORD_SECRET,
   ]);
   const addonSecrets = new Map(
@@ -319,8 +333,24 @@ export async function createApp(
               return createMistralVoiceAdapter(key).connect(config, emit);
             },
           })
-        : createLiveGateway(key, logs);
+        : createLiveGateway(key, logs, liveEndpoint().effectiveBaseUrl);
   };
+  /** Serveur Live : l’administration passe avant .env, qui passe avant OpenAI. */
+  const liveEndpoint = (): Omit<LiveEndpointView, 'models'> => {
+    const baseUrl = preferences.getLiveBaseUrl();
+    const envBaseUrl = config.liveBaseUrl ?? '';
+    return {
+      baseUrl,
+      envBaseUrl,
+      effectiveBaseUrl: baseUrl || envBaseUrl || DEFAULT_LIVE_BASE_URL,
+      source: baseUrl ? 'admin' : envBaseUrl ? 'env' : 'default',
+    };
+  };
+  let liveModels: string[] = [];
+  if (liveEndpoint().source !== 'default')
+    logs.write('info', 'openai', 'API Live remplacée par un serveur compatible', {
+      baseUrl: liveEndpoint().effectiveBaseUrl,
+    });
   const plainMemoryExtractor = (provider: MemoryFallback) => {
     if (provider === 'none') return null;
     const key = secretStore.get(provider === 'mistral' ? 'MISTRAL_API_KEY' : 'OPENAI_API_KEY');
@@ -700,6 +730,8 @@ export async function createApp(
       !fromLoopback(request)
     )
       return reply.code(403).send({ error: 'Réservé à cet ordinateur.' });
+    // Déclencheurs externes (Home Assistant) : leur jeton remplace cookie et origine.
+    if (triggerRoute(request.url)) return;
     // Le miroir n'a pas de mot de passe sur la machine. Depuis un autre appareil, ses données
     // (état, son, événements) demandent une session d'administration ou un appareil autorisé.
     if (!fromMachine(request) && !lanPublic(request.url) && !lanAuthorized(request))
@@ -1101,6 +1133,14 @@ export async function createApp(
         url: null,
         note: 'Le mot de passe du compte d’envoi, ou un mot de passe d’application (Gmail, iCloud). Le reste se règle dans Modules → E-mail.',
       },
+      {
+        ...describe(TRIGGER_TOKEN_SECRET),
+        group: 'providers' as const,
+        label: 'Jeton de déclenchement',
+        usedBy: 'Home Assistant : POST /api/trigger/start',
+        url: null,
+        note: 'Choisissez une valeur longue et aléatoire. Home Assistant l’envoie dans l’en-tête Authorization: Bearer.',
+      },
       ...[
         ...new Map([...addonSecrets.values()].map((secret) => [secret.env, secret])).values(),
       ].map((secret) => ({
@@ -1191,6 +1231,44 @@ export async function createApp(
       return controller.snapshot();
     },
   );
+  // Déclencheur externe : même effet que le bouton Démarrer. Home Assistant l'appelle avec
+  // le jeton CORNELIUS_TRIGGER_TOKEN (rest_command), par exemple au geste d'une baguette.
+  app.post(
+    '/api/trigger/start',
+    {
+      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+      preHandler: async (request, reply) => {
+        const token = secretStore.get(TRIGGER_TOKEN_SECRET);
+        if (!token)
+          return reply.code(503).send({
+            error: 'Déclencheur externe désactivé : définissez CORNELIUS_TRIGGER_TOKEN.',
+          });
+        if (!equalSecret(String(request.headers.authorization ?? ''), 'Bearer ' + token))
+          return reply.code(401).send({ error: 'Jeton de déclenchement invalide.' });
+      },
+    },
+    async () => {
+      controller.command({ type: 'start' });
+      const { session, diagnostic } = controller.snapshot().state;
+      const started = ['connecting', 'ready'].includes(session.phase);
+      // Raison lisible quand rien ne s'ouvre : Home Assistant peut l'afficher ou la journaliser.
+      const reason = started
+        ? null
+        : session.phase === 'closing'
+          ? 'Conversation en cours de fermeture : elle va se rouvrir.'
+          : (diagnostic ??
+            session.reason ??
+            (session.mode === 4
+              ? 'Démarrage impossible pour le moment.'
+              : 'Personne n’est détecté devant le miroir.'));
+      logs.write('info', 'session', 'Démarrage par un déclencheur externe', {
+        started,
+        phase: session.phase,
+        reason,
+      });
+      return { started, phase: session.phase, reason };
+    },
+  );
 
   const personalitySchema = compile<{ instructions: string }>({
     type: 'object',
@@ -1221,6 +1299,7 @@ export async function createApp(
     const features = {
       webSearch: controller.isWebSearchEnabled(),
       voice: controller.getSpeechVoice(),
+      delegationModel: controller.getDelegationModel(),
     };
     const base = liveConfiguration(tools, undefined, delegationMode, features);
     const effective = liveConfiguration(tools, preferences, delegationMode, features);
@@ -1486,6 +1565,69 @@ export async function createApp(
       live.setGateway(voiceGateway());
       controller.setSetup({ voiceKey: !!selectedVoiceKey() });
       broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+      return controller.snapshot();
+    },
+  );
+  // Serveur Live compatible : remplace OpenAI pour la conversation (miroir et satellites).
+  const liveEndpointView = (): LiveEndpointView => ({ ...liveEndpoint(), models: liveModels });
+  app.get('/api/admin/live-endpoint', { preHandler: requireAdmin }, async () => liveEndpointView());
+  app.patch<{ Body: { baseUrl?: unknown } }>(
+    '/api/admin/live-endpoint',
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      const baseUrl = request.body?.baseUrl;
+      const error = liveBaseUrlError(baseUrl);
+      if (error || typeof baseUrl !== 'string') return reply.code(400).send({ error });
+      if (!['idle', 'blocked'].includes(controller.sessionState().phase))
+        return reply
+          .code(409)
+          .send({ error: 'Terminez la conversation avant de changer de serveur Live.' });
+      const before = liveEndpoint().effectiveBaseUrl;
+      preferences.setLiveBaseUrl(baseUrl);
+      const after = liveEndpoint().effectiveBaseUrl;
+      if (after !== before) {
+        liveModels = [];
+        live.setGateway(voiceGateway());
+        logs.write('info', 'openai', 'Serveur Live modifié', { baseUrl: after });
+      }
+      return liveEndpointView();
+    },
+  );
+  app.post(
+    '/api/admin/live-endpoint/models',
+    {
+      preHandler: requireAdmin,
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    },
+    async (_request, reply) => {
+      const key = openaiKey();
+      if (!key)
+        return reply
+          .code(400)
+          .send({ error: 'Ajoutez d’abord la clé OpenAI dans Mise en route → Clés et jetons.' });
+      const { effectiveBaseUrl } = liveEndpoint();
+      try {
+        liveModels = await listLiveModels(key, effectiveBaseUrl);
+      } catch (error) {
+        logs.write('warn', 'openai', 'Liste des modèles Live illisible', {
+          baseUrl: effectiveBaseUrl,
+          error,
+        });
+        return reply
+          .code(502)
+          .send({ error: 'Impossible de lire la liste des modèles sur le serveur Live.' });
+      }
+      return liveEndpointView();
+    },
+  );
+  app.patch<{ Body: { model?: unknown } }>(
+    '/api/admin/delegation-model',
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      const model = request.body?.model;
+      if (!isDelegationModel(model))
+        return reply.code(400).send({ error: 'Modèle de délégation invalide.' });
+      controller.setDelegationModel(model);
       return controller.snapshot();
     },
   );

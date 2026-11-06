@@ -45,6 +45,8 @@ export interface LiveFeatures {
   voice?: string;
   /** Satellite audio : ni écran ni carte, la réponse est seulement dite. */
   voiceOnly?: boolean;
+  /** Modèle de délégation imposé dans l’administration ; absent ou vide : celui du mode. */
+  delegationModel?: string;
 }
 
 /** Consignes ajoutées en voix seule : elles priment sur toutes celles qui parlent de cartes. */
@@ -102,7 +104,10 @@ Les identifiants exacts des sources et des commandes autorisées sont dans la de
     delegation: {
       type: 'responses',
       responses: {
-        model: delegationMode === 'ultrafast' ? 'gpt-6-astra' : 'gpt-6-luna',
+        // Un modèle choisi dans l’administration remplace celui du mode ; la vitesse reste.
+        model:
+          features.delegationModel ||
+          (delegationMode === 'ultrafast' ? 'gpt-6-astra' : 'gpt-6-luna'),
         // Fast mode uses the priority alias supported by the Live SDK.
         service_tier:
           delegationMode === 'normal'

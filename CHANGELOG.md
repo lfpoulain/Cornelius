@@ -6,6 +6,15 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-06 : démarrage depuis Home Assistant, serveur Live compatible
+
+**Ajouté**
+
+- Variable `CORNELIUS_LIVE_BASE_URL` : la conversation OpenAI (miroir et satellites) passe par un serveur compatible avec l’API Live, par exemple sur le réseau local, à la place de `https://api.openai.com/v1`. Création, fin de session et WebSocket Live suivent cette adresse. Voir [Configuration](docs/reference/configuration.md).
+- **Mise en route → Voix de Cornelius → Serveur Live** : la même adresse se règle dans l’administration, sans redémarrage, et passe avant `.env`. Routes `GET` et `PATCH /api/admin/live-endpoint`.
+- **Délégation : recherches et actions → Modèle de délégation** : liste « Selon le mode » (par défaut), `gpt-6-luna`, `gpt-6-astra`, et les modèles du serveur Live lus avec « Charger la liste » (`POST /api/admin/live-endpoint/models`). Un modèle choisi remplace celui du mode ; la vitesse et le raisonnement du mode restent. Route `PATCH /api/admin/delegation-model` et champ `delegationModel` de l’état.
+- Route `POST /api/trigger/start`, protégée par le jeton `CORNELIUS_TRIGGER_TOKEN` (en-tête `Authorization: Bearer`, ou **Mise en route → Clés et jetons → Jeton de déclenchement**) : une automatisation Home Assistant (`rest_command`), par exemple au geste d’une baguette, ouvre une conversation comme le bouton **Démarrer**. Ni cookie ni en-tête `Origin` ; réseau local seulement, 30 appels par minute. La réponse donne `started`, `phase` et `reason`. Voir [Démarrer Cornelius depuis Home Assistant](docs/fonctionnalites/home-assistant.md#démarrer-cornelius-depuis-home-assistant).
+
 ### 2026-11-03 : fermeture après la première réponse
 
 **Ajouté**

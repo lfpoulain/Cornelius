@@ -10,6 +10,7 @@ import {
 import { api } from '../../api';
 import type { RunAction } from './types';
 import { Field } from './shared';
+import { LiveEndpointSettings } from './LiveEndpointSettings';
 import { NativeSelect, NativeSelectOption } from '../ui/native-select';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
 
@@ -100,6 +101,7 @@ export function VoiceSettings({ state, run }: { state: MirrorState; run: RunActi
                 </optgroup>
               </NativeSelect>
             </Field>
+            <LiveEndpointSettings run={run} />
           </>
         )}
       </CardContent>

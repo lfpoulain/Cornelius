@@ -115,6 +115,37 @@ Ce que ce compte limite : sans droits d’administrateur, le jeton ne donne pas 
 2. Collez-le dans **Jeton longue durée** et cliquez sur **Connecter Home Assistant**, puis recochez la sélection et l’autorisation.
 3. Dans Home Assistant, supprimez l’ancien jeton : c’est ce qui l’invalide, y compris dans les copies et sauvegardes qui le contiennent encore.
 
+## Démarrer Cornelius depuis Home Assistant
+
+Une automatisation Home Assistant peut ouvrir une conversation sur le miroir, au geste d’une baguette, à l’appui d’un bouton ou à tout autre événement. L’effet est celui du bouton **Démarrer** de l’administration.
+
+1. Choisissez un jeton long et aléatoire (32 caractères ou plus). Collez-le dans **Mise en route → Clés et jetons → Jeton de déclenchement**, ou écrivez `CORNELIUS_TRIGGER_TOKEN=…` dans `.env` puis redémarrez. Sans jeton, la route répond `503`.
+2. Dans Home Assistant, ajoutez une commande REST à `configuration.yaml` :
+
+   ```yaml
+   rest_command:
+     cornelius_start:
+       url: "https://192.168.1.20:3443/api/trigger/start"
+       method: post
+       headers:
+         authorization: !secret cornelius_trigger
+       verify_ssl: false
+   ```
+
+   Dans `secrets.yaml` : `cornelius_trigger: "Bearer votre-jeton"`. Remplacez l’adresse par celle du miroir. `verify_ssl: false` est nécessaire avec le certificat créé par Cornelius. Quand Cornelius tourne dans l’application Home Assistant, sur le même appareil, `http://127.0.0.1:3000/api/trigger/start` convient aussi.
+
+3. Dans l’automatisation de la baguette, appelez l’action `rest_command.cornelius_start`.
+
+La réponse est un objet JSON : `started` (vrai si la conversation s’ouvre ou est déjà ouverte), `phase` (état de la session) et `reason` (pourquoi rien ne s’est ouvert, sinon `null`).
+
+Les conditions du bouton **Démarrer** s’appliquent :
+
+- Le miroir doit être ouvert, et la voix activée dessus (**Activer la voix**).
+- Dans les modes avec caméra (1 à 3), une personne doit être visible devant le miroir ; dans le mode 3, elle doit le regarder. Le mode 4 (mot d’appel, caméra éteinte) n’a pas cette condition.
+- Le mode vie privée et l’option **Personnes reconnues** restent appliqués.
+
+La route n’accepte que le réseau local, refuse un jeton absent ou faux (`401`) et limite les appels à 30 par minute. Le jeton n’est jamais écrit au journal.
+
 ## Limites
 
 - Ne sont pas pris en charge : la couleur des lumières, les scènes, la commande des volets, des serrures et des thermostats, et des droits différents selon la personne.
