@@ -1139,7 +1139,7 @@ export async function createApp(
         label: 'Jeton de déclenchement',
         usedBy: 'Home Assistant : POST /api/trigger/start',
         url: null,
-        note: 'Choisissez une valeur longue et aléatoire. Home Assistant l’envoie dans l’en-tête Authorization: Bearer.',
+        note: 'Facultatif. Sans jeton, le réseau local suffit. Avec un jeton, Home Assistant l’envoie dans l’en-tête Authorization: Bearer.',
       },
       ...[
         ...new Map([...addonSecrets.values()].map((secret) => [secret.env, secret])).values(),
@@ -1247,12 +1247,17 @@ export async function createApp(
         config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
         preHandler: async (request, reply) => {
           const token = secretStore.get(TRIGGER_TOKEN_SECRET);
-          if (!token)
-            return reply.code(503).send({
-              error: 'Déclencheur externe désactivé : définissez CORNELIUS_TRIGGER_TOKEN.',
+          if (token) {
+            if (!equalSecret(String(request.headers.authorization ?? ''), 'Bearer ' + token))
+              return reply.code(401).send({ error: 'Jeton de déclenchement invalide.' });
+            return;
+          }
+          // Sans jeton, le réseau local suffit ; une page web ne doit pas pouvoir l'appeler à
+          // l'insu de la personne : un navigateur envoie toujours Origin, pas Home Assistant.
+          if (request.headers.origin)
+            return reply.code(403).send({
+              error: 'Sans jeton, le déclencheur refuse les appels venant d’un navigateur.',
             });
-          if (!equalSecret(String(request.headers.authorization ?? ''), 'Bearer ' + token))
-            return reply.code(401).send({ error: 'Jeton de déclenchement invalide.' });
         },
       },
       async () => {

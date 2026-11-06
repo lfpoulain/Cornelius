@@ -542,9 +542,20 @@ test('administrator heartbeats cannot authorize a session without a connected ki
 });
 
 test('un déclencheur externe démarre la conversation avec son jeton, sans cookie ni origine', async (t) => {
-  const closedRoute = await fixture(t);
-  const disabled = await closedRoute.app.inject({ method: 'POST', url: '/api/trigger/start' });
-  assert.equal(disabled.statusCode, 503);
+  // Sans jeton configuré : le réseau local suffit, mais jamais depuis un navigateur (Origin).
+  const open = await fixture(t, { lan: true });
+  const openCall = (headers: Record<string, string> = {}, remoteAddress = '192.168.1.40') =>
+    open.app.inject({
+      method: 'POST',
+      url: '/api/trigger/start',
+      remoteAddress,
+      headers: { host: '192.168.1.20:3443', 'content-type': 'text/plain', ...headers },
+    });
+  const noToken = await openCall();
+  assert.equal(noToken.statusCode, 200, noToken.body);
+  assert.equal(noToken.json().started, false);
+  assert.equal((await openCall({ origin: 'https://site-malveillant.example' })).statusCode, 403);
+  assert.equal((await openCall({}, '203.0.113.9')).statusCode, 403);
 
   const token = 't'.repeat(40);
   const f = await fixture(t, { triggerToken: token, lan: true });
