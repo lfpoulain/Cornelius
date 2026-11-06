@@ -558,6 +558,19 @@ test('un déclencheur externe démarre la conversation avec son jeton, sans cook
     });
   assert.equal((await call({})).statusCode, 401);
   assert.equal((await call({ authorization: 'Bearer mauvais-jeton' })).statusCode, 401);
+  // Home Assistant (rest_command) envoie son POST avec le type de contenu qu'il veut.
+  for (const contentType of [
+    'application/x-www-form-urlencoded',
+    'application/json',
+    'text/plain',
+    'application/octet-stream',
+  ])
+    assert.equal(
+      (await call({ 'content-type': contentType, authorization: 'Bearer mauvais-jeton' }))
+        .statusCode,
+      401,
+      contentType,
+    );
   assert.equal((await call({ authorization: `Bearer ${token}` }, '203.0.113.9')).statusCode, 403);
 
   // Sans personne devant le miroir, rien ne démarre : la réponse dit pourquoi.

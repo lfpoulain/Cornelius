@@ -1233,42 +1233,51 @@ export async function createApp(
   );
   // Déclencheur externe : même effet que le bouton Démarrer. Home Assistant l'appelle avec
   // le jeton CORNELIUS_TRIGGER_TOKEN (rest_command), par exemple au geste d'une baguette.
-  app.post(
-    '/api/trigger/start',
-    {
-      config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
-      preHandler: async (request, reply) => {
-        const token = secretStore.get(TRIGGER_TOKEN_SECRET);
-        if (!token)
-          return reply.code(503).send({
-            error: 'Déclencheur externe désactivé : définissez CORNELIUS_TRIGGER_TOKEN.',
-          });
-        if (!equalSecret(String(request.headers.authorization ?? ''), 'Bearer ' + token))
-          return reply.code(401).send({ error: 'Jeton de déclenchement invalide.' });
+  void app.register(async (scope) => {
+    // Le corps ne sert à rien ici : Home Assistant envoie son POST avec le type de contenu qu'il
+    // veut (formulaire, JSON vide, aucun). Tout est accepté et ignoré, sans erreur 415 ou 400.
+    scope.addContentTypeParser(
+      ['application/json', 'text/plain', '*'],
+      { parseAs: 'buffer', bodyLimit: 4096 },
+      (_request, _body, done) => done(null, undefined),
+    );
+    scope.post(
+      '/api/trigger/start',
+      {
+        config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+        preHandler: async (request, reply) => {
+          const token = secretStore.get(TRIGGER_TOKEN_SECRET);
+          if (!token)
+            return reply.code(503).send({
+              error: 'Déclencheur externe désactivé : définissez CORNELIUS_TRIGGER_TOKEN.',
+            });
+          if (!equalSecret(String(request.headers.authorization ?? ''), 'Bearer ' + token))
+            return reply.code(401).send({ error: 'Jeton de déclenchement invalide.' });
+        },
       },
-    },
-    async () => {
-      controller.command({ type: 'start' });
-      const { session, diagnostic } = controller.snapshot().state;
-      const started = ['connecting', 'ready'].includes(session.phase);
-      // Raison lisible quand rien ne s'ouvre : Home Assistant peut l'afficher ou la journaliser.
-      const reason = started
-        ? null
-        : session.phase === 'closing'
-          ? 'Conversation en cours de fermeture : elle va se rouvrir.'
-          : (diagnostic ??
-            session.reason ??
-            (session.mode === 4
-              ? 'Démarrage impossible pour le moment.'
-              : 'Personne n’est détecté devant le miroir.'));
-      logs.write('info', 'session', 'Démarrage par un déclencheur externe', {
-        started,
-        phase: session.phase,
-        reason,
-      });
-      return { started, phase: session.phase, reason };
-    },
-  );
+      async () => {
+        controller.command({ type: 'start' });
+        const { session, diagnostic } = controller.snapshot().state;
+        const started = ['connecting', 'ready'].includes(session.phase);
+        // Raison lisible quand rien ne s'ouvre : Home Assistant peut l'afficher ou la journaliser.
+        const reason = started
+          ? null
+          : session.phase === 'closing'
+            ? 'Conversation en cours de fermeture : elle va se rouvrir.'
+            : (diagnostic ??
+              session.reason ??
+              (session.mode === 4
+                ? 'Démarrage impossible pour le moment.'
+                : 'Personne n’est détecté devant le miroir.'));
+        logs.write('info', 'session', 'Démarrage par un déclencheur externe', {
+          started,
+          phase: session.phase,
+          reason,
+        });
+        return { started, phase: session.phase, reason };
+      },
+    );
+  });
 
   const personalitySchema = compile<{ instructions: string }>({
     type: 'object',
