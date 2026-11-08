@@ -159,6 +159,104 @@ test('commande précise, luminosité et retour confirmé par un état réel', as
   assert.equal(f.fake.calls.length, 1);
 });
 
+test('couleur et blanc d’une lumière : envoyés, relus et confirmés', async (t) => {
+  const f = await fixture(t);
+  f.fake.states.set('light.ruban', {
+    entity_id: 'light.ruban',
+    state: 'off',
+    last_updated: new Date().toISOString(),
+    attributes: {
+      friendly_name: 'Ruban LED',
+      supported_color_modes: ['hs', 'color_temp'],
+      brightness: 200,
+      min_color_temp_kelvin: 2200,
+      max_color_temp_kelvin: 6500,
+    } as ReturnType<typeof haState>['attributes'],
+  });
+  await f.home.refresh();
+  const ruban = f.home.view().entities.find((entity) => entity.id === 'light.ruban');
+  assert.equal(ruban?.color, true);
+  assert.equal(ruban?.colorTemp, true);
+  // Une lampe sans couleur ne l’annonce pas.
+  assert.equal(
+    f.home.view().entities.find((entity) => entity.id === 'light.salon')?.color,
+    undefined,
+  );
+  f.select(['light.ruban', 'light.salon']);
+  const [control] = f.home.tools();
+  assert.match(control!.description, /"id":"light\.ruban"[^}]*"color":true,"colorTemp":true/u);
+  assert.deepEqual((control!.parameters as { required: string[] }).required, [
+    'entityId',
+    'action',
+    'brightnessPct',
+    'rgbColor',
+    'colorTempKelvin',
+  ]);
+
+  const red = await f.home.run(
+    { ...command('light.ruban'), rgbColor: [255, 0, 0], colorTempKelvin: null },
+    signal(),
+  );
+  assert.equal(red.status, 'succeeded');
+  assert.equal(red.result?.confirmed, true, red.summary);
+  assert.deepEqual(f.fake.calls.at(-1), {
+    path: '/api/services/light/turn_on',
+    body: { entity_id: 'light.ruban', rgb_color: [255, 0, 0] },
+  });
+
+  // Blanc demandé hors de la plage de l’ampoule : ramené à sa limite, puis confirmé.
+  const warm = await f.home.run(
+    { ...command('light.ruban'), rgbColor: null, colorTempKelvin: 1800 },
+    signal(),
+  );
+  assert.equal(warm.result?.confirmed, true, warm.summary);
+  assert.deepEqual(f.fake.calls.at(-1)?.body, {
+    entity_id: 'light.ruban',
+    color_temp_kelvin: 2200,
+  });
+
+  // Une couleur jamais atteinte n’est pas confirmée.
+  f.fake.options.apply = false;
+  const blue = await f.home.run(
+    { ...command('light.ruban'), rgbColor: [0, 60, 255], colorTempKelvin: null },
+    signal(),
+  );
+  assert.equal(blue.result?.accepted, true);
+  assert.equal(blue.result?.confirmed, false);
+});
+
+test('couleur refusée sans effet : lampe sans couleur, extinction, couleur et blanc ensemble', async (t) => {
+  const f = await fixture(t);
+  f.select();
+  for (const args of [
+    { ...command('light.salon'), rgbColor: [255, 0, 0] },
+    { ...command('light.salon'), colorTempKelvin: 2700 },
+    { ...command('switch.bureau'), rgbColor: [255, 0, 0] },
+    { ...command('light.salon', 'turn_off'), rgbColor: [255, 0, 0] },
+    { ...command('light.salon'), rgbColor: [255, 0] },
+    { ...command('light.salon'), rgbColor: [256, 0, 0] },
+    { ...command('light.salon'), colorTempKelvin: 100 },
+  ])
+    assert.equal((await f.home.run(args, signal())).status, 'failed', JSON.stringify(args));
+  f.fake.states.set('light.ruban', {
+    entity_id: 'light.ruban',
+    state: 'off',
+    last_updated: new Date().toISOString(),
+    attributes: {
+      friendly_name: 'Ruban LED',
+      supported_color_modes: ['hs', 'color_temp'],
+    } as ReturnType<typeof haState>['attributes'],
+  });
+  await f.home.refresh();
+  f.select(['light.ruban']);
+  const both = await f.home.run(
+    { ...command('light.ruban'), rgbColor: [255, 0, 0], colorTempKelvin: 2700 },
+    signal(),
+  );
+  assert.equal(both.status, 'failed');
+  assert.equal(f.fake.calls.length, 0);
+});
+
 test('un appareil qui remonte son état en différé est quand même confirmé', async (t) => {
   const f = await fixture(t);
   f.select();

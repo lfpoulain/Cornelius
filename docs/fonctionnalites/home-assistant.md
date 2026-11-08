@@ -6,7 +6,7 @@ Cornelius peut allumer et éteindre les lumières et les prises de la maison, et
 
 Home Assistant est un logiciel de domotique installé à part. Cornelius s’y connecte directement : aucun module complémentaire, blueprint ni intégration n’est à installer dans Home Assistant. Cornelius peut aussi tourner lui-même sur la box, comme add-on (voir [Installer dans Home Assistant](../installation/home-assistant.md)) : la connexion décrite ici reste la même.
 
-- **Lumières et prises** (`light.*` et `switch.*`) : allumer, éteindre, lire l’état, et régler la luminosité des lumières qui le permettent (de 1 à 100 %).
+- **Lumières et prises** (`light.*` et `switch.*`) : allumer, éteindre, lire l’état, et régler la luminosité des lumières qui le permettent (de 1 à 100 %), leur couleur (« mets le bureau en violet ») et leur blanc (« blanc chaud », de 1500 à 9000 K, ramené à la plage de l’ampoule). La couleur n’est confirmée que si Home Assistant la relit (à une marge près, l’ampoule l’arrondissant à sa teinte).
 - **Capteurs**, en lecture seule : capteurs et détecteurs, minuteries, dates et heures, nombres, interrupteurs virtuels, listes de choix, compteurs, thermostats, volets et serrures. Un capteur n’est jamais commandé : Cornelius peut dire si une serrure est fermée, pas l’ouvrir.
 
 Dans Home Assistant, un « switch » peut piloter autre chose qu’une prise. Ne cochez que les appareils que Cornelius doit vraiment commander.
@@ -79,7 +79,7 @@ Pour une commande, Cornelius relit l’état de l’appareil, vérifie qu’il e
 
 Pour un capteur, Cornelius relit toujours l’état actuel, jamais une valeur gardée en mémoire. Pour une minuterie, la fin d’un programme (lave-linge, lave-vaisselle…) ou une date, le serveur calcule lui-même l’heure de fin et le temps restant. Un capteur « indisponible » ou « inconnu » est signalé comme tel.
 
-Cornelius ne peut utiliser que les deux actions marche et arrêt, et la luminosité. Aucune autre commande, adresse ou donnée ne peut lui être dictée par la conversation.
+Cornelius ne peut utiliser que les deux actions marche et arrêt, la luminosité, la couleur et le blanc. Aucune autre commande, adresse ou donnée ne peut lui être dictée par la conversation.
 
 ## Connexion et coupures
 
