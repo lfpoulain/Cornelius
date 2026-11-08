@@ -38,6 +38,9 @@ export type SatelliteChanges = Partial<SatelliteSettings> & {
 };
 
 const tokenHash = (token: string) => createHash('sha256').update(token).digest('hex');
+/** Le satellite et sa fin de parole propre, s’il en a une. */
+const selectSatellites = `SELECT satellites.*, satellite_silence.delay_ms AS silence_close_ms
+  FROM satellites LEFT JOIN satellite_silence ON satellite_silence.satellite_id = satellites.id`;
 
 function satellite(row: Record<string, unknown>): Satellite {
   return {
@@ -49,6 +52,7 @@ function satellite(row: Record<string, unknown>): Satellite {
     ledBrightness: Number(row.led_brightness),
     nightLight: Number(row.night_light) === 1,
     attentive: Number(row.attentive) === 1,
+    silenceCloseMs: row.silence_close_ms == null ? null : Number(row.silence_close_ms),
     createdAt: Number(row.created_at),
     lastSeenAt: row.last_seen_at === null ? null : Number(row.last_seen_at),
   };
@@ -61,12 +65,12 @@ export class SatelliteStore {
   ) {}
   list(): Satellite[] {
     return this.db
-      .prepare('SELECT * FROM satellites ORDER BY created_at, id')
+      .prepare(selectSatellites + ' ORDER BY created_at, id')
       .all()
       .map((row) => satellite(row));
   }
   get(id: string): Satellite | null {
-    const row = this.db.prepare('SELECT * FROM satellites WHERE id = ?').get(id);
+    const row = this.db.prepare(selectSatellites + ' WHERE satellites.id = ?').get(id);
     return row ? satellite(row) : null;
   }
   /** Le jeton n’est rendu qu’ici : il faut le noter tout de suite dans le satellite. */
@@ -104,6 +108,17 @@ export class SatelliteStore {
         next.attentive ? 1 : 0,
         id,
       );
+    if (changes.silenceCloseMs !== undefined) {
+      if (changes.silenceCloseMs === null)
+        this.db.prepare('DELETE FROM satellite_silence WHERE satellite_id = ?').run(id);
+      else
+        this.db
+          .prepare(
+            `INSERT INTO satellite_silence (satellite_id, delay_ms) VALUES (?, ?)
+            ON CONFLICT (satellite_id) DO UPDATE SET delay_ms = excluded.delay_ms`,
+          )
+          .run(id, changes.silenceCloseMs);
+    }
     return this.get(id);
   }
   remove(id: string): boolean {
@@ -113,7 +128,7 @@ export class SatelliteStore {
   authenticate(token: string): Satellite | null {
     if (!token || token.length > 256) return null;
     const row = this.db
-      .prepare('SELECT * FROM satellites WHERE token_hash = ?')
+      .prepare(selectSatellites + ' WHERE satellites.token_hash = ?')
       .get(tokenHash(token));
     return row ? satellite(row) : null;
   }

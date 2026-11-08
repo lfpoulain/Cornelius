@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-08 : fin de parole propre à chaque satellite
+
+**Ajouté**
+
+- **Satellites audio → Fin de parole sur ce satellite** : « Comme le foyer » (par défaut) ou un délai propre (5 s à 1 min dans l’administration, 3 à 300 s par l’API), pour sa conversation seulement. Champ `silenceCloseMs` des satellites (`PATCH /api/admin/satellites/:id`), table `satellite_silence`.
+
 ### 2026-11-06 : démarrage depuis Home Assistant, serveur Live compatible
 
 **Ajouté**

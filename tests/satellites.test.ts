@@ -101,9 +101,16 @@ test('registre : jeton montré une fois, empreinte seule gardée, révocation', 
     ledBrightness: 6,
     nightLight: false,
     attentive: false,
+    silenceCloseMs: null,
     createdAt: 1000,
     lastSeenAt: null,
   });
+  // Fin de parole propre : gardée à part, retirée par null, effacée avec le satellite.
+  assert.equal(store.update(satellite.id, { silenceCloseMs: 5000 })?.silenceCloseMs, 5000);
+  assert.equal(store.authenticate(token)?.silenceCloseMs, 5000);
+  assert.equal(store.list()[0]?.silenceCloseMs, 5000);
+  assert.equal(store.update(satellite.id, { nightLight: false })?.silenceCloseMs, 5000);
+  assert.equal(store.update(satellite.id, { silenceCloseMs: null })?.silenceCloseMs, null);
   // Réglages de l’administration : enregistrés, et les autres champs restent intacts.
   const tuned = store.update(satellite.id, {
     ledColor: '#2f7bff',
@@ -299,6 +306,9 @@ test('réglages depuis l’administration : validés, envoyés au satellite conn
     { ledBrightness: 11 },
     { nightLight: 'oui' },
     { attentive: 1 },
+    { silenceCloseMs: 1000 },
+    { silenceCloseMs: 400_000 },
+    { silenceCloseMs: '5000' },
   ])
     assert.equal(
       (await f.app.inject({ method: 'PATCH', url, headers, payload })).statusCode,

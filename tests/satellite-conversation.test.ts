@@ -182,6 +182,25 @@ test('satellite : fin sur silence, clôture confirmée, puis retour à la veille
   assert.equal(f.controller.isWakeListening(), true);
 });
 
+test('satellite : sa propre fin de parole remplace celle du foyer, le temps de sa conversation', (t) => {
+  const f = fixture(t);
+  f.controller.satelliteWake({ ...bureau, silenceCloseMs: 5000 });
+  f.emit({ type: 'session.started', event_id: 'e1', session: { id: 'live_sat' } });
+  f.advance(4000);
+  assert.equal(f.controller.sessionState().phase, 'ready');
+  f.advance(2000);
+  assert.deepEqual(
+    [f.controller.sessionState().phase, f.controller.sessionState().reason],
+    ['closing', 'Fin de conversation après silence.'],
+  );
+  f.emit({ type: 'session.closed', event_id: 'e2', usage: {} });
+  // Sans réglage propre, la conversation suivante suit de nouveau le foyer (20 s).
+  f.controller.satelliteWake({ ...bureau, silenceCloseMs: null });
+  f.emit({ type: 'session.started', event_id: 'e3', session: { id: 'live_sat_2' } });
+  f.advance(6000);
+  assert.equal(f.controller.sessionState().phase, 'ready');
+});
+
 test('satellite : réservé aux membres, déconnexion pendant la conversation', (t) => {
   const f = fixture(t);
   f.controller.setOpening({ trigger: 'voice', audience: 'members', recognizeVoice: false });

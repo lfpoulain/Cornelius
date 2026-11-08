@@ -19,6 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Switch } from '../ui/switch';
+import { NativeSelect, NativeSelectOption } from '../ui/native-select';
 
 /** Jeton tout juste créé : montré une seule fois, avec ce qu’il faut saisir dans le satellite. */
 interface Issued {
@@ -373,6 +374,9 @@ function SatelliteSettingsPanel({ satellite, run }: { satellite: SatelliteView; 
   const [color, setColor] = useState(satellite.ledColor);
   const [nightLight, setNightLight] = useState(satellite.nightLight);
   const [attentive, setAttentive] = useState(satellite.attentive);
+  const [silence, setSilence] = useState(
+    satellite.silenceCloseMs === null ? 'household' : String(satellite.silenceCloseMs),
+  );
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   useEffect(() => {
     const pending = timers.current;
@@ -532,6 +536,41 @@ function SatelliteSettingsPanel({ satellite, run }: { satellite: SatelliteView; 
               : 'Ne s’applique qu’à un satellite qui annule l’écho de son haut-parleur.'}
         </p>
       </div>
+      <Field
+        id={id + '-silence'}
+        label="Fin de parole sur ce satellite"
+        help="Délai de silence avant que la conversation se ferme. « Comme le foyer » suit Quand il écoute → Fin de parole."
+      >
+        <NativeSelect
+          id={id + '-silence'}
+          value={silence}
+          onChange={(event) => {
+            const value = event.target.value;
+            setSilence(value);
+            const silenceCloseMs = value === 'household' ? null : Number(value);
+            save(
+              'silence',
+              silenceCloseMs === null
+                ? 'Fin de parole : comme le foyer.'
+                : 'Fin de parole : après ' + silenceCloseMs / 1000 + ' s de silence.',
+              { silenceCloseMs },
+            );
+          }}
+        >
+          <NativeSelectOption value="household">Comme le foyer</NativeSelectOption>
+          {[5000, 10_000, 20_000, 30_000, 60_000].map((ms) => (
+            <NativeSelectOption key={ms} value={String(ms)}>
+              {ms / 1000} s
+            </NativeSelectOption>
+          ))}
+          {satellite.silenceCloseMs !== null &&
+            ![5000, 10_000, 20_000, 30_000, 60_000].includes(satellite.silenceCloseMs) && (
+              <NativeSelectOption value={String(satellite.silenceCloseMs)}>
+                {satellite.silenceCloseMs / 1000} s
+              </NativeSelectOption>
+            )}
+        </NativeSelect>
+      </Field>
     </div>
   );
 }

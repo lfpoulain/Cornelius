@@ -355,6 +355,7 @@ export class SatelliteHub {
       id: connection.satellite.id,
       name: connection.satellite.name,
       profileId: connection.satellite.profileId,
+      silenceCloseMs: connection.satellite.silenceCloseMs,
     });
     this.deps.logs.write('info', 'local', 'Mot d’appel entendu par un satellite', {
       satellite: connection.satellite.name,

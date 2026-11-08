@@ -431,6 +431,11 @@ export const migrations: readonly string[] = [
     delegation_model TEXT NOT NULL DEFAULT ''
   ) STRICT;
   INSERT OR IGNORE INTO live_preferences (id) VALUES (1);`,
+  // Fin de parole propre à un satellite : sans ligne, celle du foyer.
+  `CREATE TABLE IF NOT EXISTS satellite_silence (
+    satellite_id TEXT PRIMARY KEY REFERENCES satellites(id) ON DELETE CASCADE,
+    delay_ms INTEGER NOT NULL CHECK (delay_ms BETWEEN 3000 AND 300000)
+  ) STRICT;`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */

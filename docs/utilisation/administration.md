@@ -133,7 +133,7 @@ L’enregistrement d’un visage demande le service caméra. Quel que soit le mo
 *Premiers réglages.* Les micros et haut-parleurs des autres pièces. Voir [Les satellites audio](../fonctionnalites/satellites.md).
 
 - **Nouveaux satellites** (quand un satellite neuf attend) : « Faire clignoter », une pièce, puis « Associer » ; ou « Refuser ».
-- Une fiche par satellite : en ligne ou non, firmware, micro coupé ; la pièce et « Conversations au nom de » (« Le foyer » par défaut), avec « Enregistrer » ; puis, enregistrés aussitôt, le volume (0 à 10), la couleur et la luminosité de l’anneau, la veilleuse et l’écoute attentive ; enfin « Nouveau jeton » et « Retirer ».
+- Une fiche par satellite : en ligne ou non, firmware, micro coupé ; la pièce et « Conversations au nom de » (« Le foyer » par défaut), avec « Enregistrer » ; puis, enregistrés aussitôt, le volume (0 à 10), la couleur et la luminosité de l’anneau, la veilleuse, l’écoute attentive et la fin de parole propre au satellite (« Comme le foyer » par défaut, ou 5 s à 1 min) ; enfin « Nouveau jeton » et « Retirer ».
 - Le formulaire « Pièce du nouveau satellite » crée un accès pour un satellite configuré à la main (développement) : le jeton est affiché une seule fois, avec les adresses et l’empreinte de la clé.
 
 ## Personnaliser Cornelius

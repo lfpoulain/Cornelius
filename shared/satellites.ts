@@ -13,6 +13,11 @@ export interface SatelliteSettings {
    * la parole. Seulement avec un satellite qui annule l’écho ; sinon, il s’entendrait.
    */
   attentive: boolean;
+  /**
+   * Fin de parole propre à ce satellite, en millisecondes (3 à 300 s) ; null : le délai du
+   * foyer (Quand il écoute → Fin de parole). Une chambre peut fermer plus vite qu’un bureau.
+   */
+  silenceCloseMs: number | null;
 }
 
 /** Un satellite audio tel que l’administration le voit (jamais son jeton). */
@@ -48,6 +53,7 @@ export const DEFAULT_SATELLITE_SETTINGS: Readonly<SatelliteSettings> = {
   ledBrightness: 6,
   nightLight: false,
   attentive: false,
+  silenceCloseMs: null,
 };
 
 /** Couleurs proposées dans l’administration (l’ambre, le rouge et l’orange restent aux alertes). */

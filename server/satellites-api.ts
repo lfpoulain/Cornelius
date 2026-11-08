@@ -30,6 +30,9 @@ const updateSchema = compile<SatelliteChanges>({
     ledBrightness: { type: 'integer', minimum: 0, maximum: 10 },
     nightLight: { type: 'boolean' },
     attentive: { type: 'boolean' },
+    silenceCloseMs: {
+      anyOf: [{ type: 'integer', minimum: 3000, maximum: 300000 }, { type: 'null' }],
+    },
   },
 });
 
