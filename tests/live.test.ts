@@ -879,6 +879,43 @@ test('conversation__end : proposé avec le mot de fin, il ferme après la répon
   assert.equal(f.controller.snapshot().state.session.reason, 'Fin de conversation demandée.');
 });
 
+test('mot de fin reconnu dans la transcription, sans attendre l’outil', async (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  await f.ready();
+  // La phrase arrive par morceaux ; Cornelius répond « avec plaisir » sans déléguer.
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Merci ' });
+  f.emit({ type: 'session.input_transcript.delta', delta: 'beaucoup, c’est tout.' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Avec plaisir.' });
+  assert.ok(
+    f.logs
+      .snapshot()
+      .entries.some(
+        (entry) =>
+          entry.event === 'Fin de conversation demandée' &&
+          (entry.details as { source?: string }).source === 'transcription',
+      ),
+  );
+  f.advance(1000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+  f.advance(2000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'closing');
+  assert.equal(f.controller.snapshot().state.session.reason, 'Fin de conversation demandée.');
+});
+
+test('mot de fin : « merci, et la météo ? » ne ferme pas, ni un mot de fin désactivé', async (t) => {
+  const f = fixture(t);
+  await f.ready();
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Merci.' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Avec plaisir.' });
+  f.controller.setEndWord(true);
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Merci, et la météo ?' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Je regarde.' });
+  f.advance(1000);
+  f.advance(5000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+});
+
 test('conversation__end désactivé : l’appel est refusé et la conversation continue', async (t) => {
   const f = fixture(t);
   await f.ready();

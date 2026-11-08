@@ -10,7 +10,7 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 **Ajouté**
 
-- **Fin de parole → Fermer quand on dit merci** (désactivée par défaut) : quand la personne clôt l’échange sans nouvelle demande (« merci », « c’est tout », « au revoir », « bonne nuit »), Cornelius répond d’une formule courte puis la conversation se ferme 2 s après la fin de sa réponse, au plus tard 10 s après. La parole entendue dans la pièce ne la retient pas : utile sur un satellite quand on parle ensuite à quelqu’un d’autre. Outil vocal `conversation__end`, route `PATCH /api/admin/end-word` et champ `endWord` de l’état. Le réglage vaut à partir de la conversation suivante.
+- **Fin de parole → Fermer quand on dit merci** (désactivée par défaut) : quand la personne clôt l’échange sans nouvelle demande (« merci », « c’est tout », « au revoir », « bonne nuit »), Cornelius répond d’une formule courte puis la conversation se ferme 2 s après la fin de sa réponse, au plus tard 10 s après. La parole entendue dans la pièce ne la retient pas : utile sur un satellite quand on parle ensuite à quelqu’un d’autre. La fin est reconnue par le serveur dans la transcription (une phrase faite seulement d’une formule de fin), ou par le modèle avec l’outil vocal `conversation__end`. Route `PATCH /api/admin/end-word` et champ `endWord` de l’état. Le réglage vaut à partir de la conversation suivante.
 
 ## 0.3.0 · 2026-11-09
 

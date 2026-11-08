@@ -15,6 +15,7 @@ import {
   END_CONVERSATION_TOOL,
   endConversationResult,
   endConversationTool,
+  isClosingPhrase,
 } from './conversation-end.js';
 import { illustrationPrompt } from '../image-illustration.js';
 import { validators } from '../../shared/validation.js';
@@ -164,6 +165,8 @@ interface ActiveSession {
   continued: Set<string>;
   touched: Set<string>;
   heardUserTranscript: boolean;
+  /** Mot de fin : ce que la personne dit depuis la dernière réponse de Cornelius. */
+  userTurn: string;
   audioCaughtUp: boolean;
   contextAppends: Map<string, (accepted: boolean) => void>;
   cameraContextIds: Set<string>;
@@ -391,6 +394,7 @@ export class LiveTransport implements SessionTransport {
       continued: new Set(),
       touched: new Set(),
       heardUserTranscript: false,
+      userTurn: '',
       audioCaughtUp: false,
       contextAppends: new Map(),
       cameraContextIds: new Set(),
@@ -1055,9 +1059,17 @@ export class LiveTransport implements SessionTransport {
     )
       this.memory?.transcript(active.scope, event);
     if (event.type === 'session.input_transcript.delta') {
+      if (typeof event.delta === 'string' && active.userTurn.length < 500)
+        active.userTurn += event.delta;
       this.controller.noteUserTranscript(active.scope);
       this.controller.setVoiceActivity(active.scope, 'listening', 1200);
     }
+    // Cornelius commence à répondre : la phrase de la personne est complète.
+    if (
+      event.type === 'session.delegation.created' ||
+      event.type === 'session.output_transcript.delta'
+    )
+      this.endOnClosingPhrase(active);
     if (event.type === 'session.delegation.created') {
       this.controller.setAssistantBusy(active.scope, true);
       this.controller.setVoiceActivity(active.scope, 'thinking', 10_000);
@@ -1076,6 +1088,21 @@ export class LiveTransport implements SessionTransport {
     active.touched.add(delegation);
     active.continued.delete(delegation);
     active.pending.set(delegation, (active.pending.get(delegation) ?? 0) + 1);
+  }
+  /**
+   * Mot de fin reconnu dans la transcription, sans attendre que le modèle délègue l'outil
+   * conversation__end : une phrase faite seulement d'une formule de fin ferme la conversation.
+   */
+  private endOnClosingPhrase(active: ActiveSession) {
+    const said = active.userTurn;
+    if (!said) return;
+    active.userTurn = '';
+    if (!this.controller.isEndWordEnabled() || !isClosingPhrase(said)) return;
+    if (this.controller.requestEnd(active.scope))
+      this.logs?.write('info', 'session', 'Fin de conversation demandée', {
+        interactionId: active.scope.interactionId,
+        source: 'transcription',
+      });
   }
   private finishTool(active: ActiveSession, delegation: string) {
     const count = (active.pending.get(delegation) ?? 0) - 1;
@@ -1305,6 +1332,7 @@ export class LiveTransport implements SessionTransport {
         if (accepted)
           this.logs?.write('info', 'session', 'Fin de conversation demandée', {
             interactionId: active.scope.interactionId,
+            source: 'outil',
           });
         this.sendItem(active, item.call_id, endConversationResult(accepted));
         this.finishTool(active, delegation);
