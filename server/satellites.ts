@@ -203,6 +203,19 @@ export class SatelliteHub {
           satellite: satellite.name,
           stopped,
         });
+      } else if (message.type === 'session' && message.action === 'end') {
+        // Bouton du satellite pendant sa conversation : la fermer, comme « Arrêter la session ».
+        const session = this.deps.controller.sessionState();
+        if (
+          session.satellite?.id === satellite.id &&
+          (session.phase === 'connecting' || session.phase === 'ready')
+        ) {
+          this.deps.controller.close('Fin de conversation au bouton du satellite.');
+          this.deps.controller.publish();
+          this.deps.logs.write('info', 'session', 'Conversation fermée au bouton du satellite', {
+            satellite: satellite.name,
+          });
+        }
       } else if (message.type === 'mic' && typeof message.muted === 'boolean') {
         connection.muted = message.muted;
         this.deps.logs.write('info', 'local', 'Micro du satellite', {
