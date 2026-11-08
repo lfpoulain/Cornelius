@@ -1,3 +1,4 @@
+import type { VoiceUsageView } from '../shared/voice-usage';
 import type { CustomProviderSettings, CustomProviderView } from '../shared/custom-provider';
 import type { Opening } from '../shared/opening';
 import type {
@@ -120,6 +121,12 @@ const post = <T>(path: string, body: unknown, options: RequestOptions = {}) =>
 const slow = { timeoutMs: SLOW_REQUEST_TIMEOUT_MS };
 
 export const api = {
+  voiceUsage: () => request<VoiceUsageView>('/api/admin/voice-usage'),
+  setVoicePrice: (perMinute: number | null, currency: '$' | '€') =>
+    request<VoiceUsageView>('/api/admin/voice-usage/price', {
+      method: 'PATCH',
+      body: JSON.stringify({ perMinute, currency }),
+    }),
   agent: (profileId: string) =>
     request<AgentAdminView>('/api/admin/agents/' + encodeURIComponent(profileId)),
   saveAgent: (profileId: string, input: AgentConnectionInput) =>
