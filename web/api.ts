@@ -349,6 +349,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ enabled }),
     }),
+  endWord: (enabled: boolean) =>
+    request<StateEvent>('/api/admin/end-word', {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    }),
   visionMode: (mode: VisionMode) =>
     request<{ ok: boolean }>('/api/admin/vision', {
       method: 'PATCH',

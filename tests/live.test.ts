@@ -823,6 +823,83 @@ test('satellite__volume : proposé au satellite seulement, consigne ajoutée', (
   });
 });
 
+test('conversation__end : proposé avec le mot de fin, il ferme après la réponse', async (t) => {
+  const f = fixture(t);
+  await f.ready();
+  const without = (f.configs[0]!.delegation as MediaSessionConfig.Responses).responses;
+  assert.ok(!without.tools?.some((tool) => 'name' in tool && tool.name === 'conversation__end'));
+  assert.doesNotMatch(String(f.configs[0]!.instructions), /conversation__end/u);
+  f.controller.setEndWord(true);
+  const config = liveConfiguration(
+    [
+      {
+        name: 'conversation__end',
+        description: 'Fermer la conversation.',
+        parameters: { type: 'object', additionalProperties: false, required: [], properties: {} },
+      },
+    ],
+    undefined,
+  );
+  assert.match(
+    String(config.instructions),
+    /Fin de conversation : .*« merci ».*conversation__end/u,
+  );
+  assert.match(
+    String((config.delegation as MediaSessionConfig.Responses).responses.instructions),
+    /appelle conversation__end sans argument/u,
+  );
+  f.emit({
+    type: 'response.event',
+    delegation_id: 'end-delegation',
+    event: {
+      type: 'response.output_item.done',
+      item: {
+        type: 'function_call',
+        call_id: 'end-call',
+        name: 'conversation__end',
+        arguments: '{}',
+      },
+    },
+  });
+  await setImmediate();
+  assert.ok(
+    f.sent.some(
+      (event) =>
+        event.type === 'response.item.create' &&
+        JSON.stringify(event).includes('Ne dis rien de plus.'),
+    ),
+  );
+  assert.ok(
+    f.logs.snapshot().entries.some((entry) => entry.event === 'Fin de conversation demandée'),
+  );
+  f.advance(1000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+  f.advance(2000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'closing');
+  assert.equal(f.controller.snapshot().state.session.reason, 'Fin de conversation demandée.');
+});
+
+test('conversation__end désactivé : l’appel est refusé et la conversation continue', async (t) => {
+  const f = fixture(t);
+  await f.ready();
+  f.emit({
+    type: 'response.event',
+    delegation_id: 'end-delegation',
+    event: {
+      type: 'response.output_item.done',
+      item: {
+        type: 'function_call',
+        call_id: 'end-call',
+        name: 'conversation__end',
+        arguments: '{}',
+      },
+    },
+  });
+  await setImmediate();
+  f.advance(15_000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+});
+
 test('une alarme qui sonne est annoncée une fois par conversation, sans se bousculer', async (t) => {
   const f = fixture(t);
   assert.equal(f.live.deliverAlarmNotice('ringing:a:1', 'Le réveil sonne.'), 'busy');

@@ -1707,6 +1707,69 @@ test('fermeture après la réponse en mode voix : le silence ferme toujours sans
   assert.equal(f.state().session.reason, 'Fin de conversation après silence.');
 });
 
+test('mot de fin : réglage conservé, refusé tant qu’il est désactivé', (t) => {
+  const f = fixture(t);
+  assert.equal(f.state().endWord, false);
+  f.engage();
+  const scope = f.ready();
+  assert.equal(f.controller.requestEnd(scope), false);
+  f.controller.setEndWord(true);
+  assert.equal(new SessionPreferences(f.db).getEndWord(), true);
+  assert.equal(f.state().endWord, true);
+  assert.equal(f.controller.isEndWordEnabled(), true);
+  // Une conversation périmée ne se ferme pas à la place de la suivante.
+  assert.equal(f.controller.requestEnd({ ...scope, interactionId: 'ancienne' }), false);
+  f.controller.setEndWord(false);
+  assert.equal(new SessionPreferences(f.db).getEndWord(), false);
+});
+
+test('mot de fin : la conversation se ferme quand Cornelius se tait, malgré une voix dans la pièce', (t) => {
+  const f = fixture(t);
+  f.controller.setSessionMode(4);
+  f.controller.setEndWord(true);
+  f.controller.setWakeWordAvailability(true, null);
+  f.controller.heartbeat();
+  assert.equal(f.controller.wakeDetected(), true);
+  const scope = f.ready();
+  f.controller.setUserSpeech(scope, true);
+  f.controller.setUserSpeech(scope, false);
+  // « Merci » : l’outil est appelé pendant que Cornelius répond « avec plaisir ».
+  f.controller.setAssistantBusy(scope, true);
+  assert.equal(f.controller.requestEnd(scope), true);
+  // La personne parle maintenant à quelqu’un d’autre : sa voix ne retient pas la conversation.
+  f.controller.setUserSpeech(scope, true);
+  f.advance(1000);
+  f.controller.setAssistantBusy(scope, false);
+  f.controller.noteAssistantOutput(scope);
+  f.advance(1000);
+  assert.equal(f.state().session.phase, 'ready');
+  f.advance(2000);
+  assert.equal(f.state().session.phase, 'closing');
+  assert.equal(f.state().session.reason, 'Fin de conversation demandée.');
+  f.acknowledgeClose();
+  // La conversation suivante repart sans demande de fin en attente.
+  assert.equal(f.controller.wakeDetected(), true);
+  const next = f.ready();
+  assert.notEqual(next.interactionId, scope.interactionId);
+  f.controller.setUserSpeech(next, true);
+  f.advance(9000);
+  assert.equal(f.state().session.phase, 'ready');
+});
+
+test('mot de fin : une réponse qui ne finit pas ferme quand même après 10 s', (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  f.engage();
+  const scope = f.ready();
+  f.controller.setAssistantBusy(scope, true);
+  assert.equal(f.controller.requestEnd(scope), true);
+  f.advance(9000);
+  assert.equal(f.state().session.phase, 'ready');
+  f.advance(1000);
+  assert.equal(f.state().session.phase, 'closing');
+  assert.equal(f.state().session.reason, 'Fin de conversation demandée.');
+});
+
 function voiceFixture(t: TestContext, recognition = true) {
   const f = fixture(t);
   f.controller.setSessionMode(4);

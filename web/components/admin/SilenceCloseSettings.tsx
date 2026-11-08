@@ -123,6 +123,35 @@ export function SilenceCloseSettings({ state, run }: { state: MirrorState; run: 
             </span>
           </span>
         </label>
+        <label className="admin-mode-option admin-wake-option">
+          <input
+            type="checkbox"
+            aria-label="Fermer quand on dit merci"
+            aria-describedby="end-word-detail"
+            checked={state.endWord === true}
+            onChange={(event) => {
+              const enabled = event.target.checked;
+              void run(
+                enabled
+                  ? 'Fin de parole : quand on dit merci.'
+                  : 'Fin de parole : « merci » ne ferme plus la conversation.',
+                () => api.endWord(enabled),
+                { key: 'end-word', payload: { enabled } },
+              );
+            }}
+          />
+          <span className="admin-mode-card">
+            <span className="admin-mode-top">
+              <strong>Fermer quand on dit merci</strong>
+              <span className="admin-checkbox" aria-hidden="true" />
+            </span>
+            <span className="admin-mode-detail" id="end-word-detail">
+              « Merci », « c’est tout », « au revoir » : Cornelius répond d’un mot puis ferme la
+              conversation, même si quelqu’un parle encore dans la pièce. Un « merci » suivi d’une
+              autre demande ne ferme pas. Vaut pour la conversation suivante.
+            </span>
+          </span>
+        </label>
         <FineTuning hint="Délai personnalisé" defaultOpen={choice === 'custom'}>
           <Field
             id="silence-close-delay"

@@ -436,6 +436,12 @@ export const migrations: readonly string[] = [
     satellite_id TEXT PRIMARY KEY REFERENCES satellites(id) ON DELETE CASCADE,
     delay_ms INTEGER NOT NULL CHECK (delay_ms BETWEEN 3000 AND 300000)
   ) STRICT;`,
+  // Mot de fin (« merci », « c’est tout ») : désactivé, le comportement existant reste.
+  `CREATE TABLE IF NOT EXISTS end_word_preferences (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1))
+  ) STRICT;
+  INSERT OR IGNORE INTO end_word_preferences (id) VALUES (1);`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */
@@ -833,6 +839,17 @@ export class SessionPreferences {
   setReplyClose(enabled: boolean): void {
     this.db
       .prepare('UPDATE reply_close_preferences SET enabled = ? WHERE id = 1')
+      .run(Number(enabled));
+  }
+  /** Fermeture quand la personne clôt l’échange (« merci », « c’est tout »). */
+  getEndWord(): boolean {
+    return (
+      this.db.prepare('SELECT enabled FROM end_word_preferences WHERE id = 1').get()?.enabled === 1
+    );
+  }
+  setEndWord(enabled: boolean): void {
+    this.db
+      .prepare('UPDATE end_word_preferences SET enabled = ? WHERE id = 1')
       .run(Number(enabled));
   }
   /** Mode voix : la caméra reconnaît la personne qui a dit « Cornelius ». */

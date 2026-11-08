@@ -11,6 +11,11 @@ import type { ToolResult } from '../../shared/addons.js';
 import type { AddonReadOutcome } from '../addons/runtime.js';
 import type { SessionController, SessionTransport } from '../controller.js';
 import { SATELLITE_VOLUME_TOOL, satelliteVolumeTool } from '../satellite-volume.js';
+import {
+  END_CONVERSATION_TOOL,
+  endConversationResult,
+  endConversationTool,
+} from './conversation-end.js';
 import { illustrationPrompt } from '../image-illustration.js';
 import { validators } from '../../shared/validation.js';
 import type { PersonalityPreferences } from '../../shared/personality.js';
@@ -551,6 +556,7 @@ export class LiveTransport implements SessionTransport {
       ...(this.vision?.tools() ?? []),
       ...(this.memory?.tools() ?? []),
       ...(this.satelliteVolume ? [satelliteVolumeTool] : []),
+      ...(this.controller.isEndWordEnabled() ? [endConversationTool] : []),
     ];
   }
   /** Contexte silencieux : la description locale informe la réponse sans être lue à voix haute. */
@@ -1290,6 +1296,17 @@ export class LiveTransport implements SessionTransport {
             ? this.satelliteVolume(active.satelliteId, args)
             : failureToolResult('Le volume se règle seulement sur un satellite.'),
         );
+        this.finishTool(active, delegation);
+        return;
+      }
+      if (name === END_CONVERSATION_TOOL && this.controller.isEndWordEnabled()) {
+        this.beginTool(active, delegation);
+        const accepted = this.controller.requestEnd(active.scope);
+        if (accepted)
+          this.logs?.write('info', 'session', 'Fin de conversation demandée', {
+            interactionId: active.scope.interactionId,
+          });
+        this.sendItem(active, item.call_id, endConversationResult(accepted));
         this.finishTool(active, delegation);
         return;
       }

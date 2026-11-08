@@ -84,6 +84,8 @@ export interface SessionPreferencesStore {
   setSilenceClose?(settings: SilenceClose): void;
   getReplyClose?(): boolean;
   setReplyClose?(enabled: boolean): void;
+  getEndWord?(): boolean;
+  setEndWord?(enabled: boolean): void;
   getVoiceRecognition?(): boolean;
   setVoiceRecognition?(enabled: boolean): void;
   getScreensaver?(): ScreensaverSettings;
@@ -120,6 +122,12 @@ const voiceOutputGraceMs = 900;
  * outil qui se termine ne ferme pas la conversation avant la suite de la réponse.
  */
 const replyCloseGraceMs = 2_000;
+/**
+ * Mot de fin : calme à attendre après la dernière réponse de Cornelius (« avec plaisir »), puis
+ * délai maximal au-delà duquel la conversation se ferme même si la pièce reste bruyante.
+ */
+const endWordGraceMs = 2_000;
+const endWordMaxMs = 10_000;
 // Mode voix : délai laissé à la caméra pour reconnaître la personne après le mot d’appel.
 const voiceIdentityWindowMs = 8000;
 
@@ -257,6 +265,11 @@ export class SessionController {
   // Fermeture après la première réponse : la personne a parlé, puis Cornelius lui a répondu.
   private userTurnHeard = false;
   private replyHeard = false;
+  private endWord = false;
+  // Mot de fin : la personne a clos l’échange, la conversation se ferme dès que Cornelius se tait.
+  private endRequestedAt: number | null = null;
+  // Depuis quand Cornelius se tait, après la demande de fin.
+  private endQuietSince: number | null = null;
   // Fin sur silence devant le miroir : seul un regard détourné puis revenu rouvre la conversation.
   private gazeBreakRequired = false;
   // Mode voix : fin de la fenêtre pendant laquelle la caméra peut rattacher un profil.
@@ -305,6 +318,7 @@ export class SessionController {
     this.silenceClose = { ...(preferences?.getSilenceClose?.() ?? DEFAULT_SILENCE_CLOSE) };
     this.voiceRecognition = preferences?.getVoiceRecognition?.() ?? false;
     this.replyClose = preferences?.getReplyClose?.() ?? false;
+    this.endWord = preferences?.getEndWord?.() ?? false;
     this.delegationMode = preferences?.getDelegationMode?.() ?? DEFAULT_DELEGATION_MODE;
     this.delegationModel = preferences?.getDelegationModel?.() ?? '';
     this.timings = { ...(preferences?.getPresenceTimings?.() ?? DEFAULT_PRESENCE_TIMINGS) };
@@ -386,6 +400,11 @@ export class SessionController {
     return this.webSearch;
   }
 
+  /** Mot de fin : l’outil conversation__end est proposé à la session. */
+  isEndWordEnabled(): boolean {
+    return this.endWord;
+  }
+
   greetingMode(): GreetingMode {
     return this.greeting;
   }
@@ -445,6 +464,7 @@ export class SessionController {
       knownPeopleOnly: this.knownPeopleOnly,
       silenceClose: { ...this.silenceClose },
       replyClose: this.replyClose,
+      endWord: this.endWord,
       voiceRecognition: this.voiceRecognition,
       opening: this.opening(),
       wakeWord: {
@@ -1115,6 +1135,27 @@ export class SessionController {
     this.publish();
   }
 
+  /** Une conversation déjà ouverte garde ses outils : le réglage vaut pour la suivante. */
+  setEndWord(enabled: boolean): void {
+    this.preferences?.setEndWord?.(enabled);
+    this.endWord = enabled;
+    if (!enabled) this.endRequestedAt = null;
+    this.publish();
+  }
+
+  /**
+   * La personne a clos l’échange (« merci », « c’est tout ») : la conversation se ferme dès que
+   * Cornelius a fini de répondre, même si quelqu’un parle encore dans la pièce.
+   */
+  requestEnd(scope: Scope): boolean {
+    if (!this.endWord || !this.current(scope) || this.session.phase !== 'ready') return false;
+    if (this.endRequestedAt === null) {
+      this.endRequestedAt = this.now();
+      this.endQuietSince = null;
+    }
+    return true;
+  }
+
   /**
    * Applique l’ouverture choisie (déclencheur et public) en une fois. L’ordre évite une
    * ouverture intermédiaire : le public est fixé avant que le mot d’appel ne soit retiré.
@@ -1440,6 +1481,8 @@ export class SessionController {
     this.silenceSince = null;
     this.userTurnHeard = false;
     this.replyHeard = false;
+    this.endRequestedAt = null;
+    this.endQuietSince = null;
     this.userSpeaking = false;
     this.assistantBusy = false;
     this.assistantOutputUntil = null;
@@ -1691,7 +1734,7 @@ export class SessionController {
 
   /** Suivi de la parole : pour la fin sur silence ou la fermeture après la première réponse. */
   silenceTracking(): boolean {
-    return this.silenceClosing() || this.replyClose;
+    return this.silenceClosing() || this.replyClose || this.endWord;
   }
 
   /** Fin sur silence : toujours en mode voix, sur option dans les modes caméra. */
@@ -1794,6 +1837,21 @@ export class SessionController {
   }
 
   /**
+   * Mot de fin demandé : Cornelius ne parle plus depuis un court délai, ou le délai maximal est
+   * dépassé. La parole entendue dans la pièce ne compte pas : on parle souvent à quelqu’un d’autre.
+   */
+  private endWordFinished(now: number): boolean {
+    if (this.endRequestedAt === null || this.session.phase !== 'ready') return false;
+    if (now - this.endRequestedAt >= endWordMaxMs) return true;
+    if (this.assistantBusy || this.assistantOutputUntil !== null) {
+      this.endQuietSince = null;
+      return false;
+    }
+    this.endQuietSince ??= now;
+    return now - this.endQuietSince >= endWordGraceMs;
+  }
+
+  /**
    * Fin sur silence alors que la personne reste devant le miroir. Avec le mot d’appel, dire
    * « Cornelius » suffit à rouvrir ; sinon il faut détourner le regard puis regarder à nouveau
    * le miroir (ou partir et revenir), pour ne pas rouvrir en boucle devant le même visage.
@@ -1819,7 +1877,8 @@ export class SessionController {
     }
     // Satellite : ni caméra ni navigateur dans sa pièce, seul le silence termine la conversation.
     if (this.satelliteSession() || this.session.mode === 4) {
-      if (this.replyFinished(now)) this.close('Fin de conversation après la réponse.');
+      if (this.endWordFinished(now)) this.close('Fin de conversation demandée.');
+      else if (this.replyFinished(now)) this.close('Fin de conversation après la réponse.');
       else if (this.silenceExpired(now)) this.close('Fin de conversation après silence.');
     } else {
       if (!this.sensorHealthy()) {
@@ -1845,7 +1904,8 @@ export class SessionController {
         this.reengagementRequired = true;
         this.consumedTrigger = null;
         this.close('Fin d’engagement.');
-      } else if (this.replyFinished(now))
+      } else if (this.endWordFinished(now)) this.closeAfterSilence('Fin de conversation demandée.');
+      else if (this.replyFinished(now))
         this.closeAfterSilence('Fin de conversation après la réponse.');
       else if (this.silenceExpired(now)) this.closeAfterSilence();
     }

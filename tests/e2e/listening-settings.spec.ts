@@ -85,6 +85,28 @@ test('« Fermer après la première réponse » s’enregistre au clic', async (
   }
 });
 
+test('« Fermer quand on dit merci » s’enregistre au clic', async ({ page }) => {
+  await login(page, '/admin#voice');
+  const option = page.getByRole('checkbox', { name: 'Fermer quand on dit merci' });
+  await expect(option).not.toBeChecked();
+  try {
+    await option.click();
+    await expect(
+      page.getByText('Fin de parole : quand on dit merci.', { exact: true }),
+    ).toBeVisible();
+    await expect(option).toBeChecked();
+    expect((await (await page.request.get('/api/state')).json()).state.endWord).toBe(true);
+    await option.click();
+    await expect(option).not.toBeChecked();
+    expect((await (await page.request.get('/api/state')).json()).state.endWord).toBe(false);
+  } finally {
+    await page.request.patch('/api/admin/end-word', {
+      headers: { origin },
+      data: { enabled: false },
+    });
+  }
+});
+
 test('l’ouverture dit ce qui l’empêche de fonctionner, avec où agir', async ({ page }) => {
   await login(page, '/admin#voice');
   const card = page

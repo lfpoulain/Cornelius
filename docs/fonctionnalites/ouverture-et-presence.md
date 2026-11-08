@@ -86,6 +86,8 @@ Avec « Cornelius » pour tout le monde, la fin de parole est toujours active : 
 
 La case **Fermer après la première réponse** (désactivée par défaut) donne une question et une réponse : la conversation se ferme 2 secondes après la fin de la première réponse de Cornelius. L’accueil (« Bonjour Prénom ») ne compte pas, seule une réponse à ce que la personne a dit ferme. Une réponse qui passe par un outil ou un agent attend la fin de la réponse complète. Si personne ne parle, seul le silence réglé au-dessus ferme la conversation.
 
+La case **Fermer quand on dit merci** (désactivée par défaut) ferme la conversation quand la personne la clôt sans nouvelle demande : « merci », « merci, c’est tout », « c’est bon », « au revoir », « bonne nuit », « tu peux arrêter ». Cornelius répond d’une formule courte (« avec plaisir »), puis la conversation se ferme 2 secondes après la fin de sa réponse, et au plus tard 10 secondes après. La parole entendue ensuite dans la pièce ne la retient pas : on peut parler à quelqu’un d’autre sans que Cornelius continue d’écouter. Un « merci » suivi d’une autre demande ne ferme pas. C’est Cornelius qui reconnaît la fin, par l’outil `conversation__end` ; le réglage vaut à partir de la conversation suivante.
+
 Après une fin sur silence ou après la réponse, la conversation ne se rouvre pas toute seule devant la même personne. Pour reprendre : regarder à nouveau le miroir après avoir détourné les yeux, s’éloigner puis revenir, ou dire « Cornelius » si c’est lui qui ouvre la conversation.
 
 ## Mode vie privée
