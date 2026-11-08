@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isClosingPhrase } from '../server/live/conversation-end.js';
+import { cleanEndPhrases, isClosingPhrase } from '../server/live/conversation-end.js';
 
 test('phrase de fin : formules qui clôturent l’échange', () => {
   for (const said of [
@@ -32,4 +32,17 @@ test('phrase de fin : une demande, une réponse ou un mot seul ne clôturent pas
     'merci '.repeat(13),
   ])
     assert.equal(isClosingPhrase(said), false, said);
+});
+
+test('formules du foyer : la phrase entière, à la ponctuation près, et nettoyées', () => {
+  const extra = ['C’est bon Jarvis', 'ciao'];
+  assert.equal(isClosingPhrase('c’est bon, Jarvis !', extra), true);
+  assert.equal(isClosingPhrase('Ciao.', extra), true);
+  assert.equal(isClosingPhrase('ciao, et la météo ?', extra), false);
+  assert.equal(isClosingPhrase('c’est bon Jarvis', []), false);
+  assert.deepEqual(cleanEndPhrases(['  ciao ', 'Ciao !', '', 'x'.repeat(61), 'à plus  tard']), [
+    'ciao',
+    'à plus tard',
+  ]);
+  assert.equal(cleanEndPhrases(Array.from({ length: 30 }, (_, i) => 'formule ' + i)).length, 20);
 });

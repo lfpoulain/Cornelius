@@ -442,6 +442,12 @@ export const migrations: readonly string[] = [
     enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1))
   ) STRICT;
   INSERT OR IGNORE INTO end_word_preferences (id) VALUES (1);`,
+  // Formules de fin propres au foyer (« c’est bon Jarvis ») : liste JSON, vide par défaut.
+  `CREATE TABLE IF NOT EXISTS end_word_phrases (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    phrases TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(phrases))
+  ) STRICT;
+  INSERT OR IGNORE INTO end_word_phrases (id) VALUES (1);`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */
@@ -846,6 +852,20 @@ export class SessionPreferences {
     return (
       this.db.prepare('SELECT enabled FROM end_word_preferences WHERE id = 1').get()?.enabled === 1
     );
+  }
+  getEndPhrases(): string[] {
+    const raw = this.db.prepare('SELECT phrases FROM end_word_phrases WHERE id = 1').get()?.phrases;
+    try {
+      const list = JSON.parse(String(raw ?? '[]'));
+      return Array.isArray(list) ? list.filter((entry) => typeof entry === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+  setEndPhrases(phrases: string[]): void {
+    this.db
+      .prepare('UPDATE end_word_phrases SET phrases = ? WHERE id = 1')
+      .run(JSON.stringify(phrases));
   }
   setEndWord(enabled: boolean): void {
     this.db

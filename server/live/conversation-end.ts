@@ -79,18 +79,40 @@ const closingMarkers = [
  * c'est tout », « ok au revoir ». « Merci, et la météo ? » ne clôt pas. La transcription
  * arrive par morceaux, d'où la normalisation (casse, ponctuation, apostrophes).
  */
-export function isClosingPhrase(text: string): boolean {
-  const words = text
+export function isClosingPhrase(text: string, extra: readonly string[] = []): boolean {
+  const phrase = normalizePhrase(text);
+  if (!phrase) return false;
+  // Formules du foyer (« c’est bon Jarvis ») : la phrase entière, à la ponctuation près.
+  if (extra.some((entry) => normalizePhrase(entry) === phrase)) return true;
+  const words = phrase.split(' ');
+  if (words.length > 12) return false;
+  if (!words.every((word) => closingWords.has(word))) return false;
+  return closingMarkers.some((marker) => marker.test(phrase));
+}
+
+/** Casse, accents composés, ponctuation et apostrophes ramenés à des mots séparés d’espaces. */
+export function normalizePhrase(text: string): string {
+  return text
     .toLocaleLowerCase('fr-FR')
     .normalize('NFC')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim()
-    .split(' ')
-    .filter(Boolean);
-  if (!words.length || words.length > 12) return false;
-  if (!words.every((word) => closingWords.has(word))) return false;
-  const phrase = words.join(' ');
-  return closingMarkers.some((marker) => marker.test(phrase));
+    .trim();
+}
+
+/** Formules du foyer : 20 au plus, de 1 à 60 caractères, sans doublon. */
+export const END_PHRASES_MAX = 20;
+export const END_PHRASE_MAX_LENGTH = 60;
+export function cleanEndPhrases(list: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const kept: string[] = [];
+  for (const raw of list) {
+    const entry = raw.replace(/\s+/gu, ' ').trim();
+    const key = normalizePhrase(entry);
+    if (!key || entry.length > END_PHRASE_MAX_LENGTH || seen.has(key)) continue;
+    seen.add(key);
+    kept.push(entry);
+  }
+  return kept.slice(0, END_PHRASES_MAX);
 }
 
 /** Résultat renvoyé à Luna : rien à dire de plus, la fermeture suit la fin de la réponse. */

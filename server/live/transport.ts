@@ -541,6 +541,7 @@ export class LiveTransport implements SessionTransport {
         voice: this.controller.getSpeechVoice(),
         voiceOnly,
         delegationModel: this.controller.getDelegationModel(),
+        endPhrases: this.controller.getEndPhrases(),
       },
     );
   }
@@ -1097,7 +1098,11 @@ export class LiveTransport implements SessionTransport {
     const said = active.userTurn;
     if (!said) return;
     active.userTurn = '';
-    if (!this.controller.isEndWordEnabled() || !isClosingPhrase(said)) return;
+    if (
+      !this.controller.isEndWordEnabled() ||
+      !isClosingPhrase(said, this.controller.getEndPhrases())
+    )
+      return;
     if (this.controller.requestEnd(active.scope))
       this.logs?.write('info', 'session', 'Fin de conversation demandée', {
         interactionId: active.scope.interactionId,

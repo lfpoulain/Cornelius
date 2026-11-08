@@ -1,3 +1,4 @@
+import { cleanEndPhrases } from './live/conversation-end.js';
 import type { VoiceProvider } from '../shared/voice-provider.js';
 import { DEFAULT_CARD_SETTINGS, type CardSettings } from '../shared/cards.js';
 import { DEFAULT_LIVE_VOICE, type LiveVoice } from '../shared/voices.js';
@@ -86,6 +87,8 @@ export interface SessionPreferencesStore {
   setReplyClose?(enabled: boolean): void;
   getEndWord?(): boolean;
   setEndWord?(enabled: boolean): void;
+  getEndPhrases?(): string[];
+  setEndPhrases?(phrases: string[]): void;
   getVoiceRecognition?(): boolean;
   setVoiceRecognition?(enabled: boolean): void;
   getScreensaver?(): ScreensaverSettings;
@@ -266,6 +269,7 @@ export class SessionController {
   private userTurnHeard = false;
   private replyHeard = false;
   private endWord = false;
+  private endPhrases: string[] = [];
   // Mot de fin : la personne a clos l’échange, la conversation se ferme dès que Cornelius se tait.
   private endRequestedAt: number | null = null;
   // Depuis quand Cornelius se tait, après la demande de fin.
@@ -319,6 +323,7 @@ export class SessionController {
     this.voiceRecognition = preferences?.getVoiceRecognition?.() ?? false;
     this.replyClose = preferences?.getReplyClose?.() ?? false;
     this.endWord = preferences?.getEndWord?.() ?? false;
+    this.endPhrases = cleanEndPhrases(preferences?.getEndPhrases?.() ?? []);
     this.delegationMode = preferences?.getDelegationMode?.() ?? DEFAULT_DELEGATION_MODE;
     this.delegationModel = preferences?.getDelegationModel?.() ?? '';
     this.timings = { ...(preferences?.getPresenceTimings?.() ?? DEFAULT_PRESENCE_TIMINGS) };
@@ -405,6 +410,11 @@ export class SessionController {
     return this.endWord;
   }
 
+  /** Formules de fin propres au foyer, en plus de « merci », « c’est tout »… */
+  getEndPhrases(): string[] {
+    return [...this.endPhrases];
+  }
+
   greetingMode(): GreetingMode {
     return this.greeting;
   }
@@ -465,6 +475,7 @@ export class SessionController {
       silenceClose: { ...this.silenceClose },
       replyClose: this.replyClose,
       endWord: this.endWord,
+      endPhrases: [...this.endPhrases],
       voiceRecognition: this.voiceRecognition,
       opening: this.opening(),
       wakeWord: {
@@ -1140,6 +1151,13 @@ export class SessionController {
     this.preferences?.setEndWord?.(enabled);
     this.endWord = enabled;
     if (!enabled) this.endRequestedAt = null;
+    this.publish();
+  }
+
+  setEndPhrases(phrases: readonly string[]): void {
+    const cleaned = cleanEndPhrases(phrases);
+    this.preferences?.setEndPhrases?.(cleaned);
+    this.endPhrases = cleaned;
     this.publish();
   }
 

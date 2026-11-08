@@ -903,6 +903,24 @@ test('mot de fin reconnu dans la transcription, sans attendre l’outil', async 
   assert.equal(f.controller.snapshot().state.session.reason, 'Fin de conversation demandée.');
 });
 
+test('formule de fin du foyer reconnue dans la transcription et donnée au modèle', async (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  f.controller.setEndPhrases(['C’est bon Jarvis']);
+  assert.deepEqual(new SessionPreferences(f.db).getEndPhrases(), ['C’est bon Jarvis']);
+  assert.deepEqual(f.controller.snapshot().state.endPhrases, ['C’est bon Jarvis']);
+  await f.ready();
+  assert.match(
+    String(f.configs[0]!.instructions),
+    /Formules de fin propres au foyer.*C’est bon Jarvis/u,
+  );
+  f.emit({ type: 'session.input_transcript.delta', delta: 'C’est bon, Jarvis.' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Très bien.' });
+  f.advance(1000);
+  f.advance(2000);
+  assert.equal(f.controller.snapshot().state.session.reason, 'Fin de conversation demandée.');
+});
+
 test('mot de fin : « merci, et la météo ? » ne ferme pas, ni un mot de fin désactivé', async (t) => {
   const f = fixture(t);
   await f.ready();

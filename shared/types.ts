@@ -146,6 +146,8 @@ export interface MirrorState {
   replyClose?: boolean;
   /** Fermer la conversation quand la personne la clôt (« merci », « c’est tout ») ; absent : non. */
   endWord?: boolean;
+  /** Formules de fin propres au foyer, en plus de celles reconnues d’office. */
+  endPhrases?: string[];
   /** Mode voix : la caméra s’allume au mot d’appel pour reconnaître la personne. */
   voiceRecognition?: boolean;
   /** Ouverture lue en deux questions : ce qui l’ouvre, et qui peut l’ouvrir. */
