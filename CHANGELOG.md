@@ -6,7 +6,15 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
-Rien pour l’instant.
+### 2026-11-08 : modes, ventilateurs, scripts et scènes
+
+**Ajouté**
+
+- **Home Assistant** : `input_boolean.*` (modes, « passe en mode nuit »), `fan.*`, `script.*` et `scene.*` se commandent avec `home_assistant__control`. Un script se lance (`turn_on`) et s’arrête (`turn_off`), une scène s’active seulement ; leur lancement est confirmé par la mise à jour de l’état. Les ventilateurs et scènes suivent l’exposition par défaut de Home Assistant pour l’import Assist. L’administration affiche « Lancer », « Arrêter » ou « Activer » selon le type.
+
+**Changé**
+
+- `input_boolean.*` passe des capteurs (lecture seule) aux appareils commandables.
 
 ## 0.3.0 · 2026-11-09
 

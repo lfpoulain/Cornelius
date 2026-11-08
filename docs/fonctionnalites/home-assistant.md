@@ -7,9 +7,11 @@ Cornelius peut allumer et éteindre les lumières et les prises de la maison, et
 Home Assistant est un logiciel de domotique installé à part. Cornelius s’y connecte directement : aucun module complémentaire, blueprint ni intégration n’est à installer dans Home Assistant. Cornelius peut aussi tourner lui-même sur la box, comme add-on (voir [Installer dans Home Assistant](../installation/home-assistant.md)) : la connexion décrite ici reste la même.
 
 - **Lumières et prises** (`light.*` et `switch.*`) : allumer, éteindre, lire l’état, et régler la luminosité des lumières qui le permettent (de 1 à 100 %), leur couleur (« mets le bureau en violet ») et leur blanc (« blanc chaud », de 1500 à 9000 K, ramené à la plage de l’ampoule). La couleur n’est confirmée que si Home Assistant la relit (à une marge près, l’ampoule l’arrondissant à sa teinte).
-- **Capteurs**, en lecture seule : capteurs et détecteurs, minuteries, dates et heures, nombres, interrupteurs virtuels, listes de choix, compteurs, thermostats, volets et serrures. Un capteur n’est jamais commandé : Cornelius peut dire si une serrure est fermée, pas l’ouvrir.
+- **Modes et ventilateurs** (`input_boolean.*`, `fan.*`) : activer, désactiver, lire l’état (« passe en mode nuit »).
+- **Scripts et scènes** (`script.*`, `scene.*`) : lancer ou arrêter un script, activer une scène (une scène ne s’éteint pas). Leur lancement est confirmé par la mise à jour de leur état dans Home Assistant : un script court repasse aussitôt à « off », l’état d’une scène est l’heure de sa dernière activation.
+- **Capteurs**, en lecture seule : capteurs et détecteurs, minuteries, dates et heures, nombres, listes de choix, compteurs, thermostats, volets et serrures. Un capteur n’est jamais commandé : Cornelius peut dire si une serrure est fermée, pas l’ouvrir.
 
-Dans Home Assistant, un « switch » peut piloter autre chose qu’une prise. Ne cochez que les appareils que Cornelius doit vraiment commander.
+Dans Home Assistant, un « switch » peut piloter autre chose qu’une prise, et un script peut faire n’importe quoi. Ne cochez que les appareils et scripts que Cornelius doit vraiment commander.
 
 La configuration est commune au foyer. La carte **Home Assistant** se trouve dans la rubrique **Modules**, groupe « Maison ». Elle s’affiche quand **Sources de** vaut « Tout le monde » ou « Le foyer ».
 
