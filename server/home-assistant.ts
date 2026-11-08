@@ -326,7 +326,15 @@ export class HomeAssistant {
       selected: [...this.config.selected],
       revision: this.config.revision,
       knownPeopleOnly: this.config.knownPeopleOnly,
+      newEntities: this.newEntities(),
     };
+  }
+  /** Comparées au catalogue enregistré avec la sélection : l’enregistrer vaut « vu ». */
+  private newEntities(): string[] {
+    const known = new Set(this.config.catalog.map((entity) => entity.id));
+    // Sans catalogue enregistré (première connexion), rien n’est « nouveau ».
+    if (!known.size) return [];
+    return [...this.entities.keys()].filter((id) => !known.has(id)).sort();
   }
   private checkRevision(revision: number) {
     if (revision !== this.config.revision)
@@ -395,6 +403,10 @@ export class HomeAssistant {
       ) {
         this.entities.set(entity.id, { ...entity, aliases: previous?.aliases ?? [] });
         if (!previous && this.socket) void this.refreshAlias(this.socket, entity.id);
+        if (!previous)
+          this.logs?.write('info', 'home-assistant', 'Nouvel appareil Home Assistant à cocher', {
+            entityId: entity.id,
+          });
       }
     } else if (data.new_state === null) this.entities.delete(data.entity_id);
   }

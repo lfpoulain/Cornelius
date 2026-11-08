@@ -108,6 +108,24 @@ test('alias Assist chargés, filtrés pour Luna et actualisés sans copier les a
   assert.deepEqual(salon()?.aliases, ['Après reconnexion']);
 });
 
+test('un appareil apparu dans Home Assistant est signalé « nouveau » jusqu’à l’enregistrement', async (t) => {
+  const f = await fixture(t);
+  // Première connexion : tout le catalogue est connu.
+  assert.deepEqual(f.home.view().newEntities, []);
+  f.fake.states.set('switch.gyrophare', haState('switch.gyrophare'));
+  f.fake.emit(f.fake.states.get('switch.gyrophare')!);
+  await until(() => f.home.view().entities.some((entity) => entity.id === 'switch.gyrophare'));
+  assert.deepEqual(f.home.view().newEntities, ['switch.gyrophare']);
+  // Signalé, jamais utilisable sans être coché.
+  f.select(['light.salon']);
+  assert.ok(!JSON.stringify(f.home.tools()).includes('switch.gyrophare'));
+  // L’enregistrement de la sélection vaut « vu ».
+  assert.deepEqual(f.home.view().newEntities, []);
+  const restored = new HomeAssistant(f.repository, createHttpClient());
+  assert.deepEqual(restored.view().newEntities, []);
+  restored.dispose();
+});
+
 test('lecture individuelle des alias si la lecture groupée est indisponible', async (t) => {
   const f = await fixture(t);
   f.select(['light.salon']);

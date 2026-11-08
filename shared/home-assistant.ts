@@ -59,6 +59,11 @@ export interface HomeAssistantView {
   revision: number;
   /** Luna ne commande ni ne lit la maison sans personne reconnue devant le miroir. */
   knownPeopleOnly: boolean;
+  /**
+   * Entités apparues dans Home Assistant depuis le dernier enregistrement de la sélection : à
+   * cocher si Cornelius doit s’en servir. Rien ne devient utilisable sans être coché.
+   */
+  newEntities: string[];
 }
 
 export interface HomeAssistantCommand {

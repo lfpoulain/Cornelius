@@ -358,6 +358,17 @@ export function HomeAssistantSettings({
               placeholder="Salon, lampe, prise, lave-linge, température…"
             />
           </div>
+          {!!view.newEntities?.length && (
+            <p className="text-sm" role="status">
+              {plural(
+                view.newEntities.length,
+                'nouvel appareil dans Home Assistant',
+                'nouveaux appareils dans Home Assistant',
+              )}{' '}
+              depuis le dernier enregistrement : cochez ceux que Cornelius doit utiliser, puis
+              enregistrez. Ils sont marqués « Nouveau » dans la liste.
+            </p>
+          )}
           <p className="text-sm text-muted-foreground">
             {plural(selected.length, 'appareil sélectionné', 'appareils sélectionnés')} sur{' '}
             {view.entities.length.toLocaleString('fr-FR')} ·{' '}
@@ -400,7 +411,14 @@ export function HomeAssistantSettings({
                     onChange={(event) => toggle(entity.id, event.target.checked)}
                   />
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium">{entity.name}</span>
+                    <span className="block text-sm font-medium">
+                      {entity.name}
+                      {view.newEntities?.includes(entity.id) && (
+                        <span className="ml-2 rounded bg-secondary px-1.5 py-0.5 text-xs font-normal">
+                          Nouveau
+                        </span>
+                      )}
+                    </span>
                     {!!entity.aliases?.length && (
                       <span className="block text-xs text-muted-foreground">
                         Autres noms : {entity.aliases.join(', ')}
