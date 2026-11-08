@@ -316,6 +316,8 @@ export class SatelliteHub {
       id: satellite.id,
       name: satellite.name,
       volume: satellite.volume,
+      // Ce que le serveur sait faire : le firmware n’y lie le bouton qu’après cette annonce.
+      features: ['session_end'],
     });
     this.send(connection, settingsMessage(satellite));
     this.sync();

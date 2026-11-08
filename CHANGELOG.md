@@ -10,7 +10,7 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 **Ajouté**
 
-- Message satellite `{"type":"session","action":"end"}` : le bouton pressé pendant une conversation de ce satellite la ferme (raison « Fin de conversation au bouton du satellite. »), sans attendre le silence. Ignoré pour la conversation d’un autre satellite ou du miroir. Le firmware qui l’envoie est proposé dans cornelius-satellite.
+- Message satellite `{"type":"session","action":"end"}` : le bouton pressé pendant une conversation de ce satellite la ferme (raison « Fin de conversation au bouton du satellite. »), sans attendre le silence. Ignoré pour la conversation d’un autre satellite ou du miroir. `welcome` annonce `features: ["session_end"]`, pour que le firmware ne change le rôle du bouton qu’avec un serveur qui le comprend.
 
 ### 2026-11-06 : démarrage depuis Home Assistant, serveur Live compatible
 

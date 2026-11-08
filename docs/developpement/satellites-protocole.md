@@ -60,7 +60,7 @@ Les autres messages sont des objets JSON en texte, avec un champ `type`. Un mess
 
 | Message | Sens |
 |---|---|
-| `{"type":"welcome","protocol":1,"id":"…","name":"Chambre","volume":70}` | connexion acceptée ; `volume` de 0 à 100 |
+| `{"type":"welcome","protocol":1,"id":"…","name":"Chambre","volume":70,"features":["session_end"]}` | connexion acceptée ; `volume` de 0 à 100 ; `features` : ce que le serveur sait faire (`session_end` : il accepte `session` / `end`, le bouton peut fermer la conversation) |
 | `{"type":"settings","volume":70,"led":{"color":"#00ffb4","brightness":6,"nightLight":false},"attentive":false}` | réglages de l’administration : après `welcome`, puis à chaque changement ; volume de 0 à 100, luminosité de 0 à 10 (0 : alertes seulement), veilleuse en veille, écoute attentive |
 | `{"type":"volume","volume":40}` | ancien message, remplacé par `settings` ; toujours accepté par le firmware |
 | `{"type":"listen","enabled":true}` | envoyer (`true`) ou cesser d’envoyer (`false`) le son du micro ; envoyé après `welcome` puis à chaque changement |

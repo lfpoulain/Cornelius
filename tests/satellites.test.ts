@@ -236,6 +236,7 @@ test('veille : le son suit « listen », la détection revient au satellite', as
     id: satellite.id,
     name: 'Bureau',
     volume: 70,
+    features: ['session_end'],
   });
   assert.deepEqual(await device.next((message) => message.type === 'settings'), {
     type: 'settings',
