@@ -166,6 +166,47 @@ test('satellite : son relayé, semi-duplex pendant que Cornelius parle', (t) => 
   assert.equal(f.audio.at(-1)!.readInt16LE(0), -3000);
 });
 
+test('satellite : « parle moins fort » règle le volume de ce satellite', async (t) => {
+  const f = fixture(t);
+  const calls: [string, unknown][] = [];
+  f.live.attachSatelliteVolume((id, args) => {
+    calls.push([id, args]);
+    return {
+      schemaVersion: 1,
+      status: 'succeeded',
+      result: { level: 5 },
+      snapshotId: null,
+      actionRunId: null,
+      summary: 'Volume réglé à 5 sur 10.',
+      error: null,
+    };
+  });
+  f.controller.satelliteWake(bureau);
+  f.emit({ type: 'session.started', event_id: 'e1', session: { id: 'live_sat' } });
+  f.emit({
+    type: 'response.event',
+    delegation_id: 'volume',
+    event: {
+      type: 'response.output_item.done',
+      item: {
+        type: 'function_call',
+        call_id: 'volume-call',
+        name: 'satellite__volume',
+        arguments: JSON.stringify({ level: null, change: 'quieter' }),
+      },
+    },
+  });
+  await Promise.resolve();
+  assert.deepEqual(calls, [[bureau.id, { level: null, change: 'quieter' }]]);
+  assert.ok(
+    f.sent.some(
+      (event) =>
+        event.type === 'response.item.create' &&
+        JSON.stringify(event).includes('Volume réglé à 5 sur 10.'),
+    ),
+  );
+});
+
 test('satellite : fin sur silence, clôture confirmée, puis retour à la veille', (t) => {
   const f = fixture(t);
   f.controller.satelliteWake(bureau);

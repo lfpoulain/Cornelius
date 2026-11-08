@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-08 : volume du satellite à la voix
+
+**Ajouté**
+
+- Outil vocal `satellite__volume`, proposé seulement dans une conversation de satellite : « parle plus fort », « moins fort » (deux crans) ou « mets le volume à 5 » (0 à 10). Le volume est enregistré comme depuis l’administration et envoyé aussitôt au satellite (`settings`).
+
 ### 2026-11-06 : démarrage depuis Home Assistant, serveur Live compatible
 
 **Ajouté**
