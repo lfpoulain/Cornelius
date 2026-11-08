@@ -257,6 +257,104 @@ test('couleur refusée sans effet : lampe sans couleur, extinction, couleur et b
   assert.equal(f.fake.calls.length, 0);
 });
 
+test('thermostat : consigne ramenée au pas et à la plage, envoyée puis confirmée', async (t) => {
+  const f = await fixture(t);
+  const thermostat = (state: string) => ({
+    entity_id: 'climate.bureau',
+    state,
+    last_updated: new Date().toISOString(),
+    attributes: {
+      friendly_name: 'Thermostat bureau',
+      current_temperature: 18.4,
+      temperature: 19,
+      min_temp: 7,
+      max_temp: 25,
+      target_temp_step: 0.5,
+    } as unknown as ReturnType<typeof haState>['attributes'],
+  });
+  f.fake.states.set('climate.bureau', thermostat('heat'));
+  await f.home.refresh();
+  f.select(['climate.bureau', 'light.salon']);
+  // Désactivé par défaut : un thermostat coché est seulement lu.
+  assert.equal(f.home.view().climateControl, false);
+  assert.ok(!f.home.tools().some((tool) => tool.name === 'home_assistant__climate'));
+  const refused = await f.home.run(
+    { entityId: 'climate.bureau', temperature: 20 },
+    signal(),
+    'home_assistant__climate',
+  );
+  assert.equal(refused.error?.code, 'forbidden');
+  f.home.setAccess({ climateControl: true, revision: f.home.view().revision });
+  assert.equal(f.repository.get().climateControl, true);
+  const names = f.home.tools().map((tool) => tool.name);
+  assert.deepEqual(names, [
+    'home_assistant__control',
+    'home_assistant__read',
+    'home_assistant__climate',
+  ]);
+  assert.ok(f.home.handles('home_assistant__climate'));
+  const climate = f.home.tools().find((tool) => tool.name === 'home_assistant__climate')!;
+  assert.match(climate.description, /"id":"climate\.bureau"[^}]*"min":7,"max":25/u);
+
+  const set = await f.home.run(
+    { entityId: 'climate.bureau', temperature: 20.3 },
+    signal(),
+    'home_assistant__climate',
+  );
+  assert.equal(set.status, 'succeeded', set.summary);
+  assert.equal(set.result?.confirmed, true);
+  assert.equal(set.result?.temperature, 20.5);
+  assert.match(set.summary, /20,5 °C/u);
+  assert.deepEqual(f.fake.calls.at(-1), {
+    path: '/api/services/climate/set_temperature',
+    body: { entity_id: 'climate.bureau', temperature: 20.5 },
+  });
+  // Au-delà de la plage du thermostat : ramenée à son maximum.
+  const hot = await f.home.run(
+    { entityId: 'climate.bureau', temperature: 30 },
+    signal(),
+    'home_assistant__climate',
+  );
+  assert.equal(hot.result?.temperature, 25);
+  // Le thermostat reste lisible comme un capteur.
+  const read = await f.home.run({ entityId: 'climate.bureau' }, signal(), 'home_assistant__read');
+  assert.equal(read.status, 'succeeded');
+});
+
+test('thermostat : non coché, arrêté ou hors limites, aucune consigne envoyée', async (t) => {
+  const f = await fixture(t);
+  f.fake.states.set('climate.bureau', {
+    entity_id: 'climate.bureau',
+    state: 'off',
+    last_updated: new Date().toISOString(),
+    attributes: { friendly_name: 'Thermostat bureau', temperature: 19 } as unknown as ReturnType<
+      typeof haState
+    >['attributes'],
+  });
+  await f.home.refresh();
+  const run = (args: unknown) => f.home.run(args, signal(), 'home_assistant__climate');
+  f.select(['light.salon']);
+  f.home.setAccess({ climateControl: true, revision: f.home.view().revision });
+  assert.equal(
+    (await run({ entityId: 'climate.bureau', temperature: 20 })).error?.code,
+    'forbidden',
+  );
+  f.select(['climate.bureau']);
+  // Un thermostat arrêté n’est pas rallumé en douce par une consigne.
+  assert.equal(
+    (await run({ entityId: 'climate.bureau', temperature: 20 })).error?.code,
+    'invalid_params',
+  );
+  for (const args of [
+    { entityId: 'climate.bureau', temperature: 60 },
+    { entityId: 'climate.bureau', temperature: '20' },
+    { entityId: 'light.salon', temperature: 20 },
+    { entityId: 'climate.bureau', temperature: 20, hvacMode: 'heat' },
+  ])
+    assert.equal((await run(args)).status, 'failed', JSON.stringify(args));
+  assert.equal(f.fake.calls.length, 0);
+});
+
 test('un appareil qui remonte son état en différé est quand même confirmé', async (t) => {
   const f = await fixture(t);
   f.select();

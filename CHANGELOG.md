@@ -6,7 +6,11 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
-Rien pour l’instant.
+### 2026-11-08 : consigne des thermostats
+
+**Ajouté**
+
+- **Home Assistant → Régler les thermostats** (désactivé par défaut) : nouvel outil `home_assistant__climate`, pour la consigne seulement (« mets le bureau à 20 degrés »). La valeur est ramenée à la plage et au pas du thermostat, envoyée par `climate/set_temperature` puis confirmée par relecture ; un thermostat arrêté est refusé, le mode n’est jamais changé. Réglage `climateControl` de `PATCH /api/admin/home-assistant/access`, table `home_assistant_climate`. Les thermostats restent lisibles par `home_assistant__read`.
 
 ## 0.3.0 · 2026-11-09
 

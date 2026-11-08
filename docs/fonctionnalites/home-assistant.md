@@ -50,6 +50,7 @@ Deux interrupteurs règlent l’accès :
 
 - **Autoriser Cornelius à utiliser la sélection** : Cornelius allume ou éteint les lumières et prises cochées, et lit les capteurs cochés. Sans cette autorisation, il n’utilise pas Home Assistant.
 - **Réserver aux personnes reconnues** (désactivé par défaut) : voir la section suivante.
+- **Régler les thermostats** (désactivé par défaut) : Cornelius peut changer la consigne des thermostats cochés (« mets le bureau à 20 degrés »). La valeur est ramenée à la plage (`min_temp`, `max_temp`) et au pas (`target_temp_step`, 0,5 °C sinon) du thermostat, puis confirmée par relecture. Un thermostat arrêté n’est pas rallumé, et le mode (chauffage, arrêt) n’est jamais changé. Désactivé, les thermostats cochés sont seulement lus.
 
 Une modification des autorisations ou de la sélection s’applique aussi aux demandes en cours : elles sont annulées. Une commande déjà envoyée à Home Assistant ne peut pas être annulée.
 

@@ -59,6 +59,8 @@ export interface HomeAssistantView {
   revision: number;
   /** Luna ne commande ni ne lit la maison sans personne reconnue devant le miroir. */
   knownPeopleOnly: boolean;
+  /** Luna peut régler la consigne des thermostats cochés (désactivé par défaut). */
+  climateControl: boolean;
 }
 
 export interface HomeAssistantCommand {

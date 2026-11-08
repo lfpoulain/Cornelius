@@ -436,6 +436,12 @@ export const migrations: readonly string[] = [
     satellite_id TEXT PRIMARY KEY REFERENCES satellites(id) ON DELETE CASCADE,
     delay_ms INTEGER NOT NULL CHECK (delay_ms BETWEEN 3000 AND 300000)
   ) STRICT;`,
+  // Consigne des thermostats : désactivée, un thermostat coché pour être lu ne devient pas réglable.
+  `CREATE TABLE IF NOT EXISTS home_assistant_climate (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1))
+  ) STRICT;
+  INSERT OR IGNORE INTO home_assistant_climate (id) VALUES (1);`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */
