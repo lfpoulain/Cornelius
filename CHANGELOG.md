@@ -14,7 +14,7 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 **Changé**
 
-- `input_boolean.*` passe des capteurs (lecture seule) aux appareils commandables.
+- `input_boolean.*` passe des capteurs (lecture seule) aux appareils commandables. À la mise à jour, les `input_boolean` déjà cochés sont décochés : une sélection faite pour lire un mode ne devient pas une autorisation de le changer. Recochez ceux que Cornelius doit pouvoir changer.
 
 ## 0.3.0 · 2026-11-09
 
