@@ -9,13 +9,15 @@ import { HOME_ASSISTANT_CUT, HOME_ASSISTANT_UNREACHABLE } from '../server/home-a
 import { openDatabase } from '../server/storage.js';
 import { createHttpClient } from '../server/addons/http.js';
 import { validators } from '../shared/validation.js';
+import { DiagnosticLog } from '../server/logs.js';
 import { fakeHomeAssistant, haState } from './helpers/home-assistant.js';
 
 async function fixture(t: TestContext) {
   const fake = await fakeHomeAssistant();
   const db = openDatabase(':memory:');
   const repository = new HomeAssistantRepository(db);
-  const home = new HomeAssistant(repository, createHttpClient());
+  const logs = new DiagnosticLog();
+  const home = new HomeAssistant(repository, createHttpClient(), logs);
   t.after(async () => {
     home.dispose();
     db.close();
@@ -27,7 +29,7 @@ async function fixture(t: TestContext) {
     home.select({ selected, revision: home.view().revision });
     return home.setAccess({ enabled, revision: home.view().revision });
   };
-  return { fake, db, repository, home, select };
+  return { fake, db, repository, home, select, logs };
 }
 const command = (
   entityId = 'light.salon',
@@ -106,6 +108,71 @@ test('alias Assist chargés, filtrés pour Luna et actualisés sans copier les a
   await until(() => !f.home.view().connected);
   await until(() => f.home.view().connected);
   assert.deepEqual(salon()?.aliases, ['Après reconnexion']);
+});
+
+const announced = (logs: DiagnosticLog) =>
+  logs
+    .snapshot()
+    .entries.filter((entry) => entry.event === 'Nouvel appareil Home Assistant à cocher')
+    .map((entry) => entry.details.entityId);
+
+test('un appareil apparu dans Home Assistant est signalé « nouveau » jusqu’au choix des appareils', async (t) => {
+  const f = await fixture(t);
+  // Première connexion : tout le catalogue est connu.
+  assert.deepEqual(f.home.view().newEntities, []);
+  f.select(['light.salon']);
+  f.fake.states.set('switch.gyrophare', haState('switch.gyrophare'));
+  f.fake.emit(f.fake.states.get('switch.gyrophare')!);
+  await until(() => f.home.view().entities.some((entity) => entity.id === 'switch.gyrophare'));
+  assert.deepEqual(f.home.view().newEntities, ['switch.gyrophare']);
+  assert.deepEqual(announced(f.logs), ['switch.gyrophare']);
+  // Signalé, jamais utilisable sans être coché.
+  assert.ok(!JSON.stringify(f.home.tools()).includes('switch.gyrophare'));
+  // Les autorisations et une reconnexion à la même adresse ne valent pas examen.
+  f.home.setAccess({ enabled: false, revision: f.home.view().revision });
+  f.home.setAccess({ knownPeopleOnly: true, revision: f.home.view().revision });
+  await f.home.configure({ url: f.fake.url, revision: f.home.view().revision });
+  assert.deepEqual(f.home.view().newEntities, ['switch.gyrophare']);
+  // Un nouvel état du même appareil n’ajoute pas de ligne au journal.
+  f.fake.emit({ ...f.fake.states.get('switch.gyrophare')!, state: 'on' });
+  await until(
+    () => f.home.view().entities.find((e) => e.id === 'switch.gyrophare')?.state === 'on',
+  );
+  assert.deepEqual(announced(f.logs), ['switch.gyrophare']);
+  // L’enregistrement de la sélection vaut « vu », même après un redémarrage.
+  f.home.select({ selected: ['light.salon'], revision: f.home.view().revision });
+  assert.deepEqual(f.home.view().newEntities, []);
+  const restored = new HomeAssistant(f.repository, createHttpClient());
+  assert.deepEqual(restored.view().newEntities, []);
+  restored.dispose();
+});
+
+test('un appareil déjà connu qui disparaît puis revient n’est pas nouveau', async (t) => {
+  const f = await fixture(t);
+  f.select(['light.salon']);
+  // Rechargement d’une intégration : l’entité est retirée puis réapparaît.
+  for (const id of ['light.salon', 'switch.bureau']) {
+    f.fake.emit(null, id);
+    await until(() => !f.home.view().entities.some((entity) => entity.id === id));
+    f.fake.emit(f.fake.states.get(id)!);
+    await until(() => f.home.view().entities.some((entity) => entity.id === id));
+  }
+  assert.deepEqual(f.home.view().newEntities, []);
+  assert.deepEqual(announced(f.logs), []);
+});
+
+test('un appareil ajouté pendant un arrêt est signalé et journalisé à la reconnexion', async (t) => {
+  const f = await fixture(t);
+  f.select(['light.salon']);
+  f.home.dispose();
+  f.fake.states.set('switch.gyrophare', haState('switch.gyrophare'));
+  const logs = new DiagnosticLog();
+  const restored = new HomeAssistant(f.repository, createHttpClient(), logs);
+  t.after(() => restored.dispose());
+  restored.start();
+  await until(() => restored.view().connected);
+  assert.deepEqual(restored.view().newEntities, ['switch.gyrophare']);
+  assert.deepEqual(announced(logs), ['switch.gyrophare']);
 });
 
 test('lecture individuelle des alias si la lecture groupée est indisponible', async (t) => {

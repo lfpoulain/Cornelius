@@ -20,6 +20,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 - Home Assistant et architecture : couleur et blanc de `home_assistant__control`, comparaison à pleine intensité.
 - Test de la route `POST /api/admin/home-assistant/control` avec `rgbColor`.
 
+### 2026-11-08 : nouveaux appareils Home Assistant signalés
+
+**Ajouté**
+
+- **Home Assistant** : un appareil apparu dans Home Assistant depuis le dernier enregistrement de la sélection est marqué « Nouveau » dans la liste, avec un compteur ; champ `newEntities` de la vue, ligne « Nouvel appareil Home Assistant à cocher » au journal. Rien ne devient utilisable sans être coché.
+
 ## 0.3.0 · 2026-11-09
 
 Les satellites gagnent le bouton qui ferme la conversation, le volume à la voix et une fin de parole propre à chacun. Home Assistant règle la couleur et le blanc des lumières. S’y ajoutent les alarmes, minuteurs et rappels, le déclencheur Home Assistant et le serveur Live compatible.
