@@ -210,6 +210,9 @@ export function registerAddons(
     const snapshot = instances.getSnapshot(instance);
     return {
       ...instance,
+      // Le formulaire part des réglages migrés : les champs d'une nouvelle configVersion y
+      // apparaissent remplis, comme à la collecte. configVersion reste celle enregistrée.
+      config: runtime.editableConfig(instance),
       snapshot,
       error: instances.getError(instance.id),
       preview: runtime.preview(instance),
