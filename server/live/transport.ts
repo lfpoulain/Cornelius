@@ -306,8 +306,12 @@ export class LiveTransport implements SessionTransport {
   attach(controller: SessionController) {
     this.controller = controller;
   }
+  /** Fournisseur de la conversation en cours, sinon celui choisi pour la suivante. */
+  provider(): 'openai' | 'mistral' {
+    return (this.active?.gateway ?? this.gateway)?.provider === 'mistral' ? 'mistral' : 'openai';
+  }
   meteredByDuration(): boolean {
-    return (this.active?.gateway ?? this.gateway)?.provider === 'mistral';
+    return this.provider() === 'mistral';
   }
   onFirstAssistantResponse(listener: (scope: Scope) => void): () => void {
     this.audioCatchupListeners.add(listener);

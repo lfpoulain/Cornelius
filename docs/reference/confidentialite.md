@@ -69,6 +69,7 @@ Tout est sur l’ordinateur du miroir, dans le dossier `data/` (voir [Configurat
 | Jeton Home Assistant et jeton de connexion de chaque agent | la base, **sans chiffrement** |
 | Réveils, minuteurs et rappels, avec leur texte | la base ; supprimer un profil supprime ses échéances. Le texte d’un rappel personnel n’est affiché et dit qu’à son propriétaire reconnu. |
 | Réglages d’envoi d’e-mail et adresses des destinataires | la base ; jamais diffusées au miroir ni données à la conversation. Supprimer un profil supprime son adresse. |
+| Temps de conversation : par jour du foyer et par fournisseur, durée et nombre de conversations, sans contenu ni personne ; prix par minute saisi | la base ; 70 jours gardés |
 | Copies de sécurité de la base | à côté de la base, `cornelius.sqlite.backup-v…sqlite` |
 | Journal technique | `data/logs/cornelius.log` |
 | Trois dernières images créées | `data/generated-images/`, vidé à chaque démarrage |
@@ -127,7 +128,7 @@ Le miroir, lui, ne demande aucun mot de passe. Le miroir et l’administration r
 
 ## Les dépenses
 
-Cornelius ne compte pas ce que coûtent les conversations et ne les bloque pas pour ce motif. Fixez vos limites de dépense dans votre compte OpenAI ou Mistral. Avec Mistral, facturé à la minute, une conversation se ferme après 20 secondes sans activité et dure 15 minutes au plus. Les modes **Rapide** et **Ultra rapide** de **Quand il écoute → Réglages avancés → Délégation : recherches et actions** coûtent plus cher que **Normal**.
+Cornelius ne bloque jamais une conversation pour son coût. La carte **Mise en route → Temps de conversation** compte la durée des conversations par jour et par fournisseur ; elle n’estime un coût que pour le temps passé avec Mistral, facturé à la minute, et seulement si vous saisissez son prix. OpenAI facture aux jetons (voix, délégation, recherche web, images) : aucun coût n’est estimé pour lui, consultez sa console. Fixez vos limites de dépense dans votre compte OpenAI ou Mistral. Avec Mistral, facturé à la minute, une conversation se ferme après 20 secondes sans activité et dure 15 minutes au plus. Les modes **Rapide** et **Ultra rapide** de **Quand il écoute → Réglages avancés → Délégation : recherches et actions** coûtent plus cher que **Normal**.
 
 Le bouton **Bloquer les services IA**, dans le panneau **Conversation** de la rubrique **Quand il écoute** (le seul où ce panneau est complet), ferme la conversation en cours et interdit toute nouvelle connexion à OpenAI et à Mistral, extraction de souvenirs et images OpenAI comprises. Le blocage reste après un redémarrage. **Autoriser les services IA** le lève. La caméra, la reconnaissance et la vision locale continuent de fonctionner.
 

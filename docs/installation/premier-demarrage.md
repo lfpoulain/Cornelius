@@ -56,7 +56,7 @@ Quand tout est prêt, la carte affiche « Tout est prêt » et l’administratio
 
 Sans clé, Cornelius ne peut pas parler. Créez une clé dans votre compte OpenAI (page [API keys](https://platform.openai.com/api-keys)), sur un compte payant. Collez-la dans la carte **Clés et jetons**, plus bas dans la même rubrique, puis **Enregistrer** : elle compte tout de suite, sans redémarrage. (Elle peut aussi s’écrire dans `.env` après `OPENAI_API_KEY=`, avec un redémarrage.)
 
-La clé reste sur cet ordinateur : l’administration n’en montre ensuite que les quatre derniers caractères. Chaque conversation est facturée par OpenAI. Cornelius ne suit pas les dépenses : fixez une limite dans votre compte OpenAI. Le bouton **Bloquer les services IA**, dans le panneau de la conversation de « Quand il écoute », coupe et interdit toute connexion à OpenAI jusqu’à **Autoriser les services IA**.
+La clé reste sur cet ordinateur : l’administration n’en montre ensuite que les quatre derniers caractères. Chaque conversation est facturée par OpenAI, aux jetons. Cornelius compte la durée des conversations (carte **Temps de conversation**) mais n’estime pas la facture OpenAI : fixez une limite dans votre compte OpenAI. Le bouton **Bloquer les services IA**, dans le panneau de la conversation de « Quand il écoute », coupe et interdit toute connexion à OpenAI jusqu’à **Autoriser les services IA**.
 
 ## 4. Service caméra (perception)
 

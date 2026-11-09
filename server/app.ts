@@ -81,6 +81,7 @@ import { MailRepository } from './mail-store.js';
 import { Alarms } from './alarms.js';
 import { AlarmTools } from './alarms-tools.js';
 import { setSatelliteVolume } from './satellite-volume.js';
+import { VoiceUsage, voiceUsageMeasure } from './voice-usage.js';
 import { registerAlarms } from './alarms-api.js';
 import { AlarmsRepository } from './alarms-store.js';
 import { MAIL_PASSWORD_SECRET } from '../shared/mail.js';
@@ -405,9 +406,25 @@ export async function createApp(
         ? 'Clé vocale configurée ; connexion uniquement au démarrage d’une session'
         : `Clé ${initialProvider === 'mistral' ? 'Mistral' : 'OpenAI'} absente`,
   );
-  const controller = new SessionController(profiles, live, now, preferences, (name, details) =>
-    logs.write('info', 'mesure', name, details),
+  const voiceUsage = new VoiceUsage(
+    db,
+    now,
+    () => timeZone,
+    () => live.provider(),
   );
+  // Chaque conversation ouverte chez le fournisseur s’ajoute au temps du jour, par fournisseur.
+  const recordVoiceUsage = voiceUsageMeasure(
+    voiceUsage,
+    () => live.provider(),
+    (error) =>
+      logs.write('warn', 'mesure', 'Temps de conversation non enregistré', {
+        error: error instanceof Error ? error.message : String(error),
+      }),
+  );
+  const controller = new SessionController(profiles, live, now, preferences, (name, details) => {
+    logs.write('info', 'mesure', name, details);
+    recordVoiceUsage(name, details);
+  });
   controller.setSetup({
     openaiKey: !!initialKey,
     mistralKey: !!secretStore.get('MISTRAL_API_KEY'),
@@ -1538,6 +1555,28 @@ export async function createApp(
     controller.setSilenceClose(request.body);
     return controller.snapshot();
   });
+  app.get('/api/admin/voice-usage', { preHandler: requireAdmin }, async () => voiceUsage.view());
+  const voicePriceSchema = compile<{ perMinute: number | null; currency: '$' | '€' }>({
+    type: 'object',
+    additionalProperties: false,
+    required: ['perMinute', 'currency'],
+    properties: {
+      perMinute: { anyOf: [{ type: 'number', minimum: 0, maximum: 10 }, { type: 'null' }] },
+      currency: { enum: ['$', '€'] },
+    },
+  });
+  app.patch(
+    '/api/admin/voice-usage/price',
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      if (!voicePriceSchema(request.body))
+        return reply
+          .code(400)
+          .send({ error: 'Prix par minute invalide : de 0 à 10, en $ ou en €.' });
+      voiceUsage.setPrice(request.body.perMinute, request.body.currency);
+      return voiceUsage.view();
+    },
+  );
   app.patch('/api/admin/reply-close', { preHandler: requireAdmin }, async (request, reply) => {
     if (!enabledSchema(request.body))
       return reply.code(400).send({ error: 'Fermeture après la réponse invalide.' });

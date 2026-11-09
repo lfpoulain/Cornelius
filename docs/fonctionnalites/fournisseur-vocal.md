@@ -29,7 +29,7 @@ Mistral facture Voice Agents à la minute de conversation : 0,04 $ la minute ave
 - elle dure 15 minutes au plus ;
 - chaque fermeture supprime la session chez Mistral, y compris une ouverture interrompue.
 
-Cornelius ne compte pas les dépenses : fixez vos limites dans votre compte Mistral.
+La carte **Mise en route → Temps de conversation** compte les minutes passées avec Mistral et, si vous saisissez son prix par minute, en estime le coût. Le temps passé avec OpenAI, facturé aux jetons, est compté à part et sans coût. Ce n’est qu’une estimation : fixez vos limites dans votre compte Mistral.
 
 ## Limites de Mistral
 

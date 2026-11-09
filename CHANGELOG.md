@@ -26,6 +26,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 - **Home Assistant** : un appareil apparu dans Home Assistant depuis le dernier enregistrement de la sélection est marqué « Nouveau » dans la liste, avec un compteur ; champ `newEntities` de la vue, ligne « Nouvel appareil Home Assistant à cocher » au journal. Rien ne devient utilisable sans être coché.
 
+### 2026-11-08 : temps de conversation
+
+**Ajouté**
+
+- **Mise en route → Temps de conversation** : minutes et nombre de conversations d’aujourd’hui, du mois et du mois précédent, dans le fuseau du foyer (70 jours gardés), par fournisseur vocal. Le coût n’est estimé que pour le temps passé avec Mistral, facturé à la minute, et avec un prix par minute saisi (aucun par défaut, en $ ou en €) ; OpenAI, facturé aux jetons, n’a pas d’estimation. Seule une conversation devenue prête est comptée, y compris quand la clôture n’est pas acquittée. Table `voice_usage_days`, routes `GET /api/admin/voice-usage` et `PATCH /api/admin/voice-usage/price`.
+
 ## 0.3.0 · 2026-11-09
 
 Les satellites gagnent le bouton qui ferme la conversation, le volume à la voix et une fin de parole propre à chacun. Home Assistant règle la couleur et le blanc des lumières. S’y ajoutent les alarmes, minuteurs et rappels, le déclencheur Home Assistant et le serveur Live compatible.

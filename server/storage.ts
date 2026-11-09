@@ -1,3 +1,4 @@
+import { voiceUsageMigration } from './voice-usage.js';
 import { customProviderMigration } from './custom-provider.js';
 import { isVoiceProvider, type VoiceProvider } from '../shared/voice-provider.js';
 import { ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
@@ -436,6 +437,8 @@ export const migrations: readonly string[] = [
     satellite_id TEXT PRIMARY KEY REFERENCES satellites(id) ON DELETE CASCADE,
     delay_ms INTEGER NOT NULL CHECK (delay_ms BETWEEN 3000 AND 300000)
   ) STRICT;`,
+  // Temps de conversation par jour et prix par minute saisi (aucun par défaut).
+  voiceUsageMigration,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */
