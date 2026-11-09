@@ -41,8 +41,20 @@ const actionLabel = (entity: HomeAssistantEntity, action: 'turn_on' | 'turn_off'
       : action === 'turn_on'
         ? 'Allumer'
         : 'Éteindre';
-const stateLabel = (state: string) =>
-  ({ on: 'Allumé', off: 'Éteint', unavailable: 'Indisponible', unknown: 'Inconnu' })[state] ??
+const stateLabel = (state: string, domain?: string) =>
+  (
+    ({
+      // Un script « on » est en cours d’exécution, un mode est activé.
+      script: { on: 'En cours', off: 'Arrêté' },
+      input_boolean: { on: 'Activé', off: 'Désactivé' },
+    }) as Record<string, Record<string, string>>
+  )[domain ?? '']?.[state] ??
+  (
+    { on: 'Allumé', off: 'Éteint', unavailable: 'Indisponible', unknown: 'Inconnu' } as Record<
+      string,
+      string
+    >
+  )[state] ??
   state;
 
 /** État lisible d’un capteur : unité, heure de fin d’un horodatage ou d’une minuterie. */
@@ -292,9 +304,9 @@ export function HomeAssistantSettings({
               <div className="space-y-1">
                 <Label htmlFor="ha-enabled">Autoriser Cornelius à utiliser la sélection</Label>
                 <p className="text-xs text-muted-foreground">
-                  Cornelius allume ou éteint les lumières et prises cochées, et lit les capteurs
-                  cochés (« quelle température dans la chambre ? »). Les capteurs ne sont jamais
-                  commandés.
+                  Cornelius commande les appareils cochés (lumières, prises, modes, ventilateurs,
+                  scripts et scènes) et lit les capteurs cochés (« quelle température dans la
+                  chambre ? »). Les capteurs ne sont jamais commandés.
                 </p>
               </div>
               <Switch
@@ -440,7 +452,7 @@ export function HomeAssistantSettings({
                   {entity.domain === 'scene'
                     ? ''
                     : isControllable(entity)
-                      ? stateLabel(entity.state)
+                      ? stateLabel(entity.state, entity.domain)
                       : sensorLabel(entity)}
                   {isControllable(entity) && entity.state === 'on' && entity.brightnessPct !== null
                     ? ' · ' + entity.brightnessPct + ' %'

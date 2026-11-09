@@ -541,8 +541,15 @@ test('import Assist : règles d’exposition par défaut de Home Assistant et pl
     f.fake.emit(state);
     f.fake.registry.push({ entity_id: state.entity_id, options: {} });
   }
+  // Ventilateurs et scènes : exposés par défaut, donc précochés ; scripts et modes : non.
+  for (const id of ['fan.salon', 'scene.soiree', 'script.reveil', 'input_boolean.mode_nuit']) {
+    const state = haState(id, id.startsWith('scene.') ? new Date().toISOString() : 'off');
+    f.fake.states.set(id, state);
+    f.fake.emit(state);
+    f.fake.registry.push({ entity_id: id, options: {} });
+  }
   f.fake.registry.push({ entity_id: 'lock.porte', options: {} });
-  await until(() => f.home.view().entities.length === 10);
+  await until(() => f.home.view().entities.length === 14);
   let result = await f.home.assistSelection();
   // Expositions explicites, puis domaines et classes exposés par défaut par Home Assistant.
   assert.deepEqual(
@@ -552,6 +559,8 @@ test('import Assist : règles d’exposition par défaut de Home Assistant et pl
       'light.default',
       'sensor.salon_temperature',
       'binary_sensor.porte_entree',
+      'fan.salon',
+      'scene.soiree',
     ]),
   );
 
@@ -562,7 +571,7 @@ test('import Assist : règles d’exposition par défaut de Home Assistant et pl
     f.fake.emit(state);
     f.fake.registry.push({ entity_id: state.entity_id, options: {} });
   }
-  await until(() => f.home.view().entities.length === 130);
+  await until(() => f.home.view().entities.length === 134);
   result = await f.home.assistSelection();
   assert.equal(result.selected.length, 100);
   assert.equal(result.selected[0], 'light.salon');
