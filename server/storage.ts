@@ -1,5 +1,6 @@
 import { voiceUsageMigration } from './voice-usage.js';
 import { satelliteGesturesMigration } from './satellite-gestures.js';
+import { googlePhotosMigration } from './google-photos.js';
 import { customProviderMigration } from './custom-provider.js';
 import { isVoiceProvider, type VoiceProvider } from '../shared/voice-provider.js';
 import { ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
@@ -443,6 +444,10 @@ export const migrations: readonly string[] = [
   // La première PR utilisait l’index désormais réservé aux alarmes.
   `${alarmsMigration}
 ${satelliteGesturesMigration}`,
+  // L'ancienne PR Google Photos utilisait le même numéro que customProviderMigration.
+  // Les deux migrations sont rejouables : assurer les deux tables préserve aussi ces bases.
+  `${customProviderMigration}
+${googlePhotosMigration}`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */

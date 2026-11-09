@@ -34,6 +34,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 - Gestes configurables des satellites compatibles. Un geste peut couper le micro, qui se rouvre au bouton.
 
+### Album Google Photos dans l’écran de veille
+
+**Ajouté**
+
+- Source expérimentale Google Photos : lien d’album partagé, aperçu, actualisation réglable et retour aux images locales. Les images sont relayées depuis Google sans import sur disque, sans clé API ni connexion au compte. Le connecteur dépend du format non officiel de la page partagée et ne lit que sa page initiale (500 entrées au maximum). Voir [les réglages et limites](docs/fonctionnalites/google-photos.md).
+
 ## 0.3.0 · 2026-11-09
 
 Les satellites gagnent le bouton qui ferme la conversation, le volume à la voix et une fin de parole propre à chacun. Home Assistant règle la couleur et le blanc des lumières. S’y ajoutent les alarmes, minuteurs et rappels, le déclencheur Home Assistant et le serveur Live compatible.
