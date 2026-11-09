@@ -578,7 +578,7 @@ export function Admin({
                   )}
                   {section === 'start' && <Secrets run={run} />}
                   {section === 'start' && <VoiceSettings state={state} run={run} />}
-                  {section === 'start' && <VoiceUsageCard run={run} />}
+                  {section === 'start' && <VoiceUsageCard phase={state.session.phase} run={run} />}
                   {section === 'start' && devices && (
                     <AdminPasswordCard defaultPassword={devices.defaultPassword} run={run} />
                   )}

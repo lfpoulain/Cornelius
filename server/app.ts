@@ -81,7 +81,7 @@ import { MailRepository } from './mail-store.js';
 import { Alarms } from './alarms.js';
 import { AlarmTools } from './alarms-tools.js';
 import { setSatelliteVolume } from './satellite-volume.js';
-import { VoiceUsage } from './voice-usage.js';
+import { VoiceUsage, voiceUsageMeasure } from './voice-usage.js';
 import { registerAlarms } from './alarms-api.js';
 import { AlarmsRepository } from './alarms-store.js';
 import { MAIL_PASSWORD_SECRET } from '../shared/mail.js';
@@ -406,11 +406,24 @@ export async function createApp(
         ? 'Clé vocale configurée ; connexion uniquement au démarrage d’une session'
         : `Clé ${initialProvider === 'mistral' ? 'Mistral' : 'OpenAI'} absente`,
   );
-  const voiceUsage = new VoiceUsage(db, now, () => timeZone);
+  const voiceUsage = new VoiceUsage(
+    db,
+    now,
+    () => timeZone,
+    () => live.provider(),
+  );
+  // Chaque conversation ouverte chez le fournisseur s’ajoute au temps du jour, par fournisseur.
+  const recordVoiceUsage = voiceUsageMeasure(
+    voiceUsage,
+    () => live.provider(),
+    (error) =>
+      logs.write('warn', 'mesure', 'Temps de conversation non enregistré', {
+        error: error instanceof Error ? error.message : String(error),
+      }),
+  );
   const controller = new SessionController(profiles, live, now, preferences, (name, details) => {
     logs.write('info', 'mesure', name, details);
-    // Chaque conversation fermée s’ajoute au temps du jour (facturé à la durée).
-    if (name === 'cloture' && typeof details.seconds === 'number') voiceUsage.add(details.seconds);
+    recordVoiceUsage(name, details);
   });
   controller.setSetup({
     openaiKey: !!initialKey,

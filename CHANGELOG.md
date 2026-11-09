@@ -10,7 +10,7 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 **Ajouté**
 
-- **Mise en route → Temps de conversation** : minutes et nombre de conversations d’aujourd’hui, du mois et du mois précédent, dans le fuseau du foyer (70 jours gardés). Le coût n’est estimé qu’avec un prix par minute saisi (aucun par défaut, en $ ou en €). Table `voice_usage`, routes `GET /api/admin/voice-usage` et `PATCH /api/admin/voice-usage/price`.
+- **Mise en route → Temps de conversation** : minutes et nombre de conversations d’aujourd’hui, du mois et du mois précédent, dans le fuseau du foyer (70 jours gardés), par fournisseur vocal. Le coût n’est estimé que pour le temps passé avec Mistral, facturé à la minute, et avec un prix par minute saisi (aucun par défaut, en $ ou en €) ; OpenAI, facturé aux jetons, n’a pas d’estimation. Seule une conversation devenue prête est comptée, y compris quand la clôture n’est pas acquittée. Table `voice_usage_days`, routes `GET /api/admin/voice-usage` et `PATCH /api/admin/voice-usage/price`.
 
 ## 0.3.0 · 2026-11-09
 

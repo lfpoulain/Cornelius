@@ -1465,14 +1465,26 @@ export class SessionController {
 
   sessionClosed(interactionId: string): void {
     if (interactionId !== this.session.interactionId) return;
-    const seconds = Math.ceil((this.now() - (this.session.startedAt ?? this.now())) / 1000);
-    this.measure?.('cloture', {
-      seconds,
-      reason: this.session.reason,
-      interactionId,
-    });
+    this.measureClosure();
     this.release();
     this.publish();
+  }
+
+  /** Conversation fermée, acquittée ou libérée par le chien de garde : mesurée une fois. */
+  private measureClosure(): void {
+    const { interactionId, startedAt, readyAt } = this.session;
+    if (!interactionId) return;
+    try {
+      this.measure?.('cloture', {
+        seconds: Math.ceil((this.now() - (startedAt ?? this.now())) / 1000),
+        reason: this.session.reason,
+        interactionId,
+        // Une création refusée par le fournisseur n’a jamais été prête : rien à compter.
+        ready: readyAt !== null && readyAt !== undefined,
+      });
+    } catch {
+      // Une mesure qui échoue (base pleine ou verrouillée) n’empêche jamais la libération.
+    }
   }
 
   /** Retour au repos après la clôture confirmée ou abandonnée ; relance si elle était demandée. */
@@ -1862,6 +1874,7 @@ export class SessionController {
     }
     if (this.session.phase === 'closing' && now - this.closingAt! >= limits.closeMs) {
       // No acknowledgement from the provider: release the session locally and stay available.
+      this.measureClosure();
       this.release('Clôture non confirmée.');
     }
     this.cards = this.cards.filter((card) => card.expiresAt > now && this.current(card));

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { SessionState } from '../../../shared/types';
 import type { VoiceUsagePeriod } from '../../../shared/voice-usage';
 import { api } from '../../api';
 import { decimalText, parseDecimal } from './format';
@@ -11,12 +12,19 @@ import { NativeSelect, NativeSelectOption } from '../ui/native-select';
 const minutes = (seconds: number) => Math.round(seconds / 6) / 10;
 
 function line(label: string, period: VoiceUsagePeriod, currency: string) {
+  // Le coût ne porte que sur le temps passé avec Mistral, facturé à la minute.
+  const metered =
+    period.meteredSeconds === period.seconds
+      ? ''
+      : ' (dont ' + decimalText(minutes(period.meteredSeconds)) + ' min avec Mistral)';
   const value =
     decimalText(minutes(period.seconds)) +
     ' min · ' +
     period.sessions +
     (period.sessions === 1 ? ' conversation' : ' conversations') +
-    (period.cost === null ? '' : ' · environ ' + decimalText(period.cost) + ' ' + currency);
+    (period.cost === null || period.meteredSeconds === 0
+      ? ''
+      : metered + ' · Mistral : environ ' + decimalText(period.cost) + ' ' + currency);
   return (
     <div className="flex flex-wrap justify-between gap-2 text-sm">
       <span>{label}</span>
@@ -25,10 +33,20 @@ function line(label: string, period: VoiceUsagePeriod, currency: string) {
   );
 }
 
-/** Temps de conversation : la voix temps réel est facturée à la durée de la session. */
-export function VoiceUsageCard({ run }: { run: RunAction }) {
+/**
+ * Temps de conversation par fournisseur. Seul Mistral facture la voix à la minute : le coût
+ * estimé ne porte que sur ce temps-là.
+ */
+export function VoiceUsageCard({ phase, run }: { phase: SessionState['phase']; run: RunAction }) {
   const usage = useAdminResource(api.voiceUsage);
   const saved = usage.data;
+  // Une conversation qui se ferme s’ajoute au temps du jour : la carte se met à jour.
+  const previousPhase = useRef(phase);
+  const { reload } = usage;
+  useEffect(() => {
+    if (phase === 'idle' && previousPhase.current !== 'idle') void reload();
+    previousPhase.current = phase;
+  }, [phase, reload]);
   const [price, setPrice] = useState('');
   const [currency, setCurrency] = useState<'$' | '€'>('$');
   useEffect(() => {
@@ -45,9 +63,10 @@ export function VoiceUsageCard({ run }: { run: RunAction }) {
       <CardHeader>
         <CardTitle>Temps de conversation</CardTitle>
         <CardDescription>
-          La voix temps réel est facturée à la durée des conversations, pas au nombre de questions.
-          Le coût n’est qu’une estimation, d’après le prix par minute saisi ici : vérifiez-le chez
-          votre fournisseur.
+          Durée des conversations vocales, par jour du foyer. Mistral facture la voix à la minute :
+          avec un prix saisi ici, le coût du temps passé avec Mistral est estimé (vérifiez-le chez
+          Mistral). OpenAI facture aux jetons (voix, délégation, recherche web, images) : aucun coût
+          n’est estimé, consultez la console OpenAI.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -63,7 +82,7 @@ export function VoiceUsageCard({ run }: { run: RunAction }) {
         <div className="flex flex-wrap gap-4">
           <Field
             id="voice-price"
-            label="Prix par minute"
+            label="Prix par minute (Mistral)"
             help="Vide : pas d’estimation. De 0 à 10."
             className="max-w-40"
           >
