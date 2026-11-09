@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { CircleAlert, House, RefreshCw } from 'lucide-react';
 import {
+  controlActions,
   isControllable,
   type HomeAssistantEntity,
   type HomeAssistantView,
@@ -16,8 +17,44 @@ import { plural } from './format';
 import { ConfirmAction, ModulePanel, SaveBar, SearchInput } from './shared';
 import type { RunAction } from './types';
 
-const stateLabel = (state: string) =>
-  ({ on: 'Allumé', off: 'Éteint', unavailable: 'Indisponible', unknown: 'Inconnu' })[state] ??
+const kindLabel = (entity: HomeAssistantEntity) =>
+  !isControllable(entity)
+    ? 'Lecture seule'
+    : entity.domain === 'scene'
+      ? 'Scène'
+      : entity.domain === 'script'
+        ? 'Script'
+        : entity.domain === 'input_boolean'
+          ? 'Mode'
+          : entity.domain === 'fan'
+            ? 'Ventilateur'
+            : entity.brightness
+              ? 'Luminosité réglable'
+              : 'Marche / arrêt';
+const actionLabel = (entity: HomeAssistantEntity, action: 'turn_on' | 'turn_off') =>
+  entity.domain === 'scene'
+    ? 'Activer'
+    : entity.domain === 'script'
+      ? action === 'turn_on'
+        ? 'Lancer'
+        : 'Arrêter'
+      : action === 'turn_on'
+        ? 'Allumer'
+        : 'Éteindre';
+const stateLabel = (state: string, domain?: string) =>
+  (
+    ({
+      // Un script « on » est en cours d’exécution, un mode est activé.
+      script: { on: 'En cours', off: 'Arrêté' },
+      input_boolean: { on: 'Activé', off: 'Désactivé' },
+    }) as Record<string, Record<string, string>>
+  )[domain ?? '']?.[state] ??
+  (
+    { on: 'Allumé', off: 'Éteint', unavailable: 'Indisponible', unknown: 'Inconnu' } as Record<
+      string,
+      string
+    >
+  )[state] ??
   state;
 
 /** État lisible d’un capteur : unité, heure de fin d’un horodatage ou d’une minuterie. */
@@ -267,9 +304,9 @@ export function HomeAssistantSettings({
               <div className="space-y-1">
                 <Label htmlFor="ha-enabled">Autoriser Cornelius à utiliser la sélection</Label>
                 <p className="text-xs text-muted-foreground">
-                  Cornelius allume ou éteint les lumières et prises cochées, et lit les capteurs
-                  cochés (« quelle température dans la chambre ? »). Les capteurs ne sont jamais
-                  commandés.
+                  Cornelius commande les appareils cochés (lumières, prises, modes, ventilateurs,
+                  scripts et scènes) et lit les capteurs cochés (« quelle température dans la
+                  chambre ? »). Les capteurs ne sont jamais commandés.
                 </p>
               </div>
               <Switch
@@ -407,51 +444,48 @@ export function HomeAssistantSettings({
                       </span>
                     )}
                     <span className="block text-xs wrap-anywhere text-muted-foreground">
-                      {entity.id} ·{' '}
-                      {!isControllable(entity)
-                        ? 'Lecture seule'
-                        : entity.brightness
-                          ? 'Luminosité réglable'
-                          : 'Marche / arrêt'}
+                      {entity.id} · {kindLabel(entity)}
                     </span>
                   </span>
                 </label>
                 <span className="text-sm text-muted-foreground">
-                  {isControllable(entity) ? stateLabel(entity.state) : sensorLabel(entity)}
+                  {entity.domain === 'scene'
+                    ? ''
+                    : isControllable(entity)
+                      ? stateLabel(entity.state, entity.domain)
+                      : sensorLabel(entity)}
                   {isControllable(entity) && entity.state === 'on' && entity.brightnessPct !== null
                     ? ' · ' + entity.brightnessPct + ' %'
                     : ''}
                 </span>
-                {(isControllable(entity) ? (['turn_on', 'turn_off'] as const) : []).map(
-                  (action) => (
-                    <Button
-                      key={action}
-                      size="sm"
-                      variant="outline"
-                      aria-label={(action === 'turn_on' ? 'Allumer ' : 'Éteindre ') + entity.name}
-                      onClick={() =>
-                        void run(
-                          (action === 'turn_on' ? 'Allumer' : 'Éteindre') +
-                            ' « ' +
-                            entity.name +
-                            ' » : commande envoyée.',
-                          async () => {
-                            const result = await api.controlHomeAssistant({
-                              entityId: entity.id,
-                              action,
-                              brightnessPct: null,
-                            });
-                            if (result.status !== 'succeeded') throw new Error(result.summary);
-                            await refreshView();
-                          },
-                          { key: 'home-assistant-control-' + entity.id, payload: action },
-                        )
-                      }
-                    >
-                      {action === 'turn_on' ? 'Allumer' : 'Éteindre'}
-                    </Button>
-                  ),
-                )}
+                {controlActions(entity).map((action) => (
+                  <Button
+                    key={action}
+                    size="sm"
+                    variant="outline"
+                    aria-label={actionLabel(entity, action) + ' ' + entity.name}
+                    onClick={() =>
+                      void run(
+                        actionLabel(entity, action) +
+                          ' « ' +
+                          entity.name +
+                          ' » : commande envoyée.',
+                        async () => {
+                          const result = await api.controlHomeAssistant({
+                            entityId: entity.id,
+                            action,
+                            brightnessPct: null,
+                          });
+                          if (result.status !== 'succeeded') throw new Error(result.summary);
+                          await refreshView();
+                        },
+                        { key: 'home-assistant-control-' + entity.id, payload: action },
+                      )
+                    }
+                  >
+                    {actionLabel(entity, action)}
+                  </Button>
+                ))}
               </div>
             ))}
             {!entities.length && (

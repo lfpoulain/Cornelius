@@ -1,15 +1,17 @@
 # Home Assistant
 
-Cornelius peut allumer et éteindre les lumières et les prises de la maison, et lire les capteurs, à travers Home Assistant. Cette page explique comment le connecter, choisir les appareils autorisés, qui peut s’en servir, et ce que deviennent le jeton et les données. Elle s’adresse à la personne qui règle le miroir pour la maison.
+Cornelius peut allumer et éteindre les lumières et les prises de la maison, activer des modes, lancer des scripts et des scènes, et lire les capteurs, à travers Home Assistant. Cette page explique comment le connecter, choisir les appareils autorisés, qui peut s’en servir, et ce que deviennent le jeton et les données. Elle s’adresse à la personne qui règle le miroir pour la maison.
 
 ## Ce que fait le connecteur
 
 Home Assistant est un logiciel de domotique installé à part. Cornelius s’y connecte directement : aucun module complémentaire, blueprint ni intégration n’est à installer dans Home Assistant. Cornelius peut aussi tourner lui-même sur la box, comme add-on (voir [Installer dans Home Assistant](../installation/home-assistant.md)) : la connexion décrite ici reste la même.
 
 - **Lumières et prises** (`light.*` et `switch.*`) : allumer, éteindre, lire l’état, et régler la luminosité des lumières qui le permettent (de 1 à 100 %), leur couleur (« mets le bureau en violet ») et leur blanc (« blanc chaud », de 1500 à 9000 K, ramené à la plage de l’ampoule). La couleur n’est confirmée que si Home Assistant la relit (à une marge près, l’ampoule l’arrondissant à sa teinte).
-- **Capteurs**, en lecture seule : capteurs et détecteurs, minuteries, dates et heures, nombres, interrupteurs virtuels, listes de choix, compteurs, thermostats, volets et serrures. Un capteur n’est jamais commandé : Cornelius peut dire si une serrure est fermée, pas l’ouvrir.
+- **Modes et ventilateurs** (`input_boolean.*`, `fan.*`) : activer, désactiver, lire l’état (« passe en mode nuit »).
+- **Scripts et scènes** (`script.*`, `scene.*`) : lancer ou arrêter un script, activer une scène (une scène ne s’éteint pas). Leur lancement est confirmé par la mise à jour de leur état dans Home Assistant : un script court repasse aussitôt à « off », l’état d’une scène est l’heure de sa dernière activation. C’est un compromis : pour un script ou une scène, toute mise à jour de l’état pendant les 3 secondes d’attente vaut confirmation, même si elle ne vient pas de la commande, et l’arrêt d’un script déjà arrêté est confirmé aussitôt, sans que rien n’ait changé.
+- **Capteurs**, en lecture seule : capteurs et détecteurs, minuteries, dates et heures, nombres, listes de choix, compteurs, thermostats, volets et serrures. Un capteur n’est jamais commandé : Cornelius peut dire si une serrure est fermée, pas l’ouvrir.
 
-Dans Home Assistant, un « switch » peut piloter autre chose qu’une prise. Ne cochez que les appareils que Cornelius doit vraiment commander.
+Dans Home Assistant, un « switch » peut piloter autre chose qu’une prise, et un script peut faire n’importe quoi. Ne cochez que les appareils et scripts que Cornelius doit vraiment commander.
 
 La configuration est commune au foyer. La carte **Home Assistant** se trouve dans la rubrique **Modules**, groupe « Maison ». Elle s’affiche quand **Sources de** vaut « Tout le monde » ou « Le foyer ».
 
@@ -38,17 +40,17 @@ Pour s’y retrouver :
 
 La sélection est limitée à 100 appareils, capteurs compris.
 
-**Reprendre la sélection Assist** coche les appareils que vous exposez déjà à Assist, l’assistant vocal de Home Assistant. Il faut un jeton d’un compte administrateur Home Assistant. Cette reprise prépare seulement les cases : vérifiez-les, puis enregistrez. Elle ne modifie rien dans Home Assistant, et elle ne suit pas les changements faits ensuite dans Assist : relancez-la si besoin. Au-delà de 100 appareils exposés, seuls les 100 premiers sont cochés et un message le signale.
+**Reprendre la sélection Assist** coche les appareils que vous exposez déjà à Assist, l’assistant vocal de Home Assistant. Il faut un jeton d’un compte administrateur Home Assistant. Home Assistant expose par défaut les lumières, prises, ventilateurs, scènes, thermostats et volets : les ventilateurs et les scènes sont donc précochés, comme les lumières. Les scripts et les modes (`input_boolean`) ne le sont que s’ils sont exposés explicitement. Cette reprise prépare seulement les cases : vérifiez-les, puis enregistrez. Elle ne modifie rien dans Home Assistant, et elle ne suit pas les changements faits ensuite dans Assist : relancez-la si besoin. Au-delà de 100 appareils exposés, seuls les 100 premiers sont cochés et un message le signale.
 
 Les autres noms (alias) définis dans Home Assistant sont lus automatiquement et suivis quand ils changent. Ils apparaissent sous chaque appareil (« Autres noms ») et aident Cornelius à comprendre « la lampe du salon ». Un alias ne donne jamais accès à un appareil non coché.
 
-Les boutons **Allumer** et **Éteindre** de la liste servent à tester. Ils fonctionnent pour toutes les lumières et prises, même non cochées, et ne changent pas les autorisations de Cornelius.
+Les boutons de la liste (**Allumer** et **Éteindre**, **Activer** et **Désactiver**, **Lancer** et **Arrêter**) servent à tester. Ils fonctionnent pour tous les appareils commandables, même non cochés, et ne changent pas les autorisations de Cornelius. Attention : pour un script, le bouton **Lancer** l’exécute vraiment, et un script peut faire n’importe quoi dans la maison ; l’administration étant protégée par son mot de passe, seul l’administrateur peut l’utiliser.
 
 ## Autoriser Cornelius
 
 Deux interrupteurs règlent l’accès :
 
-- **Autoriser Cornelius à utiliser la sélection** : Cornelius allume ou éteint les lumières et prises cochées, et lit les capteurs cochés. Sans cette autorisation, il n’utilise pas Home Assistant.
+- **Autoriser Cornelius à utiliser la sélection** : Cornelius commande les appareils cochés (lumières, prises, modes, ventilateurs, scripts et scènes) et lit les capteurs cochés. Sans cette autorisation, il n’utilise pas Home Assistant.
 - **Réserver aux personnes reconnues** (désactivé par défaut) : voir la section suivante.
 
 Une modification des autorisations ou de la sélection s’applique aussi aux demandes en cours : elles sont annulées. Une commande déjà envoyée à Home Assistant ne peut pas être annulée.
@@ -79,7 +81,7 @@ Pour une commande, Cornelius relit l’état de l’appareil, vérifie qu’il e
 
 Pour un capteur, Cornelius relit toujours l’état actuel, jamais une valeur gardée en mémoire. Pour une minuterie, la fin d’un programme (lave-linge, lave-vaisselle…) ou une date, le serveur calcule lui-même l’heure de fin et le temps restant. Un capteur « indisponible » ou « inconnu » est signalé comme tel.
 
-Cornelius ne peut utiliser que les deux actions marche et arrêt, la luminosité, la couleur et le blanc. Aucune autre commande, adresse ou donnée ne peut lui être dictée par la conversation.
+Cornelius ne peut utiliser que les actions marche et arrêt (activer et désactiver un mode, lancer et arrêter un script, activer une scène), la luminosité, la couleur et le blanc. Aucune autre commande, adresse ou donnée ne peut lui être dictée par la conversation.
 
 ## Connexion et coupures
 
@@ -148,7 +150,7 @@ La route n’accepte que le réseau local et limite les appels à 30 par minute.
 
 - Ne sont pas pris en charge : la couleur des lumières, les scènes, la commande des volets, des serrures et des thermostats, et des droits différents selon la personne.
 - Une intégration Home Assistant qui dépend d’un service en ligne en dépend toujours.
-- Les commandes réelles peuvent varier selon la version de Home Assistant et l’intégration de chaque appareil. Essayez-les avec les boutons **Allumer** et **Éteindre** avant de les confier à Cornelius.
+- Les commandes réelles peuvent varier selon la version de Home Assistant et l’intégration de chaque appareil. Essayez-les avec les boutons de la liste avant de les confier à Cornelius.
 
 ## Voir aussi
 

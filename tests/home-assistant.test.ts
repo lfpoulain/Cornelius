@@ -257,6 +257,50 @@ test('couleur refusée sans effet : lampe sans couleur, extinction, couleur et b
   assert.equal(f.fake.calls.length, 0);
 });
 
+test('modes, ventilateurs, scripts et scènes : commandés et confirmés à leur façon', async (t) => {
+  const f = await fixture(t);
+  const at = new Date(Date.now() - 60_000).toISOString();
+  for (const [id, state] of [
+    ['input_boolean.mode_nuit', 'off'],
+    ['fan.bureau', 'off'],
+    ['script.allumage_bureau', 'off'],
+    ['scene.soiree', 'unknown'],
+  ] as const) {
+    f.fake.states.set(id, { ...haState(id, state), last_updated: at });
+  }
+  await f.home.refresh();
+  const ids = ['input_boolean.mode_nuit', 'fan.bureau', 'script.allumage_bureau', 'scene.soiree'];
+  f.select(ids);
+  const [control] = f.home.tools();
+  assert.equal(control!.name, 'home_assistant__control');
+  for (const id of ids) assert.ok(control!.description.includes(id), id);
+  assert.match(control!.description, /une scène s’active avec turn_on et n’a pas de turn_off/u);
+
+  for (const id of ['input_boolean.mode_nuit', 'fan.bureau']) {
+    const on = await f.home.run(command(id), signal());
+    assert.equal(on.result?.confirmed, true, id + ' : ' + on.summary);
+    assert.equal(f.fake.states.get(id)?.state, 'on');
+  }
+  // Un script court repasse aussitôt à « off » : la mise à jour de l’état confirme le lancement.
+  const script = await f.home.run(command('script.allumage_bureau'), signal());
+  assert.equal(script.result?.confirmed, true, script.summary);
+  assert.equal(f.fake.states.get('script.allumage_bureau')?.state, 'off');
+  // Une scène jamais activée (« unknown ») s’active ; son état devient l’heure d’activation.
+  const scene = await f.home.run(command('scene.soiree'), signal());
+  assert.equal(scene.result?.confirmed, true, scene.summary);
+  assert.deepEqual(f.fake.calls.at(-1), {
+    path: '/api/services/scene/turn_on',
+    body: { entity_id: 'scene.soiree' },
+  });
+  const calls = f.fake.calls.length;
+  const off = await f.home.run(command('scene.soiree', 'turn_off'), signal());
+  assert.equal(off.status, 'failed');
+  assert.equal(off.error?.code, 'invalid_params');
+  assert.equal(f.fake.calls.length, calls);
+  // Un mode n’est plus un capteur : pas d’outil de lecture pour lui.
+  assert.equal(f.home.tools().length, 1);
+});
+
 test('un appareil qui remonte son état en différé est quand même confirmé', async (t) => {
   const f = await fixture(t);
   f.select();
@@ -365,7 +409,8 @@ test('une nouvelle adresse exige son propre jeton et efface les autorisations pr
 test('normalisation ne propose jamais une luminosité pour un interrupteur ou une lampe on/off', () => {
   assert.equal(normalizeEntity(haState('switch.bureau', 'on', true))?.brightness, false);
   assert.equal(normalizeEntity(haState('light.simple'))?.brightness, false);
-  assert.equal(normalizeEntity(haState('script.scene')), null);
+  // Les automatisations restent hors de portée : seuls les scripts et scènes se déclenchent.
+  assert.equal(normalizeEntity(haState('automation.reveil')), null);
 });
 
 test('les commandes administrateur sont indépendantes de Luna sans étendre ses autorisations', async (t) => {
@@ -496,8 +541,15 @@ test('import Assist : règles d’exposition par défaut de Home Assistant et pl
     f.fake.emit(state);
     f.fake.registry.push({ entity_id: state.entity_id, options: {} });
   }
+  // Ventilateurs et scènes : exposés par défaut, donc précochés ; scripts et modes : non.
+  for (const id of ['fan.salon', 'scene.soiree', 'script.reveil', 'input_boolean.mode_nuit']) {
+    const state = haState(id, id.startsWith('scene.') ? new Date().toISOString() : 'off');
+    f.fake.states.set(id, state);
+    f.fake.emit(state);
+    f.fake.registry.push({ entity_id: id, options: {} });
+  }
   f.fake.registry.push({ entity_id: 'lock.porte', options: {} });
-  await until(() => f.home.view().entities.length === 10);
+  await until(() => f.home.view().entities.length === 14);
   let result = await f.home.assistSelection();
   // Expositions explicites, puis domaines et classes exposés par défaut par Home Assistant.
   assert.deepEqual(
@@ -507,6 +559,8 @@ test('import Assist : règles d’exposition par défaut de Home Assistant et pl
       'light.default',
       'sensor.salon_temperature',
       'binary_sensor.porte_entree',
+      'fan.salon',
+      'scene.soiree',
     ]),
   );
 
@@ -517,7 +571,7 @@ test('import Assist : règles d’exposition par défaut de Home Assistant et pl
     f.fake.emit(state);
     f.fake.registry.push({ entity_id: state.entity_id, options: {} });
   }
-  await until(() => f.home.view().entities.length === 130);
+  await until(() => f.home.view().entities.length === 134);
   result = await f.home.assistSelection();
   assert.equal(result.selected.length, 100);
   assert.equal(result.selected[0], 'light.salon');
