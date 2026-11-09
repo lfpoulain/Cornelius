@@ -806,3 +806,132 @@ test('écran de veille calé sur le réveil de Cornelius : un passant ne le reti
     fixture.close();
   }
 });
+
+for (const fallback of [false, true]) {
+  for (const duringSlideshow of [false, true]) {
+    test(`écran de veille : saute trois 404 ${duringSlideshow ? 'pendant le diaporama' : 'au démarrage'} (${fallback ? 'sans WebGL' : 'WebGL'})`, async ({
+      page,
+    }) => {
+      await page.addInitScript(
+        ({ fallback }) => {
+          Math.random = () => 0.999999;
+          if (fallback) {
+            const original = HTMLCanvasElement.prototype.getContext;
+            HTMLCanvasElement.prototype.getContext = function (
+              this: HTMLCanvasElement,
+              kind: string,
+              ...args: unknown[]
+            ) {
+              if (kind.startsWith('webgl')) return null;
+              return original.apply(this, [kind, ...args] as Parameters<typeof original>);
+            } as typeof original;
+          }
+        },
+        { fallback },
+      );
+      const fixture = await mirrorFixture(page, (state) => {
+        state.presence = { ...state.presence, state: 'absent', peopleCount: 0, people: [] };
+        state.screensaver = {
+          ...screensaverState('presence'),
+          intervalMs: 1500,
+          transition: 'none',
+          imageCount: duringSlideshow ? 5 : 4,
+        };
+      });
+      const ids = [...(duringSlideshow ? ['first'] : []), 'bad-1', 'bad-2', 'bad-3', 'healthy'];
+      const attempted: string[] = [];
+      let recovered = false;
+      await page.route('**/api/screensaver', (route) =>
+        route.fulfill({
+          json: {
+            images: ids.map((id) => ({
+              id,
+              url: `/api/screensaver/google-photos/images/${id}`,
+              title: id,
+              credit: 'Photo synthétique',
+              origin: 'google-photos',
+            })),
+          },
+        }),
+      );
+      await page.route('**/api/screensaver/google-photos/images/*', (route) => {
+        const id = route.request().url().split('/').at(-1)!;
+        attempted.push(id);
+        return !recovered && id.startsWith('bad')
+          ? route.fulfill({ status: 404, json: { error: 'Photo indisponible.' } })
+          : route.fulfill({ contentType: 'image/png', body: solidPng(64, 40, [40, 160, 70]) });
+      });
+      try {
+        await page.goto('/');
+        const caption = page.locator('.mirror-screensaver-caption');
+        if (duringSlideshow) await expect(caption).toContainText('first');
+        await expect(caption).toContainText('healthy');
+        await expect(page.locator('.mirror-page')).toHaveAttribute('data-screensaver', 'on');
+        expect(attempted.filter((id) => id.startsWith('bad'))).toEqual(['bad-1', 'bad-2', 'bad-3']);
+        if (fallback)
+          await expect(page.locator('.mirror-screensaver-fallback img').first()).toHaveJSProperty(
+            'naturalWidth',
+            64,
+          );
+        else await expect(page.locator('.mirror-screensaver canvas')).toBeVisible();
+        recovered = true;
+        await expect(caption).toContainText('bad-1');
+      } finally {
+        fixture.close();
+      }
+    });
+  }
+}
+
+test('écran de veille : repli local puis retour de la photo distante sans nouvelle révision', async ({
+  page,
+}) => {
+  const fixture = await mirrorFixture(page, (state) => {
+    state.presence = { ...state.presence, state: 'absent', peopleCount: 0, people: [] };
+    state.screensaver = {
+      ...screensaverState('presence'),
+      intervalMs: 1500,
+      transition: 'none',
+      imageCount: 1,
+    };
+  });
+  let online = false;
+  await page.route('**/api/screensaver', (route) =>
+    route.fulfill({
+      json: {
+        images: [
+          {
+            id: 'remote',
+            url: '/api/screensaver/google-photos/images/remote',
+            title: 'Album distant',
+            credit: 'Test',
+            origin: 'google-photos',
+          },
+        ],
+        fallback: [
+          {
+            id: 'local',
+            url: '/api/screensaver/images/local',
+            title: 'Image locale',
+            credit: 'Test',
+            origin: 'upload',
+          },
+        ],
+      },
+    }),
+  );
+  const png = { contentType: 'image/png', body: solidPng(64, 40, [40, 160, 70]) };
+  await page.route('**/api/screensaver/images/local', (route) => route.fulfill(png));
+  await page.route('**/api/screensaver/google-photos/images/remote', (route) =>
+    route.fulfill(online ? png : { status: 404 }),
+  );
+  try {
+    await page.goto('/');
+    const caption = page.locator('.mirror-screensaver-caption');
+    await expect(caption).toContainText('Image locale');
+    online = true;
+    await expect(caption).toContainText('Album distant');
+  } finally {
+    fixture.close();
+  }
+});

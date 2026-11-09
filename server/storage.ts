@@ -1,3 +1,4 @@
+import { googlePhotosMigration } from './google-photos.js';
 import { customProviderMigration } from './custom-provider.js';
 import { isVoiceProvider, type VoiceProvider } from '../shared/voice-provider.js';
 import { ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
@@ -436,6 +437,10 @@ export const migrations: readonly string[] = [
     satellite_id TEXT PRIMARY KEY REFERENCES satellites(id) ON DELETE CASCADE,
     delay_ms INTEGER NOT NULL CHECK (delay_ms BETWEEN 3000 AND 300000)
   ) STRICT;`,
+  // L'ancienne PR Google Photos utilisait le même numéro que customProviderMigration.
+  // Les deux migrations sont rejouables : assurer les deux tables préserve aussi ces bases.
+  `${customProviderMigration}
+${googlePhotosMigration}`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */
