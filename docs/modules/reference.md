@@ -468,7 +468,7 @@ Les mêmes exports qu’avant restent disponibles : `validateAddonDefinition`, `
 
 Un module qui s’appuie sur un ajout de 0.2.0 DOIT déclarer `minCoreVersion: '0.2.0'`.
 
-Quand `configVersion` augmente, `configMigrate` DOIT vérifier `fromVersion` et le contenu, garder les choix existants, compléter les nouveaux champs et refuser une version inconnue, sans réseau ni écriture. **Limite actuelle** : la migration s’applique en mémoire à chaque collecte, puis le résultat est validé ; elle n’est jamais écrite en base. Le formulaire de l’administration montre l’ancienne configuration, avec les nouveaux champs vides. À l’enregistrement, c’est le contenu du formulaire qui est validé contre le nouveau schéma et enregistré avec la nouvelle `configVersion`, sans passer par `configMigrate` : testez la réédition.
+Quand `configVersion` augmente, `configMigrate` DOIT vérifier `fromVersion` et le contenu, garder les choix existants, compléter les nouveaux champs et refuser une version inconnue, sans réseau ni écriture. La migration s’applique en mémoire, à chaque collecte (le résultat est alors validé) et à l’ouverture du formulaire de l’administration, qui montre ainsi les nouveaux champs déjà remplis. Elle n’est jamais écrite en base d’elle-même : c’est l’enregistrement du formulaire qui valide son contenu contre le nouveau schéma et l’enregistre avec la nouvelle `configVersion`. Si `configMigrate` lève une erreur, le formulaire montre les réglages enregistrés tels quels et le journal garde « Migration des réglages impossible ».
 
 Une nouvelle `dataVersion` force une collecte, et l’ancien relevé n’est plus utilisé en repli. Ne changez jamais le sens d’une donnée sans changer ce numéro.
 
