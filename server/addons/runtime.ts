@@ -860,6 +860,32 @@ export class AddonRuntime {
     }
   }
 
+  /**
+   * Réglages d'une source tels que le formulaire de l'administration les montre : migrés par
+   * `configMigrate`, comme à la collecte, sans rien écrire en base (c'est l'enregistrement du
+   * formulaire qui fixe la nouvelle `configVersion`). Une migration qui échoue, ou qui ne rend
+   * pas un objet, laisse les réglages enregistrés tels quels et une trace au journal.
+   */
+  editableConfig(instance: AddonInstance): Record<string, unknown> {
+    const addon = this.addons.get(instance.addonId);
+    if (!addon) return instance.config;
+    try {
+      const config: unknown = this.migrateConfig(addon, instance);
+      if (config && typeof config === 'object' && !Array.isArray(config))
+        return config as Record<string, unknown>;
+      throw new Error('La migration ne rend pas un objet.');
+    } catch (error) {
+      this.options.logs?.write('warn', 'addon', 'Migration des réglages impossible', {
+        addonId: addon.id,
+        instanceId: instance.id,
+        fromVersion: instance.configVersion,
+        toVersion: addon.configVersion,
+        message: (error instanceof Error ? error.message : String(error)).slice(0, 300),
+      });
+      return instance.config;
+    }
+  }
+
   private migrateConfig(addon: AddonDefinition, instance: AddonInstance): Record<string, unknown> {
     if (instance.configVersion === addon.configVersion || !addon.configMigrate)
       return instance.config;

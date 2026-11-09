@@ -6,7 +6,9 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
-Rien pour l’instant.
+**Corrigé**
+
+- Modules : le formulaire d’une source montre ses réglages migrés par `configMigrate` quand le module a augmenté sa `configVersion`. Les nouveaux champs n’y apparaissent plus vides ou éteints alors que la collecte, elle, les remplissait. Rien n’est écrit en base avant l’enregistrement du formulaire, et une migration qui échoue laisse voir les réglages enregistrés tels quels.
 
 ## 0.2.0 · 2026-11-02
 
