@@ -65,6 +65,10 @@ Chaque satellite a sa fiche dans **Administration → Satellites audio**, avec s
 | rouge | micro coupé |
 | rouge qui clignote | remise à zéro |
 
+## Le volume à la voix
+
+Pendant une conversation sur un satellite, « parle plus fort », « moins fort » ou « mets le volume à 5 » règle son haut-parleur (outil `satellite__volume`, de 0 à 10, deux crans pour plus fort ou moins fort). Le réglage est enregistré comme depuis l’administration et envoyé aussitôt au satellite. Il n’existe pas sur le miroir.
+
 ## Le bouton BOOT
 
 - **Appui bref pendant une conversation** (l’anneau allumé) : ferme la conversation tout de suite, sans attendre le silence. Demande un firmware qui envoie `session` / `end` ; un firmware plus ancien coupe le micro à la place.

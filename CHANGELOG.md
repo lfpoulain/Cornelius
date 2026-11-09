@@ -12,6 +12,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 - Modules : le formulaire d’une source montre ses réglages migrés par `configMigrate` quand le module a augmenté sa `configVersion`. Les nouveaux champs n’y apparaissent plus vides ou éteints alors que la collecte, elle, les remplissait. Rien n’est écrit en base avant l’enregistrement du formulaire, et une migration qui échoue laisse voir les réglages enregistrés tels quels.
 
+### 2026-11-08 : volume du satellite à la voix
+
+**Ajouté**
+
+- Outil vocal `satellite__volume`, proposé seulement dans une conversation de satellite : « parle plus fort », « moins fort » (deux crans) ou « mets le volume à 5 » (0 à 10). Le volume est enregistré comme depuis l’administration et envoyé aussitôt au satellite (`settings`).
+
 ### 2026-11-08 : fin de parole propre à chaque satellite
 
 **Ajouté**
