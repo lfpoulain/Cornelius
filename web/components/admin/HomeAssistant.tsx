@@ -138,7 +138,10 @@ export function HomeAssistantSettings({
   const entities =
     view?.entities.filter(
       (entity) =>
-        (!selectedOnly || selected.includes(entity.id)) &&
+        // Les nouveaux appareils restent visibles : le bandeau invite à les examiner.
+        (!selectedOnly ||
+          selected.includes(entity.id) ||
+          !!view.newEntities?.includes(entity.id)) &&
         (kind === 'all' || (kind === 'devices') === isControllable(entity)) &&
         (entity.name + ' ' + entity.id + ' ' + (entity.aliases ?? []).join(' '))
           .toLocaleLowerCase('fr')
@@ -365,8 +368,9 @@ export function HomeAssistantSettings({
                 'nouvel appareil dans Home Assistant',
                 'nouveaux appareils dans Home Assistant',
               )}{' '}
-              depuis le dernier enregistrement : cochez ceux que Cornelius doit utiliser, puis
-              enregistrez. Ils sont marqués « Nouveau » dans la liste.
+              depuis le dernier choix des appareils : cochez ceux que Cornelius doit utiliser, puis
+              enregistrez la sélection. Ils sont marqués « Nouveau » dans la liste, même avec «
+              Afficher uniquement la sélection ».
             </p>
           )}
           <p className="text-sm text-muted-foreground">

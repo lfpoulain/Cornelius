@@ -301,6 +301,8 @@ export class HomeAssistant {
   private configuring = false;
   private requests = new AbortController();
   private aliasRequests = new Map<string, number>();
+  /** Nouveaux appareils déjà notés au journal depuis le démarrage : une ligne chacun. */
+  private announced = new Set<string>();
   onAliasesChanged?: () => void;
   constructor(
     private readonly repository: HomeAssistantRepository,
@@ -329,12 +331,27 @@ export class HomeAssistant {
       newEntities: this.newEntities(),
     };
   }
-  /** Comparées au catalogue enregistré avec la sélection : l’enregistrer vaut « vu ». */
+  /**
+   * Comparées au catalogue enregistré par le dernier choix d’appareils : seul l’enregistrement de
+   * la sélection vaut « vu ». Une entité déjà cochée n’est jamais nouvelle.
+   */
   private newEntities(): string[] {
     const known = new Set(this.config.catalog.map((entity) => entity.id));
     // Sans catalogue enregistré (première connexion), rien n’est « nouveau ».
     if (!known.size) return [];
-    return [...this.entities.keys()].filter((id) => !known.has(id)).sort();
+    return [...this.entities.keys()]
+      .filter((id) => !known.has(id) && !this.config.selected.includes(id))
+      .sort();
+  }
+  /** Journalise une fois chaque nouvel appareil, apparu en direct ou pendant une coupure. */
+  private announceNewEntities() {
+    for (const id of this.newEntities()) {
+      if (this.announced.has(id)) continue;
+      this.announced.add(id);
+      this.logs?.write('info', 'home-assistant', 'Nouvel appareil Home Assistant à cocher', {
+        entityId: id,
+      });
+    }
   }
   private checkRevision(revision: number) {
     if (revision !== this.config.revision)
@@ -403,10 +420,7 @@ export class HomeAssistant {
       ) {
         this.entities.set(entity.id, { ...entity, aliases: previous?.aliases ?? [] });
         if (!previous && this.socket) void this.refreshAlias(this.socket, entity.id);
-        if (!previous)
-          this.logs?.write('info', 'home-assistant', 'Nouvel appareil Home Assistant à cocher', {
-            entityId: entity.id,
-          });
+        if (!previous) this.announceNewEntities();
       }
     } else if (data.new_state === null) this.entities.delete(data.entity_id);
   }
@@ -481,6 +495,8 @@ export class HomeAssistant {
             : [];
           if (JSON.stringify(previousAliases) !== JSON.stringify(currentAliases))
             this.onAliasesChanged?.();
+          // Appareils ajoutés pendant une coupure ou avant le démarrage.
+          this.announceNewEntities();
           pending.length = 0;
           buffering = false;
           this.connected = true;
@@ -551,8 +567,10 @@ export class HomeAssistant {
           ...next,
           enabled: same && next.enabled,
           selected: same ? next.selected : [],
-          catalog: connection.entities,
+          // Même connexion : le catalogue déjà vu reste la référence des « nouveaux » appareils.
+          catalog: same && next.catalog.length ? next.catalog : connection.entities,
         });
+        if (!same) this.announced.clear();
         this.invalidate();
         this.socket = connection.socket;
         connection.activate();
@@ -597,7 +615,6 @@ export class HomeAssistant {
       ...this.config,
       enabled: input.enabled ?? this.config.enabled,
       knownPeopleOnly: input.knownPeopleOnly ?? this.config.knownPeopleOnly,
-      catalog: [...this.entities.values()],
     });
     // Une restriction s’applique aussi aux commandes déjà en cours.
     this.requests.abort();
@@ -618,6 +635,7 @@ export class HomeAssistant {
     });
     this.invalidate();
     this.entities.clear();
+    this.announced.clear();
     this.error = null;
     this.interrupted = false;
     return this.view();
