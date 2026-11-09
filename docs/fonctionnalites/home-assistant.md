@@ -6,7 +6,7 @@ Cornelius peut allumer et éteindre les lumières et les prises de la maison, et
 
 Home Assistant est un logiciel de domotique installé à part. Cornelius s’y connecte directement : aucun module complémentaire, blueprint ni intégration n’est à installer dans Home Assistant. Cornelius peut aussi tourner lui-même sur la box, comme add-on (voir [Installer dans Home Assistant](../installation/home-assistant.md)) : la connexion décrite ici reste la même.
 
-- **Lumières et prises** (`light.*` et `switch.*`) : allumer, éteindre, lire l’état, et régler la luminosité des lumières qui le permettent (de 1 à 100 %), leur couleur (« mets le bureau en violet ») et leur blanc (« blanc chaud », de 1500 à 9000 K, ramené à la plage de l’ampoule). La couleur n’est confirmée que si Home Assistant la relit (à une marge près, l’ampoule l’arrondissant à sa teinte).
+- **Lumières et prises** (`light.*` et `switch.*`) : allumer, éteindre, lire l’état, et régler la luminosité des lumières qui le permettent (de 1 à 100 %), leur couleur (« mets le bureau en violet ») et leur blanc (« blanc chaud », de 1500 à 9000 K, ramené à la plage de l’ampoule). La couleur n’est confirmée que si Home Assistant la relit (à pleine intensité : une teinte sombre comme [128, 0, 128] est comparée à [255, 0, 255], et à une marge près, l’ampoule l’arrondissant à sa teinte).
 - **Capteurs**, en lecture seule : capteurs et détecteurs, minuteries, dates et heures, nombres, interrupteurs virtuels, listes de choix, compteurs, thermostats, volets et serrures. Un capteur n’est jamais commandé : Cornelius peut dire si une serrure est fermée, pas l’ouvrir.
 
 Dans Home Assistant, un « switch » peut piloter autre chose qu’une prise. Ne cochez que les appareils que Cornelius doit vraiment commander.

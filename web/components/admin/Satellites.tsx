@@ -370,6 +370,9 @@ function SatelliteCard({
 function SatelliteSettingsPanel({ satellite, run }: { satellite: SatelliteView; run: RunAction }) {
   const id = 'satellite-' + satellite.id;
   const [volume, setVolume] = useState(Math.round(satellite.volume / 10));
+  // Volume changé à la voix (« parle moins fort ») : la fiche suit la liste rechargée, sauf
+  // pendant un réglage au curseur pas encore enregistré.
+  const savedVolume = Math.round(satellite.volume / 10);
   const [brightness, setBrightness] = useState(satellite.ledBrightness);
   const [color, setColor] = useState(satellite.ledColor);
   const [nightLight, setNightLight] = useState(satellite.nightLight);
@@ -382,13 +385,18 @@ function SatelliteSettingsPanel({ satellite, run }: { satellite: SatelliteView; 
     const pending = timers.current;
     return () => pending.forEach((timer) => clearTimeout(timer));
   }, []);
+  useEffect(() => {
+    if (!timers.current.has('volume')) setVolume(savedVolume);
+  }, [savedVolume]);
   const save = (key: string, label: string, patch: Partial<SatelliteSettings>, delayMs = 0) => {
     clearTimeout(timers.current.get(key));
-    const send = () =>
+    const send = () => {
+      timers.current.delete(key);
       void run(label, () => api.updateSatellite(satellite.id, patch), {
         key: id + '-' + key,
         payload: patch,
       });
+    };
     if (delayMs === 0) send();
     else timers.current.set(key, setTimeout(send, delayMs));
   };
