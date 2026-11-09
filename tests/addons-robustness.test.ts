@@ -145,3 +145,78 @@ test('le catalogue expose les modules refusés et leur raison', async (t) => {
   assert.equal(catalog.statusCode, 200);
   assert.deepEqual(catalog.json<{ rejected: unknown }>().rejected, rejected);
 });
+
+test('le formulaire d’une source reçoit ses réglages migrés, sans écriture en base', async (t) => {
+  // Réglages v1 : sans showSeconds. La v2 l'ajoute, allumé, en gardant les choix existants.
+  const migrate = (fromVersion: number, value: unknown) => {
+    if (fromVersion !== 1) throw new Error(`version ${fromVersion} inconnue`);
+    return { ...(value as Record<string, unknown>), showSeconds: true };
+  };
+  const clockV2: AddonDefinition = { ...clock, configVersion: 2, configMigrate: migrate };
+  const broken: AddonDefinition = {
+    ...clock,
+    id: 'brokenclock',
+    configVersion: 2,
+    configMigrate: () => {
+      throw new Error('migration cassée');
+    },
+  };
+  const db = openDatabase(':memory:');
+  const instances = new AddonRepository(db);
+  const actionRepository = new ActionRepository(db);
+  const logs = new DiagnosticLog();
+  const app = Fastify();
+  registerAddons(app, {
+    runtime: new AddonRuntime({ addons: [clockV2, broken], instances, http, logs }),
+    actions: new ActionExecutor(actionRepository, http),
+    instances,
+    actionRepository,
+    profiles: new ProfileRepository(db),
+    logs,
+    requireAdmin: async () => {},
+  });
+  t.after(async () => {
+    await app.close();
+    db.close();
+  });
+  const stored = { timeZone: 'Europe/Paris', showDate: false };
+  const salon = instances.createInstance({
+    addonId: 'clock',
+    profileId: null,
+    ref: 'salon',
+    label: 'Salon',
+    config: stored,
+    configVersion: 1,
+  });
+  instances.createInstance({
+    addonId: 'brokenclock',
+    profileId: null,
+    ref: 'cuisine',
+    label: 'Cuisine',
+    config: stored,
+    configVersion: 1,
+  });
+
+  const catalog = await app.inject({ method: 'GET', url: '/api/admin/addons' });
+  assert.equal(catalog.statusCode, 200);
+  const views = catalog.json<{
+    instances: { addonId: string; config: Record<string, unknown>; configVersion: number }[];
+  }>().instances;
+  const view = (addonId: string) => views.find((entry) => entry.addonId === addonId);
+  assert.deepEqual(view('clock')?.config, { ...stored, showSeconds: true });
+  assert.equal(view('clock')?.configVersion, 1);
+  // Rien n'est écrit tant que le formulaire n'est pas enregistré.
+  assert.deepEqual(instances.getInstance(salon.id)?.config, stored);
+  assert.equal(instances.getInstance(salon.id)?.configVersion, 1);
+  // Une migration qui lève une erreur ne casse pas la page : réglages bruts, trace au journal.
+  assert.deepEqual(view('brokenclock')?.config, stored);
+  assert.ok(
+    logs
+      .snapshot()
+      .entries.some(
+        (entry) =>
+          entry.event === 'Migration des réglages impossible' &&
+          entry.details.addonId === 'brokenclock',
+      ),
+  );
+});
