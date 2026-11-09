@@ -51,6 +51,7 @@ Les autres messages sont des objets JSON en texte, avec un champ `type`. Un mess
 | binaire, 2 560 octets | tant que `listen` vaut `true` | veille : cherché pour « Cornelius » ; conversation : envoyé à Live |
 | `{"type":"mic","muted":true}` | bouton de vie privée | le serveur ignore le son tant que le micro est coupé |
 | `{"type":"ring","action":"stop"}` | bouton pendant que le satellite sonne | arrête ce qui sonne sur ce satellite |
+| `{"type":"session","action":"end"}` | bouton pendant une conversation de ce satellite | ferme la conversation (« Fin de conversation au bouton du satellite. ») ; ignoré si la conversation en cours est celle d’un autre satellite ou du miroir |
 | `{"type":"log","message":"…"}` | mesure à suivre (niveaux d’écho…) | inscrite dans le journal de Cornelius ; 200 caractères, une par seconde au plus, jamais de son ni de conversation |
 
 `firmware` est une chaîne de 1 à 32 caractères ; `aec`, facultatif (faux par défaut), annonce l’annulation d’écho ; `features`, facultatif (16 chaînes au plus), les ajouts que le firmware connaît : `ring` pour la sonnerie des alarmes.
@@ -59,7 +60,7 @@ Les autres messages sont des objets JSON en texte, avec un champ `type`. Un mess
 
 | Message | Sens |
 |---|---|
-| `{"type":"welcome","protocol":1,"id":"…","name":"Chambre","volume":70}` | connexion acceptée ; `volume` de 0 à 100 |
+| `{"type":"welcome","protocol":1,"id":"…","name":"Chambre","volume":70,"features":["session_end"]}` | connexion acceptée ; `volume` de 0 à 100 ; `features` : ce que le serveur sait faire (`session_end` : il accepte `session` / `end`, le bouton peut fermer la conversation) |
 | `{"type":"settings","volume":70,"led":{"color":"#00ffb4","brightness":6,"nightLight":false},"attentive":false}` | réglages de l’administration : après `welcome`, puis à chaque changement ; volume de 0 à 100, luminosité de 0 à 10 (0 : alertes seulement), veilleuse en veille, écoute attentive |
 | `{"type":"volume","volume":40}` | ancien message, remplacé par `settings` ; toujours accepté par le firmware |
 | `{"type":"listen","enabled":true}` | envoyer (`true`) ou cesser d’envoyer (`false`) le son du micro ; envoyé après `welcome` puis à chaque changement |

@@ -236,6 +236,7 @@ test('veille : le son suit « listen », la détection revient au satellite', as
     id: satellite.id,
     name: 'Bureau',
     volume: 70,
+    features: ['session_end'],
   });
   assert.deepEqual(await device.next((message) => message.type === 'settings'), {
     type: 'settings',
@@ -278,6 +279,57 @@ test('veille : le son suit « listen », la détection revient au satellite', as
   assert.equal(worker.received.filter(Buffer.isBuffer).length, before);
   device.socket.terminate();
   await worker.next((message) => message.type === 'wake_end');
+});
+
+test('bouton pendant la conversation : seule la conversation de ce satellite se ferme', async (t) => {
+  const f = await fixture(t);
+  const cookie = await f.admin();
+  const create = async (name: string) =>
+    (
+      await f.app.inject({
+        method: 'POST',
+        url: '/api/admin/satellites',
+        headers: { cookie, origin },
+        payload: { name },
+      })
+    ).json();
+  const bureau = await create('Bureau');
+  const salon = await create('Salon');
+  const worker = await f.perception();
+  worker.socket.send(JSON.stringify({ type: 'wake_status', ready: true, detail: null }));
+  await setImmediate();
+  const device = await f.satellite(bureau.token);
+  device.socket.send(JSON.stringify({ type: 'hello', protocol: 1, firmware: '0.4.0' }));
+  const other = await f.satellite(salon.token);
+  other.socket.send(JSON.stringify({ type: 'hello', protocol: 1, firmware: '0.4.0' }));
+  await device.next((message) => message.type === 'welcome');
+  await other.next((message) => message.type === 'welcome');
+  f.controller.setWakeWordEnabled(true);
+  await device.next((message) => message.type === 'listen' && message.enabled);
+  // Flux de veille démarrés dans l’ordre des connexions : le bureau d’abord.
+  await worker.next(
+    () => worker.received.filter((message: any) => message?.type === 'wake_start').length === 2,
+  );
+  const start = worker.received.find((message: any) => message?.type === 'wake_start') as {
+    streamId: string;
+  };
+  worker.socket.send(
+    JSON.stringify({ type: 'wake_detected', streamId: start.streamId, score: 0.9 }),
+  );
+  await device.next((message) => message.type === 'wake');
+  assert.equal(f.controller.sessionState().satellite?.id, bureau.satellite.id);
+  assert.notEqual(f.controller.sessionState().phase, 'idle');
+  // Le bouton d’un autre satellite ne ferme pas la conversation du bureau.
+  other.socket.send(JSON.stringify({ type: 'session', action: 'end' }));
+  await setImmediate();
+  assert.notEqual(f.controller.sessionState().phase, 'idle');
+  assert.notEqual(
+    f.controller.sessionState().reason,
+    'Fin de conversation au bouton du satellite.',
+  );
+  device.socket.send(JSON.stringify({ type: 'session', action: 'end' }));
+  await setImmediate();
+  assert.equal(f.controller.sessionState().reason, 'Fin de conversation au bouton du satellite.');
 });
 
 test('réglages depuis l’administration : validés, envoyés au satellite connecté', async (t) => {

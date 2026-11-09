@@ -67,7 +67,8 @@ Chaque satellite a sa fiche dans **Administration → Satellites audio**, avec s
 
 ## Le bouton BOOT
 
-- **Appui bref** : coupe ou rouvre le micro. Micro coupé, le satellite n’envoie plus aucun son, même après un redémarrage. Appuyez de nouveau pour le rouvrir.
+- **Appui bref pendant une conversation** (l’anneau allumé) : ferme la conversation tout de suite, sans attendre le silence. Demande un firmware qui envoie `session` / `end` ; un firmware plus ancien coupe le micro à la place.
+- **Appui bref** en veille : coupe ou rouvre le micro. Micro coupé, le satellite n’envoie plus aucun son, même après un redémarrage. Appuyez de nouveau pour le rouvrir.
 - **Tenu 5 secondes** : remise à zéro. Le satellite oublie le Wi-Fi, son accès et ses réglages, puis repart de l’étape 1 de l’installation.
 
 N’appuyez pas sur **RST** en tenant **BOOT** : la carte passerait en mode de programmation (un appui sur **RST** seul la fait repartir).
