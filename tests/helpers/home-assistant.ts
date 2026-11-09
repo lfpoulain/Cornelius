@@ -44,6 +44,8 @@ export async function fakeHomeAssistant() {
     aliasBatchDenied: false,
     malformed: false,
     holdRead: false,
+    /** Thermostat qui arrondit lui-même la consigne au degré, sans annoncer son pas. */
+    climateWholeDegrees: false,
   };
   let releaseRead: (() => void) | undefined;
   const server = createServer(async (req, res) => {
@@ -70,7 +72,12 @@ export async function fakeHomeAssistant() {
       const entity = states.get(String(body.entity_id));
       if (options.apply && entity && options.serviceStatus === 200) {
         const apply = () => {
-          entity.state = path.endsWith('/turn_on') ? 'on' : 'off';
+          const climate = path.endsWith('/climate/set_temperature');
+          if (climate)
+            (entity.attributes as Record<string, unknown>).temperature = options.climateWholeDegrees
+              ? Math.round(body.temperature as number)
+              : body.temperature;
+          else entity.state = path.endsWith('/turn_on') ? 'on' : 'off';
           entity.last_updated = new Date().toISOString();
           const attributes = entity.attributes as Record<string, unknown>;
           if (typeof body.brightness_pct === 'number')

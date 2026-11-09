@@ -183,6 +183,7 @@ export const api = {
   homeAssistantAccess: (input: {
     enabled?: boolean;
     knownPeopleOnly?: boolean;
+    climateControl?: boolean;
     revision: number;
   }) =>
     request<HomeAssistantView>('/api/admin/home-assistant/access', {

@@ -124,7 +124,10 @@ export function HomeAssistantSettings({
       clearInterval(timer);
     };
   }, [open, hidden]);
-  const setAccess = (patch: { enabled?: boolean; knownPeopleOnly?: boolean }, label: string) =>
+  const setAccess = (
+    patch: { enabled?: boolean; knownPeopleOnly?: boolean; climateControl?: boolean },
+    label: string,
+  ) =>
     void run(
       label,
       async () => {
@@ -303,6 +306,28 @@ export function HomeAssistantSettings({
                     knownPeopleOnly
                       ? 'Home Assistant est réservé aux personnes reconnues.'
                       : 'Home Assistant est ouvert à toute personne devant le miroir.',
+                  )
+                }
+              />
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="ha-climate-control">Régler les thermostats</Label>
+                <p className="text-xs text-muted-foreground">
+                  {view.climateControl
+                    ? 'Cornelius peut changer la consigne des thermostats cochés (« mets le bureau à 20 degrés »), dans leur plage. Il ne change jamais leur mode.'
+                    : 'Désactivé : les thermostats cochés sont seulement lus.'}
+                </p>
+              </div>
+              <Switch
+                id="ha-climate-control"
+                checked={view.climateControl}
+                onCheckedChange={(climateControl) =>
+                  setAccess(
+                    { climateControl },
+                    climateControl
+                      ? 'Cornelius peut régler les thermostats cochés.'
+                      : 'Les thermostats cochés sont seulement lus.',
                   )
                 }
               />
