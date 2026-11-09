@@ -133,3 +133,7 @@ Le simulateur envoie du silence, puis l’enregistrement, au rythme réel, affic
 
 - Mot d’appel détecté sur le satellite (`wake` envoyé par le satellite avec le son qui précède), vérifié par le serveur.
 - Bouton d’action, mise à jour du firmware.
+
+## Gestes et coupure du micro
+
+Dans `hello.features`, `gestures` indique un capteur opérationnel et `mic_toggle` la prise en charge de la coupure à distance. Le satellite peut envoyer `{"type":"gesture","gesture":"wave"}` après `welcome`. Le serveur peut envoyer `{"type":"mute","muted":true}`. Le satellite confirme son état par `mic`. La coupure persiste après redémarrage. Seul le bouton physique rouvre le micro.

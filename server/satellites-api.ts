@@ -49,6 +49,7 @@ export function registerSatellites(
     hub: SatelliteHub;
     pairing: SatellitePairing;
     profiles: ProfileRepository;
+    onRemove?: (id: string) => void;
     requireAdmin(request: FastifyRequest, reply: FastifyReply): Promise<void>;
   },
 ) {
@@ -152,6 +153,7 @@ export function registerSatellites(
       if (!store.remove(request.params.id))
         return reply.code(404).send({ error: 'Satellite introuvable.' });
       hub.disconnect(request.params.id, 'Satellite retiré.');
+      services.onRemove?.(request.params.id);
       return { ok: true };
     },
   );

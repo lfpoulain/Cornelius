@@ -87,6 +87,78 @@ async function fixture(t: TestContext, options: { now?: () => number } = {}) {
   return { ...services, admin, satellite, perception };
 }
 
+test('flotte mixte : capacités isolées par satellite et réinitialisées à la reconnexion', async (t) => {
+  const f = await fixture(t);
+  const headers = { cookie: await f.admin(), origin };
+  const devices: {
+    token: string;
+    satellite: { id: string };
+    connection: Awaited<ReturnType<typeof f.satellite>>;
+  }[] = [];
+  for (const name of ['Ancien', 'Nouveau']) {
+    const issued = (
+      await f.app.inject({
+        method: 'POST',
+        url: '/api/admin/satellites',
+        headers,
+        payload: { name },
+      })
+    ).json();
+    const bindings = Object.fromEntries(
+      ['up', 'down', 'left', 'right', 'forward', 'backward', 'wave'].map((g) => [
+        g,
+        g === 'up' ? 'volume_up' : 'none',
+      ]),
+    );
+    assert.equal(
+      (
+        await f.app.inject({
+          method: 'PUT',
+          url: `/api/admin/satellites/${issued.satellite.id}/gestures`,
+          headers,
+          payload: { enabled: true, bindings },
+        })
+      ).statusCode,
+      200,
+    );
+    const connection = await f.satellite(issued.token);
+    connection.socket.send(
+      JSON.stringify({
+        type: 'hello',
+        protocol: 1,
+        firmware: 'compatibility-test',
+        ...(name === 'Nouveau' ? { features: ['gestures', 'mic_toggle'] } : {}),
+      }),
+    );
+    await connection.next((m) => m.type === 'welcome');
+    devices.push({ ...issued, connection });
+  }
+  for (const d of devices)
+    d.connection.socket.send(JSON.stringify({ type: 'gesture', gesture: 'up' }));
+  await devices[1]!.connection.next((m) => m.type === 'settings' && m.volume === 80);
+  const list = (await f.app.inject({ url: '/api/admin/satellites', headers })).json().satellites;
+  assert.equal(list.find((s: { id: string }) => s.id === devices[0]!.satellite.id).volume, 70);
+  assert.equal(list.find((s: { id: string }) => s.id === devices[1]!.satellite.id).volume, 80);
+  assert.equal(list.filter((s: { online: boolean }) => s.online).length, 2);
+  const modern = devices[1]!;
+  const reconnected = await f.satellite(modern.token);
+  reconnected.socket.send(
+    JSON.stringify({ type: 'hello', protocol: 1, firmware: 'legacy-after-rollback' }),
+  );
+  await reconnected.next((m) => m.type === 'welcome');
+  await new Promise((resolve) => setTimeout(resolve, 720));
+  reconnected.socket.send(JSON.stringify({ type: 'gesture', gesture: 'up' }));
+  reconnected.socket.send(JSON.stringify({ type: 'mic', muted: true }));
+  await setImmediate();
+  await setImmediate();
+  const status = (
+    await f.app.inject({ url: `/api/admin/satellites/${modern.satellite.id}/gestures`, headers })
+  ).json();
+  assert.equal(status.supported, false);
+  const after = (await f.app.inject({ url: '/api/admin/satellites', headers })).json().satellites;
+  assert.equal(after.find((s: { id: string }) => s.id === modern.satellite.id).volume, 80);
+});
+
 test('registre : jeton montré une fois, empreinte seule gardée, révocation', () => {
   const db = openDatabase(':memory:');
   const profiles = new ProfileRepository(db);
@@ -544,4 +616,281 @@ test('alarmes : un satellite qui sait sonner sonne chez lui, son bouton l’arr�
     await new Promise((resolve) => setTimeout(resolve, 20));
   }
   assert.ok(f.controller.snapshot().state.alarms!.ringing.some((alarm) => alarm.id === again.id));
+});
+
+test('satellite sans PAJ : ancien hello accepté, audio disponible, gestes ignorés même configurés', async (t) => {
+  const f = await fixture(t);
+  const cookie = await f.admin();
+  const headers = { cookie, origin };
+  const { token, satellite } = (
+    await f.app.inject({
+      method: 'POST',
+      url: '/api/admin/satellites',
+      headers,
+      payload: { name: 'Sans capteur' },
+    })
+  ).json();
+  const gestures = {
+    enabled: true,
+    bindings: Object.fromEntries(
+      [
+        'up',
+        'down',
+        'left',
+        'right',
+        'forward',
+        'backward',
+        'clockwise',
+        'counterclockwise',
+        'wave',
+      ].map((g) => [g, g === 'up' ? 'volume_up' : 'none']),
+    ),
+  };
+  assert.equal(
+    (
+      await f.app.inject({
+        method: 'PUT',
+        url: `/api/admin/satellites/${satellite.id}/gestures`,
+        headers,
+        payload: gestures,
+      })
+    ).statusCode,
+    200,
+  );
+  const connection = await f.satellite(token);
+  // Legacy firmware does not send the optional capability at all.
+  connection.socket.send(
+    JSON.stringify({ type: 'hello', protocol: 1, firmware: '0.3.0-fozzy-vm2' }),
+  );
+  await connection.next((m) => m.type === 'welcome');
+  await connection.next((m) => m.type === 'settings');
+  connection.socket.send(JSON.stringify({ type: 'gesture', gesture: 'up' }));
+  connection.socket.send(JSON.stringify({ type: 'mic', muted: false }));
+  await setImmediate();
+  await setImmediate();
+  const view = (await f.app.inject({ url: '/api/admin/satellites', headers }))
+    .json()
+    .satellites.find((s: { id: string }) => s.id === satellite.id);
+  const config = (
+    await f.app.inject({ url: `/api/admin/satellites/${satellite.id}/gestures`, headers })
+  ).json();
+  assert.equal(view.online, true);
+  assert.equal(view.volume, 70);
+  assert.equal(config.supported, false);
+  assert.equal(config.last, null);
+});
+
+test('geste micro : le serveur demande uniquement la coupure', async (t) => {
+  const f = await fixture(t);
+  const cookie = await f.admin();
+  const headers = { cookie, origin };
+  const { token, satellite } = (
+    await f.app.inject({
+      method: 'POST',
+      url: '/api/admin/satellites',
+      headers,
+      payload: { name: 'Micro gestuel' },
+    })
+  ).json();
+  const bindings = Object.fromEntries(
+    [
+      'up',
+      'down',
+      'left',
+      'right',
+      'forward',
+      'backward',
+      'clockwise',
+      'counterclockwise',
+      'wave',
+    ].map((g) => [g, g === 'wave' ? 'mic_toggle' : 'none']),
+  );
+  assert.equal(
+    (
+      await f.app.inject({
+        method: 'PUT',
+        url: `/api/admin/satellites/${satellite.id}/gestures`,
+        headers,
+        payload: { enabled: true, bindings },
+      })
+    ).statusCode,
+    200,
+  );
+  const c = await f.satellite(token);
+  c.socket.send(
+    JSON.stringify({
+      type: 'hello',
+      protocol: 1,
+      firmware: '0.3.0-fozzy-gestures2',
+      features: ['gestures', 'mic_toggle'],
+    }),
+  );
+  await c.next((m) => m.type === 'welcome');
+  c.socket.send(JSON.stringify({ type: 'gesture', gesture: 'wave' }));
+  await c.next((m) => m.type === 'mute' && m.muted === true);
+  c.socket.send(JSON.stringify({ type: 'mic', muted: true }));
+  await new Promise((resolve) => setTimeout(resolve, 750));
+  c.socket.send(JSON.stringify({ type: 'gesture', gesture: 'wave' }));
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(
+    c.received.some((m: any) => m.type === 'mute' && m.muted === false),
+    false,
+  );
+});
+
+test('geste micro : ancien firmware sans capacité de bascule conserve son état', async (t) => {
+  const f = await fixture(t);
+  const cookie = await f.admin();
+  const headers = { cookie, origin };
+  const { token, satellite } = (
+    await f.app.inject({
+      method: 'POST',
+      url: '/api/admin/satellites',
+      headers,
+      payload: { name: 'Ancien micro' },
+    })
+  ).json();
+  const bindings = Object.fromEntries(
+    [
+      'up',
+      'down',
+      'left',
+      'right',
+      'forward',
+      'backward',
+      'clockwise',
+      'counterclockwise',
+      'wave',
+    ].map((g) => [g, g === 'wave' ? 'mic_toggle' : 'none']),
+  );
+  await f.app.inject({
+    method: 'PUT',
+    url: `/api/admin/satellites/${satellite.id}/gestures`,
+    headers,
+    payload: { enabled: true, bindings },
+  });
+  const c = await f.satellite(token);
+  c.socket.send(
+    JSON.stringify({
+      type: 'hello',
+      protocol: 1,
+      firmware: '0.3.0-fozzy-gestures1',
+      features: ['gestures'],
+    }),
+  );
+  await c.next((m) => m.type === 'welcome');
+  c.socket.send(JSON.stringify({ type: 'mic', muted: true }));
+  c.socket.send(JSON.stringify({ type: 'gesture', gesture: 'wave' }));
+  for (let i = 0; i < 10; i++) {
+    await setImmediate();
+    const value = (
+      await f.app.inject({ url: `/api/admin/satellites/${satellite.id}/gestures`, headers })
+    ).json();
+    if (value.last) {
+      assert.match(value.last.result, /mise à jour du firmware/u);
+      assert.equal(
+        c.received.some((m: any) => m.type === 'mute'),
+        false,
+      );
+      return;
+    }
+  }
+  assert.fail('Résultat de compatibilité absent');
+});
+
+test('volume gestuel à la limite : aucun réglage supplémentaire', async (t) => {
+  const f = await fixture(t);
+  const cookie = await f.admin();
+  const headers = { cookie, origin };
+  const { token, satellite } = (
+    await f.app.inject({
+      method: 'POST',
+      url: '/api/admin/satellites',
+      headers,
+      payload: { name: 'Volume maximum' },
+    })
+  ).json();
+  await f.app.inject({
+    method: 'PATCH',
+    url: `/api/admin/satellites/${satellite.id}`,
+    headers,
+    payload: { volume: 100 },
+  });
+  const bindings = Object.fromEntries(
+    [
+      'up',
+      'down',
+      'left',
+      'right',
+      'forward',
+      'backward',
+      'clockwise',
+      'counterclockwise',
+      'wave',
+    ].map((g) => [g, g === 'up' ? 'volume_up' : 'none']),
+  );
+  await f.app.inject({
+    method: 'PUT',
+    url: `/api/admin/satellites/${satellite.id}/gestures`,
+    headers,
+    payload: { enabled: true, bindings },
+  });
+  const c = await f.satellite(token);
+  c.socket.send(
+    JSON.stringify({
+      type: 'hello',
+      protocol: 1,
+      firmware: '0.3.0-fozzy-gestures5',
+      features: ['gestures'],
+    }),
+  );
+  await c.next((m) => m.type === 'welcome');
+  c.socket.send(JSON.stringify({ type: 'gesture', gesture: 'up' }));
+  await c.next((m) => m.type === 'settings' && m.volume === 100);
+  await setImmediate();
+  await setImmediate();
+  assert.equal(c.received.filter((m: any) => m.type === 'settings').length, 1);
+  assert.equal(
+    c.received.some((m: any) => m.type === 'volume'),
+    false,
+  );
+});
+
+test('satellite avec PAJ : événement reçu et affiché en capture seule par défaut', async (t) => {
+  const f = await fixture(t);
+  const cookie = await f.admin();
+  const headers = { cookie, origin };
+  const { token, satellite } = (
+    await f.app.inject({
+      method: 'POST',
+      url: '/api/admin/satellites',
+      headers,
+      payload: { name: 'Avec capteur' },
+    })
+  ).json();
+  const c = await f.satellite(token);
+  c.socket.send(
+    JSON.stringify({
+      type: 'hello',
+      protocol: 1,
+      firmware: '0.3.0-fozzy-gestures1',
+      features: ['gestures'],
+    }),
+  );
+  await c.next((m) => m.type === 'welcome');
+  c.socket.send(JSON.stringify({ type: 'gesture', gesture: 'up' }));
+  for (let attempt = 0; attempt < 10; attempt++) {
+    await setImmediate();
+    const view = (
+      await f.app.inject({ url: `/api/admin/satellites/${satellite.id}/gestures`, headers })
+    ).json();
+    if (view.last) {
+      assert.equal(view.supported, true);
+      assert.equal(view.config.enabled, false);
+      assert.equal(view.last.gesture, 'up');
+      assert.equal(view.last.result, 'capture');
+      return;
+    }
+  }
+  assert.fail('Geste authentifié non reçu');
 });

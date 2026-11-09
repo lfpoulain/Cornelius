@@ -1,4 +1,5 @@
 import { voiceUsageMigration } from './voice-usage.js';
+import { satelliteGesturesMigration } from './satellite-gestures.js';
 import { customProviderMigration } from './custom-provider.js';
 import { isVoiceProvider, type VoiceProvider } from '../shared/voice-provider.js';
 import { ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
@@ -439,6 +440,9 @@ export const migrations: readonly string[] = [
   ) STRICT;`,
   // Temps de conversation par jour et prix par minute saisi (aucun par défaut).
   voiceUsageMigration,
+  // La première PR utilisait l’index désormais réservé aux alarmes.
+  `${alarmsMigration}
+${satelliteGesturesMigration}`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */
