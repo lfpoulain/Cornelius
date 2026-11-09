@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+Rien pour l’instant.
+
+## 0.3.0 · 2026-11-09
+
+Les satellites gagnent le bouton qui ferme la conversation, le volume à la voix et une fin de parole propre à chacun. Home Assistant règle la couleur et le blanc des lumières. S’y ajoutent les alarmes, minuteurs et rappels, le déclencheur Home Assistant et le serveur Live compatible.
+
 ### 2026-11-09 : réglages migrés dans le formulaire des modules
 
 **Corrigé**
