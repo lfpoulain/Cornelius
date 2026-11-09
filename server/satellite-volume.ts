@@ -82,9 +82,13 @@ export function setSatelliteVolume(
   hub.refresh(updated);
   return result(
     'succeeded',
-    next === current
+    (next === current
       ? `Le volume est déjà à ${next} sur 10${next === 10 ? ', le maximum' : next === 0 ? ', le minimum' : ''}.`
-      : `Volume réglé à ${next} sur 10.`,
+      : `Volume réglé à ${next} sur 10.`) +
+      // Le satellite joue ses sonneries au même volume : à 0, elles sont muettes aussi.
+      (next === 0
+        ? ' Attention : les réveils et minuteurs de ce satellite seront muets aussi.'
+        : ''),
     next,
   );
 }

@@ -6,7 +6,19 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
-Rien pour l’instant.
+### 2026-11-09 : suites de relecture (couleur, bouton, fin de parole, volume)
+
+**Corrigé**
+
+- **Home Assistant → couleur** : une teinte sombre (`[128, 0, 128]`), relue par Home Assistant à pleine intensité (`[255, 0, 255]`), est maintenant confirmée : les deux couleurs sont comparées à pleine intensité.
+- **Satellites → volume à la voix** : la fiche du satellite dans l’administration suit un réglage fait à la voix. Au volume 0, Cornelius rappelle que les sonneries du satellite (réveils, minuteurs, rappels) sont muettes aussi.
+
+**Documentation**
+
+- Confidentialité : le bouton du satellite coupe le micro en veille et ferme la conversation pendant une conversation.
+- Satellites et administration : le délai de fin de parole propre au satellite est pris à l’ouverture, un changement vaut pour la conversation suivante ; volume 0 et sonneries.
+- Home Assistant et architecture : couleur et blanc de `home_assistant__control`, comparaison à pleine intensité.
+- Test de la route `POST /api/admin/home-assistant/control` avec `rgbColor`.
 
 ## 0.3.0 · 2026-11-09
 

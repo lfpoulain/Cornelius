@@ -28,7 +28,11 @@ test('volume à la voix : niveau dit, plus fort, moins fort, bornes', () => {
     f.run({ level: 10, change: null });
     assert.match(f.run({ level: null, change: 'louder' }).summary, /déjà à 10 sur 10, le maximum/u);
     f.run({ level: 1, change: null });
-    assert.equal(f.run({ level: null, change: 'quieter' }).result?.level, 0);
+    const muted = f.run({ level: null, change: 'quieter' });
+    assert.equal(muted.result?.level, 0);
+    // Les sonneries du satellite passent par le même volume : Cornelius le rappelle.
+    assert.match(muted.summary, /réveils et minuteurs de ce satellite seront muets aussi/u);
+    assert.doesNotMatch(f.run({ level: 3, change: null }).summary, /muets/u);
   } finally {
     f.db.close();
   }

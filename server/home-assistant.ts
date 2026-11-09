@@ -147,6 +147,14 @@ export const commandSchema = {
 };
 /** Écart toléré par canal : Home Assistant repasse la couleur par la teinte de l’ampoule. */
 const rgbTolerance = 40;
+/**
+ * Teinte à pleine intensité : Home Assistant relit `rgb_color` avec son canal le plus fort à 255
+ * (l’intensité passe dans la luminosité). [128, 0, 128] est donc relu [255, 0, 255].
+ */
+function fullIntensity(rgb: readonly number[]): number[] {
+  const max = Math.max(...rgb);
+  return max > 0 ? rgb.map((channel) => (channel * 255) / max) : [...rgb];
+}
 const kelvinTolerance = 150;
 function rgbAttribute(value: unknown): [number, number, number] | null {
   return Array.isArray(value) &&
@@ -978,8 +986,9 @@ export class HomeAssistant {
             Math.abs(candidate.brightnessPct - args.brightnessPct) <= 1)) &&
         (rgbColor === null ||
           (!!candidate.rgbColor &&
-            candidate.rgbColor.every(
-              (channel, index) => Math.abs(channel - rgbColor[index]!) <= rgbTolerance,
+            fullIntensity(candidate.rgbColor).every(
+              (channel, index) =>
+                Math.abs(channel - fullIntensity(rgbColor)[index]!) <= rgbTolerance,
             ))) &&
         (colorTempKelvin === null ||
           (candidate.colorTempKelvin != null &&

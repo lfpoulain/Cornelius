@@ -131,7 +131,7 @@ Un module (« addon » dans le code) est un dossier `addons/<id>/`, ou `<id>/` d
 
 ## Home Assistant et Hermes
 
-`server/home-assistant.ts` se connecte à Home Assistant par son API WebSocket (`server/home-assistant-socket.ts`), lit le catalogue des appareils et publie `home_assistant__control` (lumières et prises autorisées) et `home_assistant__read` (capteurs autorisés). Les autorisations et le jeton sont dans `server/home-assistant-store.ts` ; le jeton ne sort jamais du serveur.
+`server/home-assistant.ts` se connecte à Home Assistant par son API WebSocket (`server/home-assistant-socket.ts`), lit le catalogue des appareils et publie `home_assistant__control` (lumières et prises autorisées : marche, arrêt, luminosité, couleur et blanc) et `home_assistant__read` (capteurs autorisés). Les autorisations et le jeton sont dans `server/home-assistant-store.ts` ; le jeton ne sort jamais du serveur.
 
 `server/agents.ts` relie un profil à son agent Hermes par HTTP authentifié (`server/hermes-client.ts`). Hermes exécute les tâches, garde ses permissions et leur cycle de vie ; Cornelius ne conserve que la connexion et les références des tâches (`server/agents-store.ts`), pas les messages ni les résultats. Les outils `agents__*` ne sont proposés qu’au profil connecté. Voir [Home Assistant](../fonctionnalites/home-assistant.md) et [Agents Hermes](../fonctionnalites/agents-hermes.md).
 

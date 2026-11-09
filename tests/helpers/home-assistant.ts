@@ -75,11 +75,15 @@ export async function fakeHomeAssistant() {
           const attributes = entity.attributes as Record<string, unknown>;
           if (typeof body.brightness_pct === 'number')
             attributes.brightness = Math.round((body.brightness_pct / 100) * 255);
-          // Comme une ampoule réelle : la couleur relue est un peu arrondie par sa teinte.
+          // Comme une ampoule réelle : la couleur est relue à pleine intensité (canal le plus
+          // fort à 255) et un peu arrondie par sa teinte.
           if (Array.isArray(body.rgb_color)) {
-            attributes.rgb_color = (body.rgb_color as number[]).map((channel) =>
-              Math.min(255, Math.max(0, channel + (channel > 127 ? -3 : 2))),
-            );
+            const rgb = body.rgb_color as number[];
+            const max = Math.max(...rgb) || 1;
+            attributes.rgb_color = rgb.map((value) => {
+              const channel = Math.round((value * 255) / max);
+              return Math.min(255, Math.max(0, channel + (channel > 127 ? -3 : 2)));
+            });
             attributes.color_mode = 'hs';
           }
           if (typeof body.color_temp_kelvin === 'number') {

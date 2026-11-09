@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createApp } from '../server/app.js';
-import { fakeHomeAssistant } from './helpers/home-assistant.js';
+import { fakeHomeAssistant, type haState } from './helpers/home-assistant.js';
 
 test('routes Home Assistant : authentification, origine, validation et secret côté serveur', async (t) => {
   const fake = await fakeHomeAssistant();
@@ -154,6 +154,40 @@ test('routes Home Assistant : authentification, origine, validation et secret c�
   });
   assert.equal(manual.json().result.confirmed, true);
   assert.equal(fake.calls.length, 2);
+  // Couleur depuis l’administration : une teinte sombre, relue à pleine intensité, est confirmée.
+  fake.states.set('light.ruban', {
+    entity_id: 'light.ruban',
+    state: 'off',
+    last_updated: new Date().toISOString(),
+    attributes: {
+      friendly_name: 'Ruban LED',
+      supported_color_modes: ['hs'],
+      brightness: 200,
+    } as unknown as ReturnType<typeof haState>['attributes'],
+  });
+  assert.equal(
+    (await app.inject({ method: 'POST', url: root + '/refresh', headers, payload: {} })).statusCode,
+    200,
+  );
+  const purple = await app.inject({
+    method: 'POST',
+    url: root + '/control',
+    headers,
+    payload: {
+      entityId: 'light.ruban',
+      action: 'turn_on',
+      brightnessPct: null,
+      rgbColor: [128, 0, 128],
+      colorTempKelvin: null,
+    },
+  });
+  assert.equal(purple.statusCode, 200, purple.body);
+  assert.equal(purple.json().result.confirmed, true, purple.body);
+  assert.deepEqual(fake.calls.at(-1), {
+    path: '/api/services/light/turn_on',
+    body: { entity_id: 'light.ruban', rgb_color: [128, 0, 128] },
+  });
+  fake.calls.length = 2;
   const unavailable = await app.inject({
     method: 'POST',
     url: root + '/control',
