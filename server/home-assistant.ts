@@ -40,6 +40,8 @@ const usefulAttributes = [
   'min_temp',
   'max_temp',
   'target_temp_step',
+  'target_temp_low',
+  'target_temp_high',
   'current_humidity',
   'hvac_action',
   'current_position',
@@ -881,6 +883,7 @@ export class HomeAssistant {
       this.config.url === config.url &&
       this.config.token === config.token;
     let sent = false;
+    let accepted = false;
     try {
       const entity = await this.readState(config, args.entityId, combined);
       if (!permitted()) return tool('cancelled', 'Commande annulée.');
@@ -903,7 +906,22 @@ export class HomeAssistant {
         const value = entity.attributes?.[key];
         return typeof value === 'number' && Number.isFinite(value) ? value : null;
       };
-      const step = number('target_temp_step') ?? 0.5;
+      // Un thermostat réglé par une plage (minimum et maximum) n’a pas de consigne unique.
+      if (
+        number('temperature') === null &&
+        (number('target_temp_low') !== null || number('target_temp_high') !== null)
+      )
+        return tool(
+          'failed',
+          'Ce thermostat se règle par une plage (minimum et maximum) : Cornelius ne la modifie pas.',
+          null,
+          'invalid_params',
+        );
+      // Pas absent ou nul : 0,5 pour arrondir, et une relecture tolérante d’un demi-degré, car
+      // le thermostat peut arrondir lui-même (au degré, par exemple).
+      const declaredStep = number('target_temp_step');
+      const step = declaredStep !== null && declaredStep > 0 ? declaredStep : 0.5;
+      const tolerance = step === declaredStep ? 0.01 : 0.51;
       let temperature = Math.round(args.temperature / step) * step;
       const min = number('min_temp');
       const max = number('max_temp');
@@ -930,9 +948,10 @@ export class HomeAssistant {
           { accepted: false, confirmed: false, temperature },
           'upstream',
         );
+      accepted = true;
       const reached = (candidate: HomeAssistantEntity) =>
         typeof candidate.attributes?.temperature === 'number' &&
-        Math.abs(candidate.attributes.temperature - temperature) < 0.01;
+        Math.abs(candidate.attributes.temperature - temperature) < tolerance;
       const deadline = Date.now() + this.confirmWindowMs;
       let observed = await this.readState(config, entity.id, combined);
       while (!reached(observed) && Date.now() < deadline && permitted()) {
@@ -948,6 +967,8 @@ export class HomeAssistant {
         });
       this.entities.set(observed.id, observed);
       const confirmed = reached(observed);
+      // Valeur relue, celle que le thermostat a vraiment retenue.
+      if (confirmed) temperature = observed.attributes!.temperature as number;
       this.logs?.write('info', 'home-assistant', 'Consigne traitée', {
         entityId: entity.id,
         temperature,
@@ -964,10 +985,12 @@ export class HomeAssistant {
       const failure = homeAssistantError(error);
       return tool(
         sent ? 'unknown' : combined.aborted ? 'cancelled' : 'failed',
-        sent
-          ? 'Envoi interrompu ; exécution incertaine. Ne pas relancer automatiquement.'
-          : failure.message,
-        { accepted: false, confirmed: false },
+        accepted
+          ? 'Consigne acceptée ; lecture de l’état impossible.'
+          : sent
+            ? 'Envoi interrompu ; exécution incertaine. Ne pas relancer automatiquement.'
+            : failure.message,
+        { accepted, confirmed: false },
         failure.code,
       );
     }

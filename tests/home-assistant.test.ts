@@ -355,6 +355,97 @@ test('thermostat : non coché, arrêté ou hors limites, aucune consigne envoyé
   assert.equal(f.fake.calls.length, 0);
 });
 
+test('thermostat : pas absent, plage seule et relecture impossible après accusé', async (t) => {
+  const f = await fixture(t);
+  const thermostat = (attributes: Record<string, unknown>) => ({
+    entity_id: 'climate.bureau',
+    state: 'heat',
+    last_updated: new Date().toISOString(),
+    attributes: { friendly_name: 'Thermostat bureau', ...attributes } as unknown as ReturnType<
+      typeof haState
+    >['attributes'],
+  });
+  const run = (temperature: number) =>
+    f.home.run({ entityId: 'climate.bureau', temperature }, signal(), 'home_assistant__climate');
+  f.fake.states.set('climate.bureau', thermostat({ temperature: 19, target_temp_step: 0 }));
+  await f.home.refresh();
+  f.select(['climate.bureau']);
+  f.home.setAccess({ climateControl: true, revision: f.home.view().revision });
+  // Pas nul (ou absent) : arrondi au demi-degré, jamais NaN, et le thermostat qui arrondit
+  // lui-même au degré est confirmé avec la valeur qu’il a retenue.
+  f.fake.options.climateWholeDegrees = true;
+  const rounded = await run(20.3);
+  assert.deepEqual(f.fake.calls.at(-1)?.body, { entity_id: 'climate.bureau', temperature: 20.5 });
+  assert.equal(rounded.result?.confirmed, true, rounded.summary);
+  assert.equal(rounded.result?.temperature, 21);
+  assert.match(rounded.summary, /21 °C/u);
+  f.fake.options.climateWholeDegrees = false;
+
+  // Réglé par une plage : refusé avec un message clair, rien n’est envoyé.
+  f.fake.states.set(
+    'climate.bureau',
+    thermostat({ target_temp_low: 18, target_temp_high: 22, target_temp_step: 0.5 }),
+  );
+  const calls = f.fake.calls.length;
+  const range = await run(20);
+  assert.equal(range.error?.code, 'invalid_params');
+  assert.match(range.summary, /plage/u);
+  assert.equal(f.fake.calls.length, calls);
+
+  // Accusé 2xx puis relecture impossible : la consigne est dite acceptée, pas incertaine.
+  f.fake.states.set('climate.bureau', thermostat({ temperature: 19, target_temp_step: 0.5 }));
+  f.fake.options.apply = false;
+  let reads = 0;
+  const http = createHttpClient();
+  const failingRead = new HomeAssistant(
+    f.repository,
+    {
+      ...http,
+      fetch: (request) =>
+        request.url.includes('/api/states/') && ++reads > 1
+          ? Promise.reject(new Error('lecture coupée'))
+          : http.fetch(request),
+    },
+    undefined,
+    50,
+  );
+  t.after(() => failingRead.dispose());
+  const accepted = await failingRead.run(
+    { entityId: 'climate.bureau', temperature: 21 },
+    signal(),
+    'home_assistant__climate',
+  );
+  assert.equal(accepted.status, 'unknown');
+  assert.equal(accepted.result?.accepted, true);
+  assert.match(accepted.summary, /Consigne acceptée ; lecture de l’état impossible/u);
+});
+
+test('thermostat réservé aux personnes reconnues : outil masqué et appel refusé', async (t) => {
+  const f = await fixture(t);
+  f.fake.states.set('climate.bureau', {
+    entity_id: 'climate.bureau',
+    state: 'heat',
+    last_updated: new Date().toISOString(),
+    attributes: { friendly_name: 'Thermostat bureau', temperature: 19 } as unknown as ReturnType<
+      typeof haState
+    >['attributes'],
+  });
+  await f.home.refresh();
+  f.select(['climate.bureau']);
+  f.home.setAccess({ climateControl: true, revision: f.home.view().revision });
+  f.home.setAccess({ knownPeopleOnly: true, revision: f.home.view().revision });
+  assert.ok(!f.home.tools(false).some((tool) => tool.name === 'home_assistant__climate'));
+  assert.ok(f.home.tools(true).some((tool) => tool.name === 'home_assistant__climate'));
+  const refused = await f.home.run(
+    { entityId: 'climate.bureau', temperature: 20 },
+    signal(),
+    'home_assistant__climate',
+    false,
+  );
+  assert.equal(refused.error?.code, 'forbidden');
+  assert.equal(f.fake.calls.length, 0, 'aucune consigne ne part vers Home Assistant');
+});
+
 test('un appareil qui remonte son état en différé est quand même confirmé', async (t) => {
   const f = await fixture(t);
   f.select();

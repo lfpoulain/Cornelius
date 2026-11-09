@@ -46,11 +46,11 @@ Les boutons **Allumer** et **Éteindre** de la liste servent à tester. Ils fonc
 
 ## Autoriser Cornelius
 
-Deux interrupteurs règlent l’accès :
+Trois interrupteurs règlent l’accès :
 
 - **Autoriser Cornelius à utiliser la sélection** : Cornelius allume ou éteint les lumières et prises cochées, et lit les capteurs cochés. Sans cette autorisation, il n’utilise pas Home Assistant.
 - **Réserver aux personnes reconnues** (désactivé par défaut) : voir la section suivante.
-- **Régler les thermostats** (désactivé par défaut) : Cornelius peut changer la consigne des thermostats cochés (« mets le bureau à 20 degrés »). La valeur est ramenée à la plage (`min_temp`, `max_temp`) et au pas (`target_temp_step`, 0,5 °C sinon) du thermostat, puis confirmée par relecture. Un thermostat arrêté n’est pas rallumé, et le mode (chauffage, arrêt) n’est jamais changé. Désactivé, les thermostats cochés sont seulement lus.
+- **Régler les thermostats** (désactivé par défaut) : Cornelius peut changer la consigne des thermostats cochés (« mets le bureau à 20 degrés »). La valeur est ramenée à la plage (`min_temp`, `max_temp`) et au pas (`target_temp_step`, 0,5 °C sinon) du thermostat, puis confirmée par relecture. Un thermostat arrêté n’est pas rallumé, et le mode (chauffage, arrêt) n’est jamais changé. Désactivé, les thermostats cochés sont seulement lus. Les bornes de 5 à 35 de l’outil sont des degrés Celsius : une installation Home Assistant réglée en °F n’est pas prise en charge. Un thermostat réglé par une plage (minimum et maximum, `target_temp_low` et `target_temp_high`) est refusé avec un message clair. Sans pas annoncé par le thermostat, la consigne est arrondie au demi-degré et la valeur relue, éventuellement arrondie par le thermostat, est celle annoncée.
 
 Une modification des autorisations ou de la sélection s’applique aussi aux demandes en cours : elles sont annulées. Une commande déjà envoyée à Home Assistant ne peut pas être annulée.
 
@@ -80,7 +80,7 @@ Pour une commande, Cornelius relit l’état de l’appareil, vérifie qu’il e
 
 Pour un capteur, Cornelius relit toujours l’état actuel, jamais une valeur gardée en mémoire. Pour une minuterie, la fin d’un programme (lave-linge, lave-vaisselle…) ou une date, le serveur calcule lui-même l’heure de fin et le temps restant. Un capteur « indisponible » ou « inconnu » est signalé comme tel.
 
-Cornelius ne peut utiliser que les deux actions marche et arrêt, la luminosité, la couleur et le blanc. Aucune autre commande, adresse ou donnée ne peut lui être dictée par la conversation.
+Cornelius ne peut utiliser que les actions marche et arrêt, la luminosité, la couleur et le blanc, et, si **Régler les thermostats** est activé, la consigne de température. Aucune autre commande, adresse ou donnée ne peut lui être dictée par la conversation.
 
 ## Connexion et coupures
 
@@ -94,7 +94,7 @@ En cas de coupure, Cornelius se reconnecte seul, en espaçant les essais de 1 à
 - Il n’est jamais renvoyé au navigateur, à la conversation ni au journal. Le champ **Jeton longue durée** affiche seulement « Jeton enregistré (masqué) ».
 - Laissez le champ vide pour garder le jeton enregistré. Ce n’est possible qu’à la même adresse : une nouvelle adresse demande un nouveau jeton.
 - Changer d’adresse ou de jeton vide la sélection et retire l’autorisation de Cornelius, jusqu’à un nouvel enregistrement.
-- **Supprimer la connexion** efface le jeton, la sélection et l’autorisation. Le réglage **Réserver aux personnes reconnues** est conservé. Révoquez aussi le jeton dans Home Assistant pour l’invalider.
+- **Supprimer la connexion** efface le jeton, la sélection et l’autorisation. Les réglages **Réserver aux personnes reconnues** et **Régler les thermostats** sont conservés. Révoquez aussi le jeton dans Home Assistant pour l’invalider.
 - Le jeton garde les droits du compte Home Assistant qui l’a créé. C’est Cornelius qui limite ce que la conversation peut faire, pas le jeton.
 - Cornelius refuse les redirections vers une autre adresse. Les réglages de Home Assistant ne sont accessibles que depuis l’administration.
 - La base et ses copies ne sont lisibles que par le compte système qui fait tourner Cornelius (fichiers en `0600`, dossier `data/` en `0700`). Une sauvegarde de `data/` contient le jeton : gardez-la à l’abri comme un mot de passe.
@@ -147,7 +147,7 @@ La route n’accepte que le réseau local et limite les appels à 30 par minute.
 
 ## Limites
 
-- Ne sont pas pris en charge : la couleur des lumières, les scènes, la commande des volets, des serrures et des thermostats, et des droits différents selon la personne.
+- Ne sont pas pris en charge : les scènes, la commande des volets et des serrures, le mode des thermostats (chauffage, arrêt) et leur plage (minimum et maximum), et des droits différents selon la personne.
 - Une intégration Home Assistant qui dépend d’un service en ligne en dépend toujours.
 - Les commandes réelles peuvent varier selon la version de Home Assistant et l’intégration de chaque appareil. Essayez-les avec les boutons **Allumer** et **Éteindre** avant de les confier à Cornelius.
 
