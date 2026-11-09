@@ -2,7 +2,7 @@ import { DiagnosticLog } from '../server/logs.js';
 import assert from 'node:assert/strict';
 import { compile } from '../shared/validation.js';
 import test, { type TestContext } from 'node:test';
-import { setImmediate } from 'node:timers/promises';
+import { setImmediate, setTimeout as delay } from 'node:timers/promises';
 import type { ConnectClientEvent, ConnectServerEvent } from 'openai/resources/live/sideband';
 import type { MediaSessionConfig } from 'openai/resources/live/live';
 import { openDatabase, ProfileRepository, SessionPreferences } from '../server/storage.js';
@@ -821,6 +821,225 @@ test('satellite__volume : proposé au satellite seulement, consigne ajoutée', (
     const tools = (f.configs[0]!.delegation as MediaSessionConfig.Responses).responses.tools ?? [];
     assert.ok(!tools.some((entry) => 'name' in entry && entry.name === 'satellite__volume'));
   });
+});
+
+test('conversation__end : proposé avec le mot de fin, il ferme après la réponse', async (t) => {
+  const f = fixture(t);
+  await f.ready();
+  const without = (f.configs[0]!.delegation as MediaSessionConfig.Responses).responses;
+  assert.ok(!without.tools?.some((tool) => 'name' in tool && tool.name === 'conversation__end'));
+  assert.doesNotMatch(String(f.configs[0]!.instructions), /conversation__end/u);
+  f.controller.setEndWord(true);
+  const config = liveConfiguration(
+    [
+      {
+        name: 'conversation__end',
+        description: 'Fermer la conversation.',
+        parameters: { type: 'object', additionalProperties: false, required: [], properties: {} },
+      },
+    ],
+    undefined,
+  );
+  assert.match(
+    String(config.instructions),
+    /Fin de conversation : .*« merci ».*conversation__end/u,
+  );
+  assert.match(
+    String((config.delegation as MediaSessionConfig.Responses).responses.instructions),
+    /appelle conversation__end sans argument/u,
+  );
+  f.emit({
+    type: 'response.event',
+    delegation_id: 'end-delegation',
+    event: {
+      type: 'response.output_item.done',
+      item: {
+        type: 'function_call',
+        call_id: 'end-call',
+        name: 'conversation__end',
+        arguments: '{}',
+      },
+    },
+  });
+  await setImmediate();
+  assert.ok(
+    f.sent.some(
+      (event) =>
+        event.type === 'response.item.create' &&
+        JSON.stringify(event).includes('Ne dis rien de plus.'),
+    ),
+  );
+  assert.ok(
+    f.logs.snapshot().entries.some((entry) => entry.event === 'Fin de conversation demandée'),
+  );
+  f.advance(1000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+  f.advance(2000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'closing');
+  assert.equal(f.controller.snapshot().state.session.reason, 'Fin de conversation demandée.');
+});
+
+test('mot de fin reconnu dans la transcription, sans attendre l’outil', async (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  await f.ready();
+  // La phrase arrive par morceaux ; Cornelius répond « avec plaisir » sans déléguer.
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Merci ' });
+  f.emit({ type: 'session.input_transcript.delta', delta: 'beaucoup, c’est tout.' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Avec plaisir.' });
+  assert.ok(
+    f.logs
+      .snapshot()
+      .entries.some(
+        (entry) =>
+          entry.event === 'Fin de conversation demandée' &&
+          (entry.details as { source?: string }).source === 'transcription',
+      ),
+  );
+  f.advance(1000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+  f.advance(2000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'closing');
+  assert.equal(f.controller.snapshot().state.session.reason, 'Fin de conversation demandée.');
+});
+
+test('formule de fin du foyer reconnue dans la transcription et donnée au modèle', async (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  f.controller.setEndPhrases(['C’est bon Jarvis']);
+  assert.deepEqual(new SessionPreferences(f.db).getEndPhrases(), ['C’est bon Jarvis']);
+  assert.deepEqual(f.controller.snapshot().state.endPhrases, ['C’est bon Jarvis']);
+  await f.ready();
+  assert.match(
+    String(f.configs[0]!.instructions),
+    /Formules de fin propres au foyer.*C’est bon Jarvis/u,
+  );
+  f.emit({ type: 'session.input_transcript.delta', delta: 'C’est bon, Jarvis.' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Très bien.' });
+  f.advance(1000);
+  f.advance(2000);
+  assert.equal(f.controller.snapshot().state.session.reason, 'Fin de conversation demandée.');
+});
+
+test('mot de fin : « merci, et la météo ? » ne ferme pas, ni un mot de fin désactivé', async (t) => {
+  const f = fixture(t);
+  await f.ready();
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Merci.' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Avec plaisir.' });
+  f.controller.setEndWord(true);
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Merci, et la météo ?' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Je regarde.' });
+  f.advance(1000);
+  f.advance(5000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+});
+
+test('mot de fin : une vraie demande juste après « merci » l’annule', async (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  await f.ready();
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Merci.' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Avec plaisir.' });
+  f.advance(1000);
+  // Une hésitation ne compte pas ; la vraie demande, si.
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Euh…' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Oui ?' });
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Ah, et la météo de demain ?' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Demain, du soleil.' });
+  assert.ok(
+    f.logs.snapshot().entries.some((entry) => entry.event === 'Fin de conversation annulée'),
+  );
+  f.advance(1000);
+  f.advance(12_000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+});
+
+test('mot de fin : transcription arrivée après le début de la réponse', async (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  await f.ready();
+  // Cornelius répond avant que la transcription de « merci » n’arrive.
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Avec plaisir.' });
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Merci, ' });
+  f.emit({ type: 'session.input_transcript.delta', delta: 'c’est tout.' });
+  await delay(800);
+  assert.ok(
+    f.logs
+      .snapshot()
+      .entries.some(
+        (entry) =>
+          entry.event === 'Fin de conversation demandée' &&
+          (entry.details as { source?: string }).source === 'transcription',
+      ),
+  );
+  // « Merci » ne préfixe pas la phrase suivante : elle est examinée seule.
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Au revoir.' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'À bientôt.' });
+  f.advance(1000);
+  f.advance(2000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'closing');
+  assert.equal(f.controller.snapshot().state.session.reason, 'Fin de conversation demandée.');
+});
+
+test('mot de fin : réponse à une question ou alarme qui sonne, le serveur ne ferme pas', async (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  await f.ready();
+  f.emit({
+    type: 'session.output_transcript.delta',
+    delta: 'Et toi, tu as passé une bonne journée ?',
+  });
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Oui, super, merci.' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Tant mieux.' });
+  f.advance(1000);
+  f.advance(12_000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+
+  let ringing = true;
+  const alarms = {
+    tools: () => [],
+    handles: () => false,
+    ringing: () => ringing,
+    run: () => {
+      throw new Error('jamais appelé');
+    },
+  };
+  const g = fixture(t, { integrations: { alarms } });
+  g.controller.setEndWord(true);
+  await g.ready();
+  // « C’est bon » arrête ce qui sonne (alarms__respond), pas la conversation.
+  g.emit({ type: 'session.input_transcript.delta', delta: 'C’est bon, merci.' });
+  g.emit({ type: 'session.output_transcript.delta', delta: 'Réveil arrêté.' });
+  g.advance(1000);
+  g.advance(12_000);
+  assert.equal(g.controller.snapshot().state.session.phase, 'ready');
+  ringing = false;
+  g.emit({ type: 'session.input_transcript.delta', delta: 'Merci, au revoir.' });
+  g.emit({ type: 'session.output_transcript.delta', delta: 'Au revoir.' });
+  g.advance(1000);
+  g.advance(2000);
+  assert.equal(g.controller.snapshot().state.session.reason, 'Fin de conversation demandée.');
+});
+
+test('conversation__end désactivé : l’appel est refusé et la conversation continue', async (t) => {
+  const f = fixture(t);
+  await f.ready();
+  f.emit({
+    type: 'response.event',
+    delegation_id: 'end-delegation',
+    event: {
+      type: 'response.output_item.done',
+      item: {
+        type: 'function_call',
+        call_id: 'end-call',
+        name: 'conversation__end',
+        arguments: '{}',
+      },
+    },
+  });
+  await setImmediate();
+  f.advance(15_000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
 });
 
 test('une alarme qui sonne est annoncée une fois par conversation, sans se bousculer', async (t) => {

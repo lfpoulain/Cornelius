@@ -13,6 +13,7 @@ import { FineTuning } from './FineTuning';
 import { decimalText, parseDecimal } from './format';
 import { DecimalInput, Field, SaveBar } from './shared';
 import { ChoiceGroup, type ChoiceOption } from '../ui/choice-card';
+import { Textarea } from '../ui/textarea';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
 
 /** Délais proposés d’un geste ; toute autre valeur se règle dans « Réglage fin ». */
@@ -123,6 +124,36 @@ export function SilenceCloseSettings({ state, run }: { state: MirrorState; run: 
             </span>
           </span>
         </label>
+        <label className="admin-mode-option admin-wake-option">
+          <input
+            type="checkbox"
+            aria-label="Fermer quand on dit merci"
+            aria-describedby="end-word-detail"
+            checked={state.endWord === true}
+            onChange={(event) => {
+              const enabled = event.target.checked;
+              void run(
+                enabled
+                  ? 'Fin de parole : quand on dit merci.'
+                  : 'Fin de parole : « merci » ne ferme plus la conversation.',
+                () => api.endWord(enabled),
+                { key: 'end-word', payload: { enabled } },
+              );
+            }}
+          />
+          <span className="admin-mode-card">
+            <span className="admin-mode-top">
+              <strong>Fermer quand on dit merci</strong>
+              <span className="admin-checkbox" aria-hidden="true" />
+            </span>
+            <span className="admin-mode-detail" id="end-word-detail">
+              « Merci », « c’est tout », « au revoir » : Cornelius répond d’un mot puis ferme la
+              conversation. Une hésitation ensuite ne la retient pas ; une vraie demande (« merci…
+              ah, et la météo ? ») l’annule. Vaut pour la conversation suivante.
+            </span>
+          </span>
+        </label>
+        {state.endWord === true && <EndPhrases state={state} run={run} />}
         <FineTuning hint="Délai personnalisé" defaultOpen={choice === 'custom'}>
           <Field
             id="silence-close-delay"
@@ -151,5 +182,46 @@ export function SilenceCloseSettings({ state, run }: { state: MirrorState; run: 
         />
       </CardContent>
     </Card>
+  );
+}
+
+/** Formules de fin du foyer, une par ligne, en plus de « merci », « c’est tout », « au revoir ». */
+function EndPhrases({ state, run }: { state: MirrorState; run: RunAction }) {
+  const saved = (state.endPhrases ?? []).join('\n');
+  const [text, setText] = useState(saved);
+  useEffect(() => setText(saved), [saved]);
+  const phrases = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const valid = phrases.length <= 20 && phrases.every((line) => line.length <= 60);
+  return (
+    <>
+      <Field
+        id="end-phrases"
+        label="Autres formules de fin"
+        help="Une par ligne, 20 au plus (« c’est bon Jarvis », « ciao »). La phrase entière doit correspondre, à la ponctuation près."
+      >
+        <Textarea
+          id="end-phrases"
+          rows={3}
+          value={text}
+          aria-invalid={!valid || undefined}
+          onChange={(event) => setText(event.target.value)}
+        />
+      </Field>
+      <SaveBar
+        label="Formules de fin"
+        count={text === saved ? 0 : 1}
+        error={valid ? null : '20 formules au plus, de 60 caractères au plus.'}
+        onSave={() =>
+          void run('Formules de fin enregistrées.', () => api.endPhrases(phrases), {
+            key: 'end-phrases',
+            payload: { phrases },
+          })
+        }
+        onCancel={() => setText(saved)}
+      />
+    </>
   );
 }
