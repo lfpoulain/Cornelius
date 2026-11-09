@@ -72,8 +72,20 @@ export async function fakeHomeAssistant() {
         const apply = () => {
           entity.state = path.endsWith('/turn_on') ? 'on' : 'off';
           entity.last_updated = new Date().toISOString();
+          const attributes = entity.attributes as Record<string, unknown>;
           if (typeof body.brightness_pct === 'number')
-            entity.attributes.brightness = Math.round((body.brightness_pct / 100) * 255);
+            attributes.brightness = Math.round((body.brightness_pct / 100) * 255);
+          // Comme une ampoule réelle : la couleur relue est un peu arrondie par sa teinte.
+          if (Array.isArray(body.rgb_color)) {
+            attributes.rgb_color = (body.rgb_color as number[]).map((channel) =>
+              Math.min(255, Math.max(0, channel + (channel > 127 ? -3 : 2))),
+            );
+            attributes.color_mode = 'hs';
+          }
+          if (typeof body.color_temp_kelvin === 'number') {
+            attributes.color_temp_kelvin = body.color_temp_kelvin;
+            attributes.color_mode = 'color_temp';
+          }
           emit(entity);
         };
         if (options.applyDelayMs > 0) setTimeout(apply, options.applyDelayMs);

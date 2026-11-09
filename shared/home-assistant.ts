@@ -35,6 +35,13 @@ export interface HomeAssistantEntity {
   deviceClass?: string | null;
   /** Attributs utiles seulement : fin de minuterie, température, position… */
   attributes?: Record<string, string | number | boolean | null>;
+  /** Lumières : couleur et blanc réglables, état de couleur relu dans Home Assistant. */
+  color?: boolean;
+  colorTemp?: boolean;
+  rgbColor?: [number, number, number] | null;
+  colorTempKelvin?: number | null;
+  minColorTempKelvin?: number | null;
+  maxColorTempKelvin?: number | null;
 }
 
 export function isControllable(entity: Pick<HomeAssistantEntity, 'domain'>): boolean {
@@ -58,4 +65,8 @@ export interface HomeAssistantCommand {
   entityId: string;
   action: 'read' | 'turn_on' | 'turn_off';
   brightnessPct: number | null;
+  /** Couleur demandée (0 à 255 par canal) ; absente ou null : inchangée. */
+  rgbColor?: [number, number, number] | null;
+  /** Blanc demandé, en kelvins ; absent ou null : inchangé. */
+  colorTempKelvin?: number | null;
 }
