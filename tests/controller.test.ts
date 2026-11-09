@@ -1770,6 +1770,34 @@ test('mot de fin : une réponse qui ne finit pas ferme quand même après 10 s',
   assert.equal(f.state().session.reason, 'Fin de conversation demandée.');
 });
 
+test('mot de fin : une nouvelle demande l’annule, la conversation continue', (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  f.engage();
+  const scope = f.ready();
+  assert.equal(f.controller.cancelEnd(scope), false, 'rien à annuler');
+  assert.equal(f.controller.requestEnd(scope), true);
+  assert.equal(f.controller.cancelEnd({ ...scope, interactionId: 'ancienne' }), false);
+  assert.equal(f.controller.cancelEnd(scope), true);
+  f.advance(15_000);
+  assert.equal(f.state().session.phase, 'ready');
+});
+
+test('mot de fin : une réponse encore jouée par le satellite n’est jamais coupée', (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  f.engage();
+  const scope = f.ready();
+  assert.equal(f.controller.requestEnd(scope), true);
+  // 14 s d’audio reçues d’un coup : le satellite les joue en temps réel.
+  f.controller.noteAssistantOutput(scope, f.clock() + 14_000);
+  f.advance(12_000);
+  assert.equal(f.state().session.phase, 'ready', 'au-delà de 10 s, la lecture continue');
+  f.advance(3_000);
+  assert.equal(f.state().session.phase, 'closing');
+  assert.equal(f.state().session.reason, 'Fin de conversation demandée.');
+});
+
 function voiceFixture(t: TestContext, recognition = true) {
   const f = fixture(t);
   f.controller.setSessionMode(4);

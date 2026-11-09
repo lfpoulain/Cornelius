@@ -1175,6 +1175,17 @@ export class SessionController {
   }
 
   /**
+   * Une nouvelle demande suit le mot de fin (« merci… ah, et la météo ? ») : la fin demandée est
+   * oubliée, la conversation se termine ensuite comme d’habitude (silence ou réponse).
+   */
+  cancelEnd(scope: Scope): boolean {
+    if (this.endRequestedAt === null || !this.current(scope)) return false;
+    this.endRequestedAt = null;
+    this.endQuietSince = null;
+    return true;
+  }
+
+  /**
    * Applique l’ouverture choisie (déclencheur et public) en une fois. L’ordre évite une
    * ouverture intermédiaire : le public est fixé avant que le mot d’appel ne soit retiré.
    */
@@ -1795,11 +1806,19 @@ export class SessionController {
     return true;
   }
 
-  /** The Live sideband streams silence too, so only audible output extends this hold. */
-  noteAssistantOutput(scope: Scope): boolean {
+  /**
+   * The Live sideband streams silence too, so only audible output extends this hold. `playedUntil` :
+   * fin de lecture estimée quand l’audio arrive plus vite qu’il n’est joué (satellite), pour ne
+   * fermer qu’après la fin réelle de la réponse.
+   */
+  noteAssistantOutput(scope: Scope, playedUntil?: number): boolean {
     if (!this.current(scope) || this.session.phase !== 'ready' || !this.silenceTracking())
       return false;
-    this.assistantOutputUntil = this.now() + voiceOutputGraceMs;
+    const now = this.now();
+    this.assistantOutputUntil = Math.max(
+      this.assistantOutputUntil ?? 0,
+      Math.max(now, Number.isFinite(playedUntil) ? playedUntil! : now) + voiceOutputGraceMs,
+    );
     this.silenceSince = null;
     if (this.userTurnHeard) this.replyHeard = true;
     return true;
@@ -1857,11 +1876,17 @@ export class SessionController {
   /**
    * Mot de fin demandé : Cornelius ne parle plus depuis un court délai, ou le délai maximal est
    * dépassé. La parole entendue dans la pièce ne compte pas : on parle souvent à quelqu’un d’autre.
+   * Une réponse audible en cours n’est jamais coupée, même au-delà du délai maximal : la fermeture
+   * vide la file audio du satellite.
    */
   private endWordFinished(now: number): boolean {
     if (this.endRequestedAt === null || this.session.phase !== 'ready') return false;
+    if (this.assistantOutputUntil !== null) {
+      this.endQuietSince = null;
+      return false;
+    }
     if (now - this.endRequestedAt >= endWordMaxMs) return true;
-    if (this.assistantBusy || this.assistantOutputUntil !== null) {
+    if (this.assistantBusy) {
       this.endQuietSince = null;
       return false;
     }

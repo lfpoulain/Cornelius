@@ -148,8 +148,8 @@ export function SilenceCloseSettings({ state, run }: { state: MirrorState; run: 
             </span>
             <span className="admin-mode-detail" id="end-word-detail">
               « Merci », « c’est tout », « au revoir » : Cornelius répond d’un mot puis ferme la
-              conversation, même si quelqu’un parle encore dans la pièce. Un « merci » suivi d’une
-              autre demande ne ferme pas. Vaut pour la conversation suivante.
+              conversation. Une hésitation ensuite ne la retient pas ; une vraie demande (« merci…
+              ah, et la météo ? ») l’annule. Vaut pour la conversation suivante.
             </span>
           </span>
         </label>

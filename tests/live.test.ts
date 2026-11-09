@@ -2,7 +2,7 @@ import { DiagnosticLog } from '../server/logs.js';
 import assert from 'node:assert/strict';
 import { compile } from '../shared/validation.js';
 import test, { type TestContext } from 'node:test';
-import { setImmediate } from 'node:timers/promises';
+import { setImmediate, setTimeout as delay } from 'node:timers/promises';
 import type { ConnectClientEvent, ConnectServerEvent } from 'openai/resources/live/sideband';
 import type { MediaSessionConfig } from 'openai/resources/live/live';
 import { openDatabase, ProfileRepository, SessionPreferences } from '../server/storage.js';
@@ -932,6 +932,93 @@ test('mot de fin : « merci, et la météo ? » ne ferme pas, ni un mot de fin d
   f.advance(1000);
   f.advance(5000);
   assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+});
+
+test('mot de fin : une vraie demande juste après « merci » l’annule', async (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  await f.ready();
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Merci.' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Avec plaisir.' });
+  f.advance(1000);
+  // Une hésitation ne compte pas ; la vraie demande, si.
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Euh…' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Oui ?' });
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Ah, et la météo de demain ?' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Demain, du soleil.' });
+  assert.ok(
+    f.logs.snapshot().entries.some((entry) => entry.event === 'Fin de conversation annulée'),
+  );
+  f.advance(1000);
+  f.advance(12_000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+});
+
+test('mot de fin : transcription arrivée après le début de la réponse', async (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  await f.ready();
+  // Cornelius répond avant que la transcription de « merci » n’arrive.
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Avec plaisir.' });
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Merci, ' });
+  f.emit({ type: 'session.input_transcript.delta', delta: 'c’est tout.' });
+  await delay(800);
+  assert.ok(
+    f.logs
+      .snapshot()
+      .entries.some(
+        (entry) =>
+          entry.event === 'Fin de conversation demandée' &&
+          (entry.details as { source?: string }).source === 'transcription',
+      ),
+  );
+  // « Merci » ne préfixe pas la phrase suivante : elle est examinée seule.
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Au revoir.' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'À bientôt.' });
+  f.advance(1000);
+  f.advance(2000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'closing');
+  assert.equal(f.controller.snapshot().state.session.reason, 'Fin de conversation demandée.');
+});
+
+test('mot de fin : réponse à une question ou alarme qui sonne, le serveur ne ferme pas', async (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  await f.ready();
+  f.emit({
+    type: 'session.output_transcript.delta',
+    delta: 'Et toi, tu as passé une bonne journée ?',
+  });
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Oui, super, merci.' });
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Tant mieux.' });
+  f.advance(1000);
+  f.advance(12_000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+
+  let ringing = true;
+  const alarms = {
+    tools: () => [],
+    handles: () => false,
+    ringing: () => ringing,
+    run: () => {
+      throw new Error('jamais appelé');
+    },
+  };
+  const g = fixture(t, { integrations: { alarms } });
+  g.controller.setEndWord(true);
+  await g.ready();
+  // « C’est bon » arrête ce qui sonne (alarms__respond), pas la conversation.
+  g.emit({ type: 'session.input_transcript.delta', delta: 'C’est bon, merci.' });
+  g.emit({ type: 'session.output_transcript.delta', delta: 'Réveil arrêté.' });
+  g.advance(1000);
+  g.advance(12_000);
+  assert.equal(g.controller.snapshot().state.session.phase, 'ready');
+  ringing = false;
+  g.emit({ type: 'session.input_transcript.delta', delta: 'Merci, au revoir.' });
+  g.emit({ type: 'session.output_transcript.delta', delta: 'Au revoir.' });
+  g.advance(1000);
+  g.advance(2000);
+  assert.equal(g.controller.snapshot().state.session.reason, 'Fin de conversation demandée.');
 });
 
 test('conversation__end désactivé : l’appel est refusé et la conversation continue', async (t) => {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { cleanEndPhrases, isClosingPhrase } from '../server/live/conversation-end.js';
+import { cleanEndPhrases, isClosingPhrase, isNewRequest } from '../server/live/conversation-end.js';
 
 test('phrase de fin : formules qui clôturent l’échange', () => {
   for (const said of [
@@ -14,6 +14,7 @@ test('phrase de fin : formules qui clôturent l’échange', () => {
     'Bonne nuit Cornelius',
     'Super, merci mille fois',
     'Ça ira, merci.',
+    'Ça va aller, merci.',
     'Tu peux arrêter.',
   ])
     assert.equal(isClosingPhrase(said), true, said);
@@ -29,9 +30,24 @@ test('phrase de fin : une demande, une réponse ou un mot seul ne clôturent pas
     'Merci, éteins aussi le salon',
     'Allume le gyrophare',
     'Non merci',
+    // Réponse à « comment ça va ? », pas une fin.
+    'Ça va bien, merci.',
+    'ça va merci',
     'merci '.repeat(13),
   ])
     assert.equal(isClosingPhrase(said), false, said);
+});
+
+test('nouvelle demande : une vraie phrase, pas une hésitation', () => {
+  for (const said of [
+    'Ah, et la météo de demain ?',
+    'Allume le salon',
+    'Attends',
+    'Quelle heure ?',
+  ])
+    assert.equal(isNewRequest(said), true, said);
+  for (const said of ['', 'Euh…', 'Oui', 'ok', 'Hein ?', 'Ah !', 'non'])
+    assert.equal(isNewRequest(said), false, said);
 });
 
 test('formules du foyer : la phrase entière, à la ponctuation près, et nettoyées', () => {

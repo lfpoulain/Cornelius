@@ -6,7 +6,7 @@ export const END_CONVERSATION_TOOL = 'conversation__end';
 export const endConversationTool = {
   name: END_CONVERSATION_TOOL,
   description:
-    'Fermer la conversation quand la personne la clôt sans nouvelle demande : « merci », « merci, c’est tout », « c’est bon », « ça ira », « au revoir », « bonne nuit », « tu peux arrêter ». Pas pour un « merci » suivi d’une autre demande ni pendant une question en attente. La formule de politesse est déjà dite : n’ajoute rien après.',
+    'Fermer la conversation quand la personne la clôt sans nouvelle demande : « merci », « merci, c’est tout », « c’est bon », « ça ira », « au revoir », « bonne nuit », « tu peux arrêter ». Pas pour un « merci » suivi d’une autre demande, ni pour répondre à ta question (« ça va bien, merci »), ni quand un réveil, un minuteur ou un rappel sonne : « arrête », « c’est bon » passent alors par alarms__respond. La formule de politesse est déjà dite : n’ajoute rien après.',
   parameters: {
     type: 'object',
     additionalProperties: false,
@@ -87,7 +87,36 @@ export function isClosingPhrase(text: string, extra: readonly string[] = []): bo
   const words = phrase.split(' ');
   if (words.length > 12) return false;
   if (!words.every((word) => closingWords.has(word))) return false;
+  // « Ça va (bien), merci » répond à « comment ça va ? » ; « ça va aller » reste une fin.
+  if (/(^| )ça va( (?!aller)|$)/u.test(phrase)) return false;
   return closingMarkers.some((marker) => marker.test(phrase));
+}
+
+/** Hésitations et acquiescements qui ne demandent rien à Cornelius. */
+const fillers = new Set([
+  'euh',
+  'heu',
+  'hum',
+  'hmm',
+  'ben',
+  'bah',
+  'hein',
+  'ah',
+  'oh',
+  'ok',
+  'oui',
+  'non',
+]);
+
+/**
+ * Une vraie demande (« ah, et la météo de demain ? ») plutôt qu’une hésitation : elle annule un
+ * mot de fin déjà reconnu.
+ */
+export function isNewRequest(text: string): boolean {
+  const words = normalizePhrase(text)
+    .split(' ')
+    .filter((word) => word.length >= 2 && !fillers.has(word));
+  return words.length >= 2 || words.some((word) => word.length >= 4);
 }
 
 /** Casse, accents composés, ponctuation et apostrophes ramenés à des mots séparés d’espaces. */

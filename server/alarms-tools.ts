@@ -195,6 +195,11 @@ export class AlarmTools {
     ];
   }
 
+  /** Quelque chose sonne : « arrête » ou « c’est bon » s’adressent à l’alarme. */
+  ringing(): boolean {
+    return this.alarms.ringing().length > 0;
+  }
+
   handles(name: string): boolean {
     return (
       (name === setTool || name === listTool || name === cancelTool || name === respondTool) &&
