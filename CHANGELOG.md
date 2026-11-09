@@ -12,6 +12,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 - **Satellites audio → Fin de parole sur ce satellite** : « Comme le foyer » (par défaut) ou un délai propre (5 s à 1 min dans l’administration, 3 à 300 s par l’API), pour sa conversation seulement. Champ `silenceCloseMs` des satellites (`PATCH /api/admin/satellites/:id`), table `satellite_silence`.
 
+### 2026-11-08 : bouton du satellite pendant une conversation
+
+**Ajouté**
+
+- Message satellite `{"type":"session","action":"end"}` : le bouton pressé pendant une conversation de ce satellite la ferme (raison « Fin de conversation au bouton du satellite. »), sans attendre le silence. Ignoré pour la conversation d’un autre satellite ou du miroir. `welcome` annonce `features: ["session_end"]`, pour que le firmware ne change le rôle du bouton qu’avec un serveur qui le comprend.
+
 ### 2026-11-06 : démarrage depuis Home Assistant, serveur Live compatible
 
 **Ajouté**
