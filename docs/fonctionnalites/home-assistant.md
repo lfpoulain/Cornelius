@@ -121,7 +121,7 @@ Ce que ce compte limite : sans droits d’administrateur, le jeton ne donne pas 
 
 Une automatisation Home Assistant peut ouvrir une conversation sur le miroir, au geste d’une baguette, à l’appui d’un bouton ou à tout autre événement. L’effet est celui du bouton **Démarrer** de l’administration.
 
-1. **Le jeton est facultatif.** Sans jeton, toute machine du réseau local peut appeler la route (sauf un navigateur : voir plus bas). Pour la protéger, choisissez un jeton long et aléatoire (32 caractères ou plus) dans **Mise en route → Clés et jetons → Jeton de déclenchement**, ou écrivez `CORNELIUS_TRIGGER_TOKEN=…` dans `.env` puis redémarrez. Les appels doivent alors l’envoyer.
+1. **Le jeton est facultatif.** Sans jeton, toute machine du réseau local peut appeler la route (sauf un navigateur : voir plus bas). Pour la protéger, choisissez un jeton long et aléatoire (32 caractères ou plus) dans **Clés et accès → Clés et jetons → Jeton de déclenchement**, ou écrivez `CORNELIUS_TRIGGER_TOKEN=…` dans `.env` puis redémarrez. Les appels doivent alors l’envoyer.
 2. Dans Home Assistant, ajoutez une commande REST à `configuration.yaml` :
 
    ```yaml

@@ -9,7 +9,7 @@ L’ordinateur de Cornelius garde son adresse habituelle, `http://127.0.0.1:3000
 - le miroir : `https://<adresse de l’ordinateur>:3443/` ;
 - l’administration : `https://<adresse de l’ordinateur>:3443/admin`.
 
-L’adresse exacte s’affiche dans l’administration, rubrique **Mise en route**, carte **Accès depuis le réseau local**, et au démarrage du serveur (ligne « Réseau local · https://192.168.1.20:3443 »). Le nom de l’ordinateur suivi de `.local` fonctionne aussi sur la plupart des réseaux (par exemple `https://miroir.local:3443/`).
+L’adresse exacte s’affiche dans l’administration, rubrique **Clés et accès**, carte **Accès depuis le réseau local**, et au démarrage du serveur (ligne « Réseau local · https://192.168.1.20:3443 »). Le nom de l’ordinateur suivi de `.local` fonctionne aussi sur la plupart des réseaux (par exemple `https://miroir.local:3443/`).
 
 Une adresse tapée sans le « s » (`http://192.168.1.20:3443/`) renvoie d’elle-même vers l’adresse chiffrée. Le port `3000`, lui, ne répond qu’à l’ordinateur de Cornelius.
 
@@ -32,7 +32,7 @@ L’administration demande son mot de passe, comme sur l’ordinateur. Le miroir
 
 Le bouton **Retirer les autorisations**, dans la même carte, oublie tous les appareils autorisés. Chacun devra se reconnecter.
 
-Tant que le mot de passe vaut `cornelius` (la valeur de départ), aucune connexion n’est acceptée depuis un autre appareil : changez-le d’abord dans l’administration, sur l’ordinateur de Cornelius (**Mise en route**, carte « Mot de passe administrateur »). Sur un ordinateur sans écran, installé par SSH, la commande `npm run password`, lancée dans le dossier de Cornelius, fait la même chose ; l’installateur Linux la propose à la fin.
+Tant que le mot de passe vaut `cornelius` (la valeur de départ), aucune connexion n’est acceptée depuis un autre appareil : changez-le d’abord dans l’administration, sur l’ordinateur de Cornelius (**Clés et accès**, carte « Mot de passe administrateur »). Sur un ordinateur sans écran, installé par SSH, la commande `npm run password`, lancée dans le dossier de Cornelius, fait la même chose ; l’installateur Linux la propose à la fin.
 
 ## Un seul miroir à la fois
 

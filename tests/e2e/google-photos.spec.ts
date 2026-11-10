@@ -70,7 +70,7 @@ test('album partagé : choix de source, validation, aperçu, actualisation et an
     .getByLabel('Mot de passe administrateur')
     .fill('admin-browser-test-only-credentials-1234');
   await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
-  await page.getByRole('button', { name: 'Écran de veille', exact: true }).click();
+  await page.getByRole('button', { name: 'Orbe et écran de veille', exact: true }).click();
   await page.getByRole('radio', { name: 'Album Google Photos', exact: true }).check();
   await expect(
     page.getByText('Photos accessibles à toute personne possédant le lien', { exact: true }),
@@ -166,7 +166,7 @@ for (const unavailableAlbum of [false, true]) {
       .getByLabel('Mot de passe administrateur')
       .fill('admin-browser-test-only-credentials-1234');
     await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
-    await page.getByRole('button', { name: 'Écran de veille', exact: true }).click();
+    await page.getByRole('button', { name: 'Orbe et écran de veille', exact: true }).click();
     const placeholder = page.getByRole('img', {
       name: unavailableAlbum ? 'Aucune photo disponible' : 'Aperçu indisponible',
       exact: true,

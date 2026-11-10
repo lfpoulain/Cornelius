@@ -89,7 +89,7 @@ Certains modules ont besoin d’un jeton personnel, obtenu gratuitement chez le 
 | Météo | `CORNELIUS_METEO_CONCEPT_TOKEN` |
 | Transports | `CORNELIUS_PRIM_API_KEY` |
 
-Tant qu’un jeton manque, la carte du module dit « Ce module a besoin d’un jeton… », donne le lien d’inscription et grise « Ajouter une source ». Collez le jeton dans le champ de cette carte (ou dans **Mise en route → Clés et jetons**) : il compte tout de suite. Vous pouvez aussi l’écrire dans le fichier `.env`, puis redémarrer :
+Tant qu’un jeton manque, la carte du module dit « Ce module a besoin d’un jeton… », donne le lien d’inscription et grise « Ajouter une source ». Collez le jeton dans le champ de cette carte (ou dans **Clés et accès → Clés et jetons**) : il compte tout de suite. Vous pouvez aussi l’écrire dans le fichier `.env`, puis redémarrer :
 
 ```ini
 CORNELIUS_METEO_CONCEPT_TOKEN=votre-jeton

@@ -89,7 +89,7 @@ Si le script s’arrête en route, corrigez la cause puis relancez-le avec les m
 
 `npm run setup` crée le fichier `.env` à la racine du dossier, lisible par vous seul. Il contient le port (`PORT=3000`), la base de données, le mot de passe de l’administration (`cornelius` au départ), un jeton privé pour la perception et une ligne `OPENAI_API_KEY=` vide. Sur un `.env` existant, il ne change rien et complète seulement les lignes manquantes.
 
-Le plus simple : collez la clé dans l’administration, rubrique **Mise en route**, carte **Clés et jetons** ; elle compte tout de suite. Vous pouvez aussi ouvrir `.env` avec un éditeur de texte et coller votre clé après le signe égal :
+Le plus simple : collez la clé dans l’administration, rubrique **Clés et accès**, carte **Clés et jetons** ; elle compte tout de suite. Vous pouvez aussi ouvrir `.env` avec un éditeur de texte et coller votre clé après le signe égal :
 
 ```sh
 nano .env
@@ -99,7 +99,7 @@ nano .env
 OPENAI_API_KEY=sk-...
 ```
 
-Le mot de passe de l’administration se change avec `npm run password`, dans le dossier de Cornelius : il compte aussitôt, sans redémarrage, comme celui choisi dans **Mise en route**. Après une modification de `.env`, redémarrez le serveur pour qu’il lise le fichier :
+Le mot de passe de l’administration se change avec `npm run password`, dans le dossier de Cornelius : il compte aussitôt, sans redémarrage, comme celui choisi dans **Clés et accès**. Après une modification de `.env`, redémarrez le serveur pour qu’il lise le fichier :
 
 ```sh
 systemctl --user restart cornelius        # avec les services systemd

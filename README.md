@@ -136,10 +136,10 @@ Avec Home Assistant OS, Cornelius peut tourner comme add-on sur la box, le miroi
 
 ### 🔑 Après l’installation
 
-Ouvrez l’administration et collez votre clé OpenAI dans **Mise en route → Clés et jetons** : elle compte tout de suite.
+Ouvrez l’administration et collez votre clé OpenAI dans **Clés et accès → Clés et jetons** : elle compte tout de suite.
 
 > [!IMPORTANT]
-> Le mot de passe de départ de l’administration est `cornelius`. Changez-le tout de suite dans **Mise en route → Mot de passe administrateur**.
+> Le mot de passe de départ de l’administration est `cornelius`. Changez-le tout de suite dans **Clés et accès → Mot de passe administrateur**.
 
 ## ▶️ Lancer
 

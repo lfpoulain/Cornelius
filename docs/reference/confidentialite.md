@@ -32,7 +32,7 @@ Pour couper tout envoi vers OpenAI et Mistral, utilisez **Bloquer les services I
 
 ## Ce qui part chez le fournisseur vocal, et quand
 
-Le fournisseur vocal est OpenAI par défaut, ou Mistral s’il est choisi dans **Mise en route → Voix de Cornelius**. Un seul des deux reçoit une conversation donnée. Voir [Le fournisseur vocal](../fonctionnalites/fournisseur-vocal.md).
+Le fournisseur vocal est OpenAI par défaut, ou Mistral s’il est choisi dans **Voix et modèles → Voix de Cornelius**. Un seul des deux reçoit une conversation donnée. Voir [Le fournisseur vocal](../fonctionnalites/fournisseur-vocal.md).
 
 **Pendant une conversation**, le fournisseur reçoit :
 
@@ -75,7 +75,7 @@ Tout est sur l’ordinateur du miroir, dans le dossier `data/` (voir [Configurat
 | Trois dernières images créées | `data/generated-images/`, vidé à chaque démarrage |
 | Images de l’écran de veille (vos photos et les peintures) | `data/screensaver/` ; leur titre dans la base |
 | Source Google Photos de l’écran de veille | lien partagé et réglages dans la base et ses sauvegardes ; liste et images relayées uniquement en mémoire |
-| Mot de passe de l’administration | le fichier `.env` au départ ; s’il est changé dans **Mise en route**, une empreinte (scrypt) dans la base, jamais le mot de passe lui-même |
+| Mot de passe de l’administration | le fichier `.env` au départ ; s’il est changé dans **Clés et accès**, une empreinte (scrypt) dans la base, jamais le mot de passe lui-même |
 | Secrets des commandes (`CORNELIUS_SECRET_*`) | le fichier `.env`, jamais dans la base |
 | Clés OpenAI et Mistral, jetons Météo et Transports, mot de passe SMTP | la base locale s’ils sont saisis dans l’administration (ils y passent avant ceux de `.env`), sinon le fichier `.env`. L’administration n’en montre que les quatre derniers caractères, et le journal les masque. |
 
@@ -123,13 +123,13 @@ Il ne contient donc ni la parole, ni les images, ni le texte des conversations. 
 
 ## L’administration
 
-L’administration demande le mot de passe administrateur (celui de `.env`, ou celui choisi dans **Mise en route**). La connexion reste ouverte une heure après la dernière action, puis il faut se reconnecter. Un redémarrage du serveur ferme toutes les connexions.
+L’administration demande le mot de passe administrateur (celui de `.env`, ou celui choisi dans **Clés et accès**). La connexion reste ouverte une heure après la dernière action, puis il faut se reconnecter. Un redémarrage du serveur ferme toutes les connexions.
 
 Le miroir, lui, ne demande aucun mot de passe. Le miroir et l’administration répondent à l’ordinateur lui-même et, en HTTPS, aux appareils du réseau local (désactivable avec `CORNELIUS_LAN=0`), jamais à Internet. Un autre appareil n’ouvre le miroir qu’après avoir été autorisé une fois avec le mot de passe administrateur.
 
 ## Les dépenses
 
-Cornelius ne bloque jamais une conversation pour son coût. La carte **Mise en route → Temps de conversation** compte la durée des conversations par jour et par fournisseur ; elle n’estime un coût que pour le temps passé avec Mistral, facturé à la minute, et seulement si vous saisissez son prix. OpenAI facture aux jetons (voix, délégation, recherche web, images) : aucun coût n’est estimé pour lui, consultez sa console. Fixez vos limites de dépense dans votre compte OpenAI ou Mistral. Avec Mistral, facturé à la minute, une conversation se ferme après 20 secondes sans activité et dure 15 minutes au plus. Les modes **Rapide** et **Ultra rapide** de **Quand il écoute → Réglages avancés → Délégation : recherches et actions** coûtent plus cher que **Normal**.
+Cornelius ne bloque jamais une conversation pour son coût. La carte **Voix et modèles → Temps de conversation** compte la durée des conversations par jour et par fournisseur ; elle n’estime un coût que pour le temps passé avec Mistral, facturé à la minute, et seulement si vous saisissez son prix. OpenAI facture aux jetons (voix, délégation, recherche web, images) : aucun coût n’est estimé pour lui, consultez sa console. Fixez vos limites de dépense dans votre compte OpenAI ou Mistral. Avec Mistral, facturé à la minute, une conversation se ferme après 20 secondes sans activité et dure 15 minutes au plus. Les modes **Rapide** et **Ultra rapide** de **Voix et modèles → Délégation : recherches et actions** coûtent plus cher que **Normal**.
 
 Le bouton **Bloquer les services IA**, dans le panneau **Conversation** de la rubrique **Quand il écoute** (le seul où ce panneau est complet), ferme la conversation en cours et interdit toute nouvelle connexion à OpenAI et à Mistral, extraction de souvenirs et images OpenAI comprises. Le blocage reste après un redémarrage. **Autoriser les services IA** le lève. La caméra, la reconnaissance et la vision locale continuent de fonctionner.
 

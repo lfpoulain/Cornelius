@@ -19,6 +19,7 @@ import { Personality } from './admin/Personality';
 import { Profiles } from './admin/Profiles';
 import { Addons } from './admin/Addons';
 import { Agents } from './admin/Agents';
+import { DelegationSettings } from './admin/DelegationSettings';
 import { Diagnostics } from './admin/Diagnostics';
 import { AdminPasswordCard, RestartServerCard } from './admin/ServerControls';
 import { VoiceSettings } from './admin/VoiceSettings';
@@ -51,73 +52,90 @@ import {
 import { openMirrorWindow } from '../mirror-window';
 import './Admin.css';
 
+// Six groupes, dans l’ordre où l’on s’en sert : installer, régler la conversation, les personnes,
+// ce que Cornelius sait faire, le matériel, puis le dépannage. Une rubrique ne porte que ce que
+// dit son titre : « Mise en route » est la seule liste d’étapes, les clés et les accès ont la leur.
 const sections = [
   {
     id: 'start',
-    group: 'Premiers réglages',
+    group: 'Pour commencer',
     label: 'Mise en route',
     description: 'Ce qu’il reste à faire avant la première conversation, étape par étape.',
   },
   {
-    id: 'audio',
-    group: 'Premiers réglages',
-    label: 'Micro et haut-parleurs',
-    description: 'Par où Cornelius vous entend, et par où il vous répond.',
-  },
-  {
-    id: 'camera',
-    group: 'Premiers réglages',
-    label: 'Caméra et reconnaissance',
-    description: 'La caméra du miroir, la reconnaissance des visages et le regard.',
-  },
-  {
-    id: 'profiles',
-    group: 'Premiers réglages',
-    label: 'Le foyer et les visages',
-    description: 'Les personnes que Cornelius connaît, et le visage de chacune.',
+    id: 'access',
+    group: 'Pour commencer',
+    label: 'Clés et accès',
+    description:
+      'Les clés des services, le mot de passe de cet espace et l’accès depuis les autres appareils de la maison.',
   },
   {
     id: 'voice',
-    group: 'Premiers réglages',
+    group: 'Conversation',
     label: 'Quand il écoute',
     description: 'Ce qui ouvre la conversation, qui peut l’ouvrir et quand elle se termine.',
   },
   {
-    id: 'satellites',
-    group: 'Premiers réglages',
-    label: 'Satellites audio',
-    description: 'Les micros et haut-parleurs des autres pièces, qui répondent à « Cornelius ».',
+    id: 'assistant',
+    group: 'Conversation',
+    label: 'Voix et modèles',
+    description:
+      'Le fournisseur de la conversation, la voix de Cornelius, le modèle de ses recherches et le temps passé à converser.',
   },
   {
     id: 'personality',
-    group: 'Au quotidien',
+    group: 'Conversation',
     label: 'Personnaliser Cornelius',
-    description:
-      'Son caractère pour toute la maison, sa façon de parler à chacun et la taille de son orbe.',
+    description: 'Son caractère pour toute la maison, et sa façon de parler à chacun.',
   },
   {
-    id: 'screensaver',
-    group: 'Au quotidien',
-    label: 'Écran de veille',
-    description: 'Les peintures et les photos affichées quand personne n’est devant le miroir.',
+    id: 'profiles',
+    group: 'Les personnes',
+    label: 'Le foyer et les visages',
+    description: 'Les personnes que Cornelius connaît, et le visage de chacune.',
+  },
+  {
+    id: 'memory',
+    group: 'Les personnes',
+    label: 'Mémoire',
+    description: 'Les souvenirs de chaque personne, à consulter, corriger ou oublier.',
   },
   {
     id: 'modules',
-    group: 'Au quotidien',
+    group: 'Ce qu’il sait faire',
     label: 'Modules',
     description: 'Les sources de ses réponses et les commandes qu’il peut lancer.',
   },
   {
     id: 'agents',
-    group: 'Au quotidien',
+    group: 'Ce qu’il sait faire',
     label: 'Agents',
     description: 'Les agents personnels reliés au miroir, et vos demandes en cours.',
   },
   {
-    id: 'memory',
-    group: 'Au quotidien',
-    label: 'Mémoire',
-    description: 'Les souvenirs de chaque personne, à consulter, corriger ou oublier.',
+    id: 'audio',
+    group: 'Le miroir',
+    label: 'Micro et haut-parleurs',
+    description: 'Par où Cornelius vous entend, et par où il vous répond.',
+  },
+  {
+    id: 'camera',
+    group: 'Le miroir',
+    label: 'Caméra et reconnaissance',
+    description: 'La caméra du miroir, la reconnaissance des visages et le regard.',
+  },
+  {
+    id: 'screensaver',
+    group: 'Le miroir',
+    label: 'Orbe et écran de veille',
+    description:
+      'La taille de l’orbe, et les images affichées quand personne n’est devant le miroir.',
+  },
+  {
+    id: 'satellites',
+    group: 'Le miroir',
+    label: 'Satellites audio',
+    description: 'Les micros et haut-parleurs des autres pièces, qui répondent à « Cornelius ».',
   },
   {
     id: 'diagnostic',
@@ -134,7 +152,7 @@ const sections = [
 ] as const;
 type Section = (typeof sections)[number]['id'];
 type ModuleView = 'information' | 'commands';
-const groups = ['Premiers réglages', 'Au quotidien', 'Diagnostic'];
+const groups = [...new Set(sections.map((item) => item.group))];
 // Rubriques de lecture seule : hors connexion, leurs filtres, leur recherche et leur export
 // restent utilisables. Ailleurs, les réglages sont grisés tant que le serveur ne répond pas.
 const readingSections: ReadonlySet<Section> = new Set(['diagnostic', 'logs']);
@@ -576,18 +594,23 @@ export function Admin({
                       }
                     />
                   )}
-                  {section === 'start' && <Secrets run={run} />}
-                  {section === 'start' && <VoiceSettings state={state} run={run} />}
-                  {section === 'start' && <VoiceUsageCard phase={state.session.phase} run={run} />}
-                  {section === 'start' && devices && (
+                  {section === 'access' && <Secrets run={run} />}
+                  {section === 'access' && devices && (
                     <AdminPasswordCard defaultPassword={devices.defaultPassword} run={run} />
                   )}
-                  {section === 'start' && devices && (
+                  {section === 'access' && devices && (
                     <NetworkAccess
                       network={devices.network}
                       defaultPassword={devices.defaultPassword}
                       run={run}
                     />
+                  )}
+                  {section === 'assistant' && <VoiceSettings state={state} run={run} />}
+                  {section === 'assistant' && state.voiceProvider !== 'mistral' && (
+                    <DelegationSettings state={state} run={run} />
+                  )}
+                  {section === 'assistant' && (
+                    <VoiceUsageCard phase={state.session.phase} run={run} />
                   )}
                   {(section === 'voice' || section === 'camera' || section === 'audio') && (
                     <Devices section={section} state={state} status={devices} run={run} />
@@ -612,15 +635,13 @@ export function Admin({
                     </div>
                   )}
                   {section === 'personality' && (
-                    <div className="space-y-5">
-                      <Personality
-                        profiles={state.profiles}
-                        initialProfileId={personalityProfile}
-                        run={run}
-                      />
-                      <OrbScaleSettings state={state} run={run} />
-                    </div>
+                    <Personality
+                      profiles={state.profiles}
+                      initialProfileId={personalityProfile}
+                      run={run}
+                    />
                   )}
+                  {section === 'screensaver' && <OrbScaleSettings state={state} run={run} />}
                   {section === 'screensaver' && <ScreensaverSettings state={state} run={run} />}
                   {section === 'modules' && (
                     <Addons

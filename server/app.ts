@@ -218,7 +218,7 @@ export async function createApp(
   const defaultPassword = () => adminPassword.isDefault();
   if (defaultPassword())
     logs.write('warn', 'local', 'Mot de passe administrateur par défaut', {
-      conseil: 'Le changer dans l’administration, Mise en route.',
+      conseil: 'Le changer dans l’administration, Clés et accès.',
     });
   // Clés des fournisseurs et jetons des modules : administration prioritaire sur .env.
   const envSecrets: Record<string, string | undefined> = {
@@ -1078,7 +1078,7 @@ export async function createApp(
       if (defaultPassword() && !fromMachine(request))
         return reply.code(403).send({
           error:
-            'Mot de passe par défaut : changez-le d’abord dans l’administration, sur l’ordinateur du miroir (Mise en route), ou dans un terminal de cet ordinateur avec npm run password.',
+            'Mot de passe par défaut : changez-le d’abord dans l’administration, sur l’ordinateur du miroir (Clés et accès), ou dans un terminal de cet ordinateur avec npm run password.',
         });
       purgeSessions();
       const existing = request.cookies[adminCookie];
@@ -1632,7 +1632,7 @@ export async function createApp(
           .send({ error: 'Terminez la conversation avant de changer de fournisseur.' });
       if (!secretStore.get(provider === 'mistral' ? 'MISTRAL_API_KEY' : 'OPENAI_API_KEY'))
         return reply.code(400).send({
-          error: 'Ajoutez d’abord la clé de ce fournisseur dans Mise en route → Clés et jetons.',
+          error: 'Ajoutez d’abord la clé de ce fournisseur dans Clés et accès → Clés et jetons.',
         });
       controller.setVoiceProvider(provider);
       live.setGateway(voiceGateway());
@@ -1677,7 +1677,7 @@ export async function createApp(
       if (!key)
         return reply
           .code(400)
-          .send({ error: 'Ajoutez d’abord la clé OpenAI dans Mise en route → Clés et jetons.' });
+          .send({ error: 'Ajoutez d’abord la clé OpenAI dans Clés et accès → Clés et jetons.' });
       const { effectiveBaseUrl } = liveEndpoint();
       try {
         liveModels = await listLiveModels(key, effectiveBaseUrl);

@@ -137,11 +137,12 @@
 .admin-navigation {
   display: flex;
   flex-direction: column;
-  gap: 27px;
+  /* Six groupes : assez serrés pour tenir d’un regard sur un écran d’ordinateur. */
+  gap: 20px;
 }
 .admin-nav-group > .admin-eyebrow {
   padding: 0 12px;
-  margin: 0 0 10px;
+  margin: 0 0 6px;
 }
 .admin-nav-item {
   display: flex;
@@ -149,9 +150,9 @@
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  min-height: 43px;
-  margin: 3px 0;
-  padding: 11px 12px;
+  min-height: 38px;
+  margin: 2px 0;
+  padding: 8px 12px;
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;

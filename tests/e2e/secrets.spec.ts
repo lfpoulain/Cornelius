@@ -1,14 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 
 async function login(page: Page) {
-  await page.goto('/admin#start');
+  await page.goto('/admin#access');
   await page
     .getByLabel('Mot de passe administrateur')
     .fill('admin-browser-test-only-credentials-1234');
   await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
 }
 
-test('un jeton de module se saisit dans Mise en route, compte aussitôt et s’efface', async ({
+test('un jeton de module se saisit dans Clés et accès, compte aussitôt et s’efface', async ({
   page,
 }) => {
   await login(page);

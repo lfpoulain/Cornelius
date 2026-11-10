@@ -6,6 +6,16 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-10 : administration réorganisée
+
+**Modifié**
+
+- **Administration → barre latérale** : six groupes, dans l’ordre où l’on s’en sert, à la place de trois : **Pour commencer** (Mise en route, Clés et accès), **Conversation** (Quand il écoute, Voix et modèles, Personnaliser Cornelius), **Les personnes** (Le foyer et les visages, Mémoire), **Ce qu’il sait faire** (Modules, Agents), **Le miroir** (Micro et haut-parleurs, Caméra et reconnaissance, Orbe et écran de veille, Satellites audio) et **Diagnostic** (État du système, Journal).
+- **Mise en route** ne porte plus que la liste des étapes. Les cartes qui la suivaient ont leur rubrique : **Clés et accès** (`#access` : Clés et jetons, Mot de passe administrateur, Accès depuis le réseau local) et **Voix et modèles** (`#assistant` : Voix de Cornelius, Délégation, Temps de conversation). Les étapes « Clé OpenAI » et « Mot de passe administrateur » y mènent par un bouton (« Saisir la clé », « Changer le mot de passe »).
+- **Délégation : recherches et actions** quitte les réglages avancés de « Quand il écoute » pour « Voix et modèles », avec le fournisseur et la voix.
+- **Taille de l’orbe** quitte « Personnaliser Cornelius » pour la rubrique « Écran de veille », renommée **Orbe et écran de veille**.
+- Les messages du serveur et du miroir qui renvoyaient à « Mise en route → Clés et jetons » disent « Clés et accès → Clés et jetons ». Les adresses des autres rubriques ne changent pas.
+
 ### 2026-11-09 : suites de relecture (couleur, bouton, fin de parole, volume)
 
 **Corrigé**

@@ -70,7 +70,7 @@ La carte **Ce que Cornelius reçoit** montre, pour les réglages enregistrés, l
 - **Conversation**, pour les réponses orales ;
 - **Recherches et actions**, pour les demandes qui utilisent des outils.
 
-Vos réglages y apparaissent surlignés, à la fin. Cornelius ne prononce jamais ces textes. « Luna » y désigne le modèle chargé des recherches et des actions, réglé dans **Quand il écoute → Réglages avancés → Délégation : recherches et actions**.
+Vos réglages y apparaissent surlignés, à la fin. Cornelius ne prononce jamais ces textes. « Luna » y désigne le modèle chargé des recherches et des actions, réglé dans **Voix et modèles → Délégation : recherches et actions**.
 
 Les fichiers qui construisent ces textes sont décrits dans [Les prompts](../developpement/prompts.md).
 

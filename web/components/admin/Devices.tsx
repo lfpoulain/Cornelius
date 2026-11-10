@@ -13,7 +13,6 @@ import { SessionMode } from './SessionMode';
 import { AdmissionSoundSettings } from './AdmissionSoundSettings';
 import { GreetingSettings } from './GreetingSettings';
 import { SilenceCloseSettings } from './SilenceCloseSettings';
-import { DelegationSettings } from './DelegationSettings';
 import { AdvancedAudioBuffer } from './AdvancedAudioBuffer';
 import { RecognitionTester } from './RecognitionTester';
 import { CollapsibleSection } from './shared';
@@ -63,12 +62,11 @@ export function Devices({
       <CollapsibleSection
         icon={SlidersHorizontal}
         title="Réglages avancés"
-        description="Micro gardé prêt, délais de présence et modèle confié aux recherches et aux actions."
+        description="Micro gardé prêt et délais de présence."
         defaultOpen={false}
       >
         <AdvancedAudioBuffer state={state} run={run} />
         <PresenceTimingSettings status={status} run={run} />
-        {state.voiceProvider !== 'mistral' && <DelegationSettings state={state} run={run} />}
       </CollapsibleSection>
       <p className="text-xs text-muted-foreground">
         Ces réglages sont enregistrés sur le serveur et conservés après un redémarrage.

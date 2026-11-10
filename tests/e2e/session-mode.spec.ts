@@ -76,10 +76,9 @@ test('« Quand il écoute » range ses cartes dans l’ordre, les réglages avan
     'Mode vie privée',
     'Accueil à l’ouverture',
     'Son d’ouverture',
-    // Dans le repli « Réglages avancés » : trois cartes du même style que les autres.
+    // Dans le repli « Réglages avancés » : deux cartes du même style que les autres.
     'Micro gardé prêtBêta',
     'Délais de présence',
-    'Délégation : recherches et actions',
   ]);
   const advanced = page.locator('summary').filter({ hasText: 'Réglages avancés' }).locator('..');
   await expect(advanced).not.toHaveAttribute('open');
@@ -131,14 +130,13 @@ test('deux choix d’ouverture rapprochés sont enregistrés tous les deux', asy
 test('la délégation permet Luna normal, Luna rapide et Astra ultra rapide, avec choix conservé', async ({
   page,
 }) => {
-  await page.goto('/admin#voice');
+  await page.goto('/admin#assistant');
   await page
     .getByLabel('Mot de passe administrateur')
     .fill('admin-browser-test-only-credentials-1234');
   await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
-  // Le choix du modèle vit dans le repli « Réglages avancés », fermé par défaut.
-  const advanced = page.locator('summary').filter({ hasText: 'Réglages avancés' });
-  await advanced.click();
+  // Le choix du modèle vit dans « Voix et modèles », avec le fournisseur et la voix.
+  await expect(page.getByRole('heading', { level: 1, name: 'Voix et modèles' })).toBeVisible();
   const options = page.getByRole('group', { name: 'Mode de délégation', exact: true });
   // Les noms de modèles restent : c’est le choix proposé. Le reste est dit en français courant.
   await expect(options.getByText('GPT-6 Luna', { exact: true })).toHaveCount(2);
@@ -151,7 +149,6 @@ test('la délégation permet Luna normal, Luna rapide et Astra ultra rapide, ave
     await expect(choice).toBeChecked();
     await expect(page.getByText('Mode de délégation enregistré.', { exact: true })).toBeVisible();
     await page.reload();
-    await advanced.click();
     await expect(choice).toBeChecked();
     if (label === 'Ultra rapide') {
       await expect(card.getByText(/garde ses données en Europe/)).toBeVisible();

@@ -944,7 +944,7 @@ test('unavailableReason distingue le blocage administrateur de la clé OpenAI ab
   const missing = new LiveTransport(null, () => false, logs);
   assert.equal(
     missing.unavailableReason(),
-    'Ajoutez la clé du fournisseur vocal choisi dans Mise en route → Clés et jetons.',
+    'Ajoutez la clé du fournisseur vocal choisi dans Clés et accès → Clés et jetons.',
   );
 });
 

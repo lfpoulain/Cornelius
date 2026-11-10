@@ -26,7 +26,7 @@ notepad .env
 
 - `npm ci` installe les dépendances exactes du projet.
 - `npm run setup` crée le fichier `.env` : le port (`PORT=3000`), la base de données, le mot de passe de l’administration (`cornelius` au départ), un jeton privé pour la perception et une ligne `OPENAI_API_KEY=` vide. Sur un `.env` existant, il ne change rien et complète seulement les lignes manquantes.
-- Dans le Bloc-notes, choisissez un autre mot de passe dans `CORNELIUS_ADMIN_PASSWORD` (4 caractères au moins), puis enregistrez. La clé OpenAI peut se coller ici après `OPENAI_API_KEY=`, ou plus tard dans l’administration (**Mise en route → Clés et jetons**), sans redémarrage.
+- Dans le Bloc-notes, choisissez un autre mot de passe dans `CORNELIUS_ADMIN_PASSWORD` (4 caractères au moins), puis enregistrez. La clé OpenAI peut se coller ici après `OPENAI_API_KEY=`, ou plus tard dans l’administration (**Clés et accès → Clés et jetons**), sans redémarrage.
 
 Les autres réglages possibles de `.env` (jetons des modules, caméra, vision, images) sont décrits dans [Configuration](../reference/configuration.md) et commentés dans `.env.example`.
 

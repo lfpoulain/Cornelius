@@ -4,8 +4,8 @@ La conversation de Cornelius passe par un service en ligne qui écoute, comprend
 
 ## Choisir le fournisseur
 
-1. Dans **Mise en route → Clés et jetons**, renseignez la clé du fournisseur : **Clé OpenAI** ou **Clé Mistral**. Le compte Mistral doit avoir accès à l’API Voice Agents. Aucun autre service n’est à configurer.
-2. Dans la carte **Voix de Cornelius** (rubrique **Mise en route**), choisissez le **Fournisseur de la conversation** : « OpenAI · GPT Live » ou « Mistral · Voxtral 3 ».
+1. Dans **Clés et accès → Clés et jetons**, renseignez la clé du fournisseur : **Clé OpenAI** ou **Clé Mistral**. Le compte Mistral doit avoir accès à l’API Voice Agents. Aucun autre service n’est à configurer.
+2. Dans la carte **Voix de Cornelius** (rubrique **Voix et modèles**), choisissez le **Fournisseur de la conversation** : « OpenAI · GPT Live » ou « Mistral · Voxtral 3 ».
 
 Le changement s’applique à la conversation suivante. Il est refusé pendant une conversation, et tant que la clé du fournisseur choisi manque. Les deux clés sont gardées séparément : sans la clé du fournisseur choisi, aucune conversation ne s’ouvre, et Cornelius ne bascule jamais seul sur l’autre compte.
 
@@ -15,7 +15,7 @@ Le changement s’applique à la conversation suivante. Il est refusé pendant u
 
 - **Voix et écoute.** Voxtral transcrit et parle en français, avec la voix Marie. Le choix de la voix GPT-Live ne s’applique pas.
 - **Réponses et outils.** Mistral Small répond et appelle les mêmes outils que GPT-Live : modules, commandes, Home Assistant, agents Hermes, cartes, mémoire, e-mail. Ces outils restent exécutés par Cornelius, avec les mêmes autorisations et confirmations.
-- **Mémoire.** L’extraction des souvenirs garde le choix de Mistral après la conversation, mais ce choix devient indépendant : il se règle dans **Mise en route → Clés et jetons → Mémoire personnalisée**. Voir [La mémoire](memoire.md).
+- **Mémoire.** L’extraction des souvenirs garde le choix de Mistral après la conversation, mais ce choix devient indépendant : il se règle dans **Clés et accès → Clés et jetons → Mémoire personnalisée**. Voir [La mémoire](memoire.md).
 - **Images.** La génération d’images « Avec OpenAI » garde la clé OpenAI.
 - **Recherche web.** Elle est faite par Mistral. Les sources s’affichent sur la carte quand Mistral les renvoie ; aucun lien n’est déduit du texte de sa réponse.
 - **Délégation.** La carte **Délégation : recherches et actions** disparaît : elle ne concerne que GPT-Live.
@@ -29,7 +29,7 @@ Mistral facture Voice Agents à la minute de conversation : 0,04 $ la minute ave
 - elle dure 15 minutes au plus ;
 - chaque fermeture supprime la session chez Mistral, y compris une ouverture interrompue.
 
-La carte **Mise en route → Temps de conversation** compte les minutes passées avec Mistral et, si vous saisissez son prix par minute, en estime le coût. Le temps passé avec OpenAI, facturé aux jetons, est compté à part et sans coût. Ce n’est qu’une estimation : fixez vos limites dans votre compte Mistral.
+La carte **Voix et modèles → Temps de conversation** compte les minutes passées avec Mistral et, si vous saisissez son prix par minute, en estime le coût. Le temps passé avec OpenAI, facturé aux jetons, est compté à part et sans coût. Ce n’est qu’une estimation : fixez vos limites dans votre compte Mistral.
 
 ## Limites de Mistral
 

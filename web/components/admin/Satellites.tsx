@@ -91,7 +91,7 @@ export function Satellites({
               <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>
                 L’accès depuis le réseau local est désactivé : un satellite ne peut pas se
-                connecter. Voir la carte « Accès depuis le réseau local » dans Mise en route.
+                connecter. Voir la carte « Accès depuis le réseau local » dans Clés et accès.
               </span>
             </p>
           )}

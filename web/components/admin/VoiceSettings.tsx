@@ -30,7 +30,7 @@ export function VoiceSettings({ state, run }: { state: MirrorState; run: RunActi
         <Field
           id="voice-provider"
           label="Fournisseur de la conversation"
-          help="Ajoutez sa clé dans Mise en route → Clés et jetons. Le changement s’applique à la prochaine conversation."
+          help="Ajoutez sa clé dans Clés et accès → Clés et jetons. Le changement s’applique à la prochaine conversation."
         >
           <NativeSelect
             id="voice-provider"

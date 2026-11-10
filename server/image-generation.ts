@@ -344,7 +344,7 @@ export class ImageGeneration {
   private openaiUnavailable(): string | null {
     if (!this.openai) return 'OpenAI n’est pas relié à ce serveur.';
     if (this.openai.blocked()) return 'Connexions OpenAI bloquées dans l’administration.';
-    if (!this.openai.creator()) return 'Clé OpenAI absente : renseignez-la dans Mise en route.';
+    if (!this.openai.creator()) return 'Clé OpenAI absente : renseignez-la dans Clés et accès.';
     return null;
   }
 

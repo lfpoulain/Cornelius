@@ -334,7 +334,7 @@ export class LiveTransport implements SessionTransport {
   unavailableReason() {
     if (this.isBlocked()) return 'Connexions IA bloquées dans l’administration.';
     if (!this.gateway)
-      return 'Ajoutez la clé du fournisseur vocal choisi dans Mise en route → Clés et jetons.';
+      return 'Ajoutez la clé du fournisseur vocal choisi dans Clés et accès → Clés et jetons.';
     return null;
   }
   /** Nouvelle clé OpenAI (ou plus de clé) : prise en compte dès la prochaine conversation. */

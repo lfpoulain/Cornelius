@@ -34,7 +34,7 @@ SDXL Turbo et FLUX.2 Klein calculent directement en 512 × 512. SANA-Sprint et Z
 
 Choisissez **Avec OpenAI** en haut de la carte. Les étapes deviennent :
 
-1. **Clé OpenAI** : la clé de Cornelius (rubrique **Mise en route**, carte « Clés et jetons », ou `OPENAI_API_KEY` dans `.env`) sert aussi aux images. Si elle manque, ou si les connexions OpenAI sont bloquées, l’étape le dit. OpenAI peut demander de vérifier votre organisation (platform.openai.com, rubrique Organization) avant d’autoriser ses modèles d’image : sans cela, Cornelius répond que le modèle est refusé pour ce compte.
+1. **Clé OpenAI** : la clé de Cornelius (rubrique **Clés et accès**, carte « Clés et jetons », ou `OPENAI_API_KEY` dans `.env`) sert aussi aux images. Si elle manque, ou si les connexions OpenAI sont bloquées, l’étape le dit. OpenAI peut demander de vérifier votre organisation (platform.openai.com, rubrique Organization) avant d’autoriser ses modèles d’image : sans cela, Cornelius répond que le modèle est refusé pour ce compte.
 2. **Choisir le modèle et la qualité** :
    - **Modèle OpenAI** : **GPT Image 2.5 Flare** (par défaut, le plus rapide, conseillé), **GPT Image 2.5 Sunburst** (plus précis sur les détails et le texte, plus lent) ou **GPT Image 1 mini** (le plus économique).
    - **Qualité** : **Rapide** (par défaut, conseillée pour le miroir), **Équilibrée** ou **Soignée**. Une qualité plus élevée ajoute des détails, mais l’image arrive plus tard et coûte plus cher.

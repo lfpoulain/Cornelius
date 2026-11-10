@@ -7,7 +7,7 @@ Cette page explique où se trouvent les consignes que Cornelius donne aux modèl
 | Rôle | Modèle | Où il est choisi |
 |---|---|---|
 | Conversation vocale | `gpt-live-1`, voix `cedar` | `server/live/configuration.ts` |
-| Recherches et actions (la « délégation », appelée Luna dans les consignes) | `gpt-6-luna` en mode « Normal » ou « Rapide », `gpt-6-astra` en « Ultra rapide » | `server/live/configuration.ts`, d’après **Quand il écoute → Réglages avancés → Délégation : recherches et actions** (`shared/delegation.ts`, « Rapide » par défaut) ; un **Modèle de délégation** choisi dans la même carte remplace le modèle du mode (`shared/live-endpoint.ts`) |
+| Recherches et actions (la « délégation », appelée Luna dans les consignes) | `gpt-6-luna` en mode « Normal » ou « Rapide », `gpt-6-astra` en « Ultra rapide » | `server/live/configuration.ts`, d’après **Voix et modèles → Délégation : recherches et actions** (`shared/delegation.ts`, « Rapide » par défaut) ; un **Modèle de délégation** choisi dans la même carte remplace le modèle du mode (`shared/live-endpoint.ts`) |
 | Extraction de la mémoire après la conversation | `gpt-5.6-luna` | `server/memory-extractor.ts` |
 | Description de la scène, sur la machine | LFM2.5-VL | `perception/scene.py` |
 

@@ -8,7 +8,7 @@ Google peut changer cette page et rendre le connecteur inutilisable.
 L’intégration fait partie du cœur de l’écran de veille : le contrat actuel des modules ne
 permet que des présentations de texte ou de valeurs et ne fournit aucun point d’extension pour
 remplacer le diaporama plein écran. Le choix entre images locales et Google Photos reste dans
-la rubrique « Écran de veille » de l’administration.
+la rubrique « Orbe et écran de veille » de l’administration.
 
 ## Choisir l’album
 

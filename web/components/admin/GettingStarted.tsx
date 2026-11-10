@@ -35,12 +35,13 @@ const statuses: Record<ReadinessStatus, { label: string; icon: LucideIcon; tone:
 // Libellés d’action propres à chaque étape : jamais le nom d’une rubrique, que la navigation
 // porte déjà.
 const sectionActions: Partial<Record<ReadinessId, string>> = {
+  'openai-key': 'Saisir la clé',
+  'admin-password': 'Changer le mot de passe',
   perception: 'Ouvrir le diagnostic',
   camera: 'Choisir la caméra',
   faces: 'Enregistrer un visage',
 };
 const docActions: Partial<Record<ReadinessId, string>> = {
-  'openai-key': 'Guide d’installation',
   'wake-word': 'Guide du mot d’appel',
 };
 

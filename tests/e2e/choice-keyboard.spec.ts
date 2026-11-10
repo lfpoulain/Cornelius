@@ -70,8 +70,7 @@ test('changer de délégation pendant une conversation demande confirmation', as
     if (request.url().endsWith('/api/admin/delegation-mode') && request.method() === 'PATCH')
       sent.push(request.postDataJSON());
   });
-  await login(page, '/admin#voice');
-  await page.locator('summary').filter({ hasText: 'Réglages avancés' }).click();
+  await login(page, '/admin#assistant');
   const options = page.getByRole('group', { name: 'Mode de délégation', exact: true });
   const fast = options.getByRole('radio', { name: 'Rapide', exact: true });
   const normal = options.getByRole('radio', { name: 'Normal', exact: true });

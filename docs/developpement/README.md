@@ -133,18 +133,30 @@ L’administration (`web/components/Admin.tsx`) range ses rubriques dans l’adr
 
 | Rubrique | Ancre | Composants principaux |
 |---|---|---|
-| Mise en route | `#start` | `GettingStarted.tsx`, d’après `shared/readiness.ts` |
-| Micro et haut-parleurs | `#audio` | `Devices.tsx` → `AudioDevices.tsx` |
-| Caméra et reconnaissance | `#camera` | `Devices.tsx` → `Camera.tsx`, `RecognitionSettings.tsx`, `RecognitionTester.tsx`, `EngagementSettings.tsx` |
-| Le foyer et les visages | `#profiles` | `Profiles.tsx`, `FaceEnrollment.tsx` |
-| Quand il écoute | `#voice` | `Devices.tsx` → `SessionMode.tsx`, `SilenceCloseSettings.tsx`, `PrivacyMode.tsx`, `GreetingSettings.tsx`, `AdmissionSoundSettings.tsx` ; dans **Réglages avancés** : `AdvancedAudioBuffer.tsx`, `PresenceTimingSettings.tsx`, `DelegationSettings.tsx` |
+| **Pour commencer** | | |
+| Mise en route | `#start` | `GettingStarted.tsx`, d’après `shared/readiness.ts` : les étapes seulement |
+| Clés et accès | `#access` | `Secrets.tsx`, `ServerControls.tsx` (`AdminPasswordCard`), `NetworkAccess.tsx` |
+| **Conversation** | | |
+| Quand il écoute | `#voice` | `Devices.tsx` → `SessionMode.tsx`, `SilenceCloseSettings.tsx`, `PrivacyMode.tsx`, `GreetingSettings.tsx`, `AdmissionSoundSettings.tsx` ; dans **Réglages avancés** : `AdvancedAudioBuffer.tsx`, `PresenceTimingSettings.tsx` |
+| Voix et modèles | `#assistant` | `VoiceSettings.tsx` (avec `LiveEndpointSettings.tsx`), `DelegationSettings.tsx`, `VoiceUsage.tsx` |
 | Personnaliser Cornelius | `#personality` | `Personality.tsx` |
+| **Les personnes** | | |
+| Le foyer et les visages | `#profiles` | `Profiles.tsx`, `FaceEnrollment.tsx` |
+| Mémoire | `#memory` | `Memory.tsx` |
+| **Ce qu’il sait faire** | | |
 | Modules | `#modules` | `Addons.tsx`, `AddonForm.tsx`, `WebSearchSettings.tsx`, `VisionSettings.tsx`, `ImageGenerationSettings.tsx`, `HomeAssistant.tsx`, `ModelInstall.tsx` |
 | Modules, module Commandes HTTP ouvert | `#modules/commandes` | `Actions.tsx`, `ActionForm.tsx` |
 | Agents | `#agents` | `Agents.tsx` |
-| Mémoire | `#memory` | `Memory.tsx` |
-| État du système | `#diagnostic` | `Diagnostics.tsx` |
+| **Le miroir** | | |
+| Micro et haut-parleurs | `#audio` | `Devices.tsx` → `AudioDevices.tsx` |
+| Caméra et reconnaissance | `#camera` | `Devices.tsx` → `Camera.tsx`, `RecognitionSettings.tsx`, `RecognitionTester.tsx`, `EngagementSettings.tsx` |
+| Orbe et écran de veille | `#screensaver` | `OrbScaleSettings.tsx`, `ScreensaverSettings.tsx`, `GooglePhotosSettings.tsx` |
+| Satellites audio | `#satellites` | `Satellites.tsx`, `SatelliteGestureSettings.tsx` |
+| **Diagnostic** | | |
+| État du système | `#diagnostic` | `ServerControls.tsx` (`RestartServerCard`), `Diagnostics.tsx` |
 | Journal | `#logs` | `Logs.tsx`, `log-view.ts` |
+
+Les groupes et leur ordre sont la liste `sections` de `Admin.tsx` : une rubrique ne porte que ce que dit son titre. Un réglage nouveau rejoint la rubrique dont il partage le sujet, pas « Mise en route ».
 
 `shared.tsx`, `FineTuning.tsx` et `FormOptions.tsx` regroupent les éléments communs (sections repliables, sélecteur de personne, règle d’enregistrement des réglages). Le miroir lui-même est `web/components/Mirror.tsx`, avec l’orbe (`Orb.tsx`) et les informations permanentes (`AmbientModules.tsx`).
 

@@ -24,7 +24,7 @@ Après la conversation, ce texte et les souvenirs actuels de la personne sont en
 
 ## Qui lit la conversation
 
-Le fournisseur mémoire se choisit dans **Mise en route → Clés et jetons → Mémoire personnalisée** : OpenAI (par défaut), Mistral, ou une API compatible OpenAI, par exemple un modèle installé sur une machine de la maison. On y renseigne l’URL de base, la clé `CUSTOM_OPENAI_API_KEY` et le modèle ; « Détecter les modèles » les liste depuis le serveur, ou le modèle se saisit à la main. Ce choix ne change ni le fournisseur de la conversation ni la génération d’images.
+Le fournisseur mémoire se choisit dans **Clés et accès → Clés et jetons → Mémoire personnalisée** : OpenAI (par défaut), Mistral, ou une API compatible OpenAI, par exemple un modèle installé sur une machine de la maison. On y renseigne l’URL de base, la clé `CUSTOM_OPENAI_API_KEY` et le modèle ; « Détecter les modèles » les liste depuis le serveur, ou le modèle se saisit à la main. Ce choix ne change ni le fournisseur de la conversation ni la génération d’images.
 
 Une proposition reçue est vérifiée avec le même schéma avant d’être appliquée, quel que soit le fournisseur.
 
