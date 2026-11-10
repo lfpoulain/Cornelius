@@ -15,6 +15,20 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 - **Délégation : recherches et actions** quitte les réglages avancés de « Quand il écoute » pour « Voix et modèles », avec le fournisseur et la voix.
 - **Taille de l’orbe** quitte « Personnaliser Cornelius » pour la rubrique « Écran de veille », renommée **Orbe et écran de veille**.
 - Les messages du serveur et du miroir qui renvoyaient à « Mise en route → Clés et jetons » disent « Clés et accès → Clés et jetons ». Les adresses des autres rubriques ne changent pas.
+- **Mise en route → Miroir ouvert** : l’étape distingue le miroir sur cet écran (bouton) du miroir sur un autre écran, dont elle donne l’adresse sur le réseau local.
+- **Clés et jetons → Extraction des souvenirs** (ex-« Mémoire personnalisée ») : le fournisseur se choisit d’abord (OpenAI par défaut, Mistral, ou « Mon serveur ») ; l’adresse, le modèle et le secours ne sont demandés qu’avec « Mon serveur ». Le champ « Nom affiché », qui ne servait nulle part, n’est plus proposé.
+- **Temps de conversation** : le prix par minute de Mistral n’apparaît plus quand la conversation passe par OpenAI.
+- **Orbe et écran de veille** : « Revenir à 100 % » est un vrai bouton ; avec l’album Google Photos, les images locales deviennent un secours replié.
+
+**Corrigé**
+
+- **Sécurité, réseau local** : les contrôles d’accès lisaient l’adresse brute, alors que le routeur décode les `%xx` : `/%61pi/state` était servi comme `/api/state` à un appareil non autorisé. Ils lisent désormais le chemin décodé ; `/voice-audio` rejoint les chemins réservés aux appareils autorisés.
+- **Satellites** : recharger le miroir, ou l’ouvrir dans un autre onglet, ne coupe plus la conversation en cours sur un satellite.
+- **Satellites avec Mistral** : une question dite d’une traite après « Cornelius » n’est plus perdue ; le son reçu avant la fin de la connexion attend au lieu d’être jeté.
+- **Caméra** : une caméra débranchée un instant, ou muette après une mise en veille, est rouverte toute seule (après 1 s, puis toutes les 2 à 15 s) et l’administration affiche « Caméra déconnectée » entre-temps. La caméra du navigateur se rouvre de même.
+- **Installation Linux** : relancer l’installateur sur une machine avec carte graphique ne casse plus ONNX Runtime.
+- **Tests navigateur** : le serveur de test n’écoute plus sur le réseau local et ne s’annonce plus aux satellites.
+- Tests : la liste des notices se compare sans tenir compte des fins de ligne ; le dossier temporaire du test de suppression de profil s’efface après la fermeture de la base ; les specs de vision et d’images ne dépendent plus des modèles installés sur le poste.
 
 ### 2026-11-09 : suites de relecture (couleur, bouton, fin de parole, volume)
 

@@ -41,6 +41,43 @@ class CameraTests(unittest.TestCase):
             self.assertIsNone(camera.preview())
             camera.disable()
 
+    def test_lost_camera_is_reopened_and_reported(self):
+        devices = [SimpleNamespace(index=0, backend=700, name="Camera 0", path="device-0")]
+        with patch("camera.enumerate_cameras", return_value=devices), patch("camera.cv2.VideoCapture", Capture):
+            camera = Camera()
+            first = Capture.opened[-1]
+            boot = camera.boot
+            self.assertTrue(camera.read()[0])
+            self.assertIsNone(camera.take_status_change())
+            # Câble débranché : les lectures échouent, et la réouverture échoue aussi.
+            first.closed = True
+            with patch.object(Capture, "read", lambda self: (False, None)):
+                for _ in range(12):
+                    self.assertFalse(camera.read()[0])
+                lost = camera.take_status_change()
+                self.assertIn("déconnectée", lost["error"])
+                self.assertEqual(lost["selectedId"], camera.selected_id)
+                # Une seule annonce, et pas de réouverture à chaque image.
+                opened = len(Capture.opened)
+                for _ in range(5):
+                    camera.read()
+                self.assertEqual(len(Capture.opened), opened)
+                self.assertIsNone(camera.take_status_change())
+            # Rebranchée : la tentative suivante la retrouve, sans redémarrer la perception.
+            camera.retry_at = 0
+            ok, frame, _, new_boot = camera.read()
+            self.assertTrue(ok)
+            self.assertEqual(frame.shape[:2], (48, 64))
+            self.assertNotEqual(new_boot, boot)
+            self.assertIsNone(camera.take_status_change()["error"])
+            self.assertTrue(camera.read()[0])
+            # Caméra éteinte volontairement : aucune tentative.
+            camera.disable()
+            opened = len(Capture.opened)
+            for _ in range(15):
+                self.assertFalse(camera.read()[0])
+            self.assertEqual(len(Capture.opened), opened)
+
     def test_detected_face_has_json_serializable_engagement(self):
         import json
         from vision import Vision

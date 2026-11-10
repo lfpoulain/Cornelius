@@ -19,6 +19,10 @@ export default defineConfig({
       CORNELIUS_DATABASE: ':memory:',
       CORNELIUS_ADMIN_PASSWORD: 'admin-browser-test-only-credentials-1234',
       CORNELIUS_LOGIN_RATE_LIMIT: '200',
+      // Le serveur de test reste sur cette machine : ni port ouvert sur le réseau local avec le
+      // mot de passe de test, ni second « Cornelius » annoncé aux satellites de la maison.
+      CORNELIUS_LAN: '0',
+      CORNELIUS_MDNS: '0',
       // Les parcours ne dépendent pas du dépôt cornelius-modules éventuellement cloné à côté :
       // leur seul module externe est celui d'essai du formulaire.
       CORNELIUS_MODULES_DIR: 'tests/e2e/modules',

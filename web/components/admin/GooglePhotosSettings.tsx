@@ -49,7 +49,14 @@ function AlbumPreview({ image }: { image: ScreensaverImage }) {
   );
 }
 
-export function GooglePhotosSettings({ run }: { run: RunAction }) {
+export function GooglePhotosSettings({
+  run,
+  onSourceChange,
+}: {
+  run: RunAction;
+  /** Source choisie, enregistrée ou non : la carte des images locales s’y adapte. */
+  onSourceChange?: (source: Settings['source']) => void;
+}) {
   const load = useCallback(() => api.googlePhotos(), []);
   const resource = useAdminResource(load);
   const [draft, setDraft] = useState<Settings>(DEFAULT_GOOGLE_PHOTOS);
@@ -62,6 +69,7 @@ export function GooglePhotosSettings({ run }: { run: RunAction }) {
       setDraft({ source, albumUrl, refreshMinutes });
     }
   }, [resource.data, dirty]);
+  useEffect(() => onSourceChange?.(draft.source), [draft.source, onSourceChange]);
   useEffect(() => {
     if (busy || dirty) return;
     const timer = setInterval(() => void resource.reload(), 30000);

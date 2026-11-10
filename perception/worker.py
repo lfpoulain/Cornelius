@@ -177,6 +177,11 @@ class Worker:
                 continue
             started = time.monotonic()
             captured, people, engaged, embeddings, health, boot = await asyncio.to_thread(self.frame)
+            # Caméra perdue ou revenue d’elle-même : l’administration le voit.
+            take = getattr(getattr(self, "camera", None), "take_status_change", None)
+            changed = take() if take else None
+            if changed:
+                await socket.send(json.dumps(changed))
             self.sequence += 1
             await socket.send(json.dumps({"type": "observation", "observation": {
                 "schemaVersion": 1, "producerBootId": boot, "sequence": self.sequence,

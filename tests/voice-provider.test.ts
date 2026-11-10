@@ -129,6 +129,32 @@ test('adapter reuses local tool dispatch, returns RPC results and confirms conte
   emit({ type: 'user_transcript', id: 'late', text: 'private', startMs: 0, endMs: 20 });
   assert.equal(events.length, count);
 });
+test('audio sent between "connected" and the returned connection is kept, in order', async () => {
+  const received: Buffer[] = [];
+  let live!: ReturnType<NonNullable<ReturnType<typeof createVoiceGateway>['connect']>>;
+  const frames = [Buffer.from([1, 0]), Buffer.from([2, 0]), Buffer.from([3, 0])];
+  const gateway = createVoiceGateway({
+    connect: async (_config, handler) => {
+      // Comme l’adaptateur Mistral : « connected » part avant que la connexion soit rendue, et
+      // le satellite rejoue alors le son d’avant le mot d’appel.
+      await Promise.resolve();
+      handler({ type: 'connected', id: 'session' });
+      live.sendAudio(frames[0]!);
+      live.sendAudio(frames[1]!);
+      return {
+        audio: (pcm: Buffer) => received.push(pcm),
+        result() {},
+        async update() {},
+        async close() {},
+      } as VoiceConnection;
+    },
+  });
+  live = gateway.connect!(liveConfiguration(), { open() {}, event() {}, failure() {} });
+  await tick();
+  live.sendAudio(frames[2]!);
+  assert.deepEqual(received, frames);
+});
+
 test('late creation is closed when the local session has already ended', async () => {
   let resolve!: (value: VoiceConnection) => void;
   let closes = 0;

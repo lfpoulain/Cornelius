@@ -116,7 +116,7 @@ export function readinessChecklist(input: ReadinessInput): ReadinessItem[] {
           id: 'mirror',
           status: 'todo',
           title: 'Miroir ouvert',
-          detail: 'Ouvrez la page du miroir dans un navigateur, sur l’écran du miroir.',
+          detail: 'Ouvrez la page du miroir dans un navigateur, sur l’écran qui sert de miroir.',
           action: { kind: 'mirror' },
         },
     !state.browserConnected

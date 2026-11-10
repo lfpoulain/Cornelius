@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { SessionState } from '../../../shared/types';
+import type { VoiceProvider } from '../../../shared/voice-provider';
 import type { VoiceUsagePeriod } from '../../../shared/voice-usage';
 import { api } from '../../api';
 import { decimalText, parseDecimal } from './format';
@@ -37,7 +38,16 @@ function line(label: string, period: VoiceUsagePeriod, currency: string) {
  * Temps de conversation par fournisseur. Seul Mistral facture la voix à la minute : le coût
  * estimé ne porte que sur ce temps-là.
  */
-export function VoiceUsageCard({ phase, run }: { phase: SessionState['phase']; run: RunAction }) {
+export function VoiceUsageCard({
+  phase,
+  provider,
+  run,
+}: {
+  phase: SessionState['phase'];
+  /** Fournisseur de la conversation : le prix par minute ne concerne que Mistral. */
+  provider: VoiceProvider | undefined;
+  run: RunAction;
+}) {
   const usage = useAdminResource(api.voiceUsage);
   const saved = usage.data;
   // Une conversation qui se ferme s’ajoute au temps du jour : la carte se met à jour.
@@ -58,15 +68,23 @@ export function VoiceUsageCard({ phase, run }: { phase: SessionState['phase']; r
   const valid = parsed === null || (Number.isFinite(parsed) && parsed >= 0 && parsed <= 10);
   const dirty =
     !!saved && (currency !== saved.currency || (parsed ?? null) !== (saved.perMinute ?? null));
+  // Le prix par minute ne sert qu’avec Mistral : il reste visible tant que du temps Mistral est
+  // compté ou qu’un prix est enregistré, pour pouvoir le corriger ou l’effacer.
+  const metered =
+    provider === 'mistral' ||
+    saved?.perMinute != null ||
+    [saved?.today, saved?.month, saved?.previousMonth].some(
+      (period) => (period?.meteredSeconds ?? 0) > 0,
+    );
   return (
     <Card>
       <CardHeader>
         <CardTitle>Temps de conversation</CardTitle>
         <CardDescription>
-          Durée des conversations vocales, par jour du foyer. Mistral facture la voix à la minute :
-          avec un prix saisi ici, le coût du temps passé avec Mistral est estimé (vérifiez-le chez
-          Mistral). OpenAI facture aux jetons (voix, délégation, recherche web, images) : aucun coût
-          n’est estimé, consultez la console OpenAI.
+          Durée des conversations vocales, par jour du foyer.{' '}
+          {metered
+            ? 'Mistral facture la voix à la minute : avec un prix saisi ici, le coût du temps passé avec Mistral est estimé (vérifiez-le chez Mistral). Le temps passé avec OpenAI, facturé aux jetons, est compté sans coût.'
+            : 'OpenAI facture aux jetons (voix, délégation, recherche web, images) : aucun coût n’est estimé ici, consultez la console OpenAI.'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -79,31 +97,33 @@ export function VoiceUsageCard({ phase, run }: { phase: SessionState['phase']; r
             </div>
           )}
         </ResourceState>
-        <div className="flex flex-wrap gap-4">
-          <Field
-            id="voice-price"
-            label="Prix par minute (Mistral)"
-            help="Vide : pas d’estimation. De 0 à 10."
-            className="max-w-40"
-          >
-            <DecimalInput
+        {metered && (
+          <div className="flex flex-wrap gap-4">
+            <Field
               id="voice-price"
-              value={price}
-              aria-invalid={!valid || undefined}
-              onChange={(event) => setPrice(event.target.value)}
-            />
-          </Field>
-          <Field id="voice-currency" label="Monnaie" className="max-w-28">
-            <NativeSelect
-              id="voice-currency"
-              value={currency}
-              onChange={(event) => setCurrency(event.target.value === '€' ? '€' : '$')}
+              label="Prix par minute (Mistral)"
+              help="Vide : pas d’estimation. De 0 à 10."
+              className="max-w-40"
             >
-              <NativeSelectOption value="$">$</NativeSelectOption>
-              <NativeSelectOption value="€">€</NativeSelectOption>
-            </NativeSelect>
-          </Field>
-        </div>
+              <DecimalInput
+                id="voice-price"
+                value={price}
+                aria-invalid={!valid || undefined}
+                onChange={(event) => setPrice(event.target.value)}
+              />
+            </Field>
+            <Field id="voice-currency" label="Monnaie" className="max-w-28">
+              <NativeSelect
+                id="voice-currency"
+                value={currency}
+                onChange={(event) => setCurrency(event.target.value === '€' ? '€' : '$')}
+              >
+                <NativeSelectOption value="$">$</NativeSelectOption>
+                <NativeSelectOption value="€">€</NativeSelectOption>
+              </NativeSelect>
+            </Field>
+          </div>
+        )}
         <SaveBar
           label="Prix par minute"
           count={dirty ? 1 : 0}

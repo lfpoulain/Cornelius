@@ -53,6 +53,7 @@ export function remainingSteps(items: readonly ReadinessItem[]): number {
 export function GettingStarted({
   items,
   perceptionDiagnostic,
+  lanUrl,
   openaiBlocked,
   onGo,
   onActivateMirror,
@@ -61,6 +62,8 @@ export function GettingStarted({
   items: ReadinessItem[];
   /** Dernière erreur du service caméra, affichée sous son étape. */
   perceptionDiagnostic: string | null;
+  /** Adresse du miroir pour un autre appareil de la maison ; null si le réseau local est fermé. */
+  lanUrl: string | null;
   openaiBlocked: boolean;
   onGo: (section: string) => void;
   /** « Activer et ouvrir le miroir », le même geste que dans le panneau de session. */
@@ -128,10 +131,25 @@ export function GettingStarted({
                   </p>
                   <p className="text-sm leading-relaxed text-muted-foreground">{item.detail}</p>
                   {item.id === 'mirror' && item.status === 'todo' && (
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      Adresse du miroir :{' '}
-                      <code className="font-mono text-xs text-foreground">{location.origin}/</code>
-                    </p>
+                    // Le miroir n’est pas forcément sur cet appareil : sans cela, l’étape laisse
+                    // croire qu’il faut l’ouvrir ici.
+                    <ul className="list-disc space-y-1 pl-5 text-sm leading-relaxed text-muted-foreground">
+                      <li>
+                        <strong className="font-medium text-foreground">Sur cet écran</strong> :
+                        utilisez le bouton.
+                      </li>
+                      <li>
+                        <strong className="font-medium text-foreground">Sur un autre écran</strong>{' '}
+                        (tablette, mini-PC derrière le miroir) : ouvrez-y{' '}
+                        {lanUrl ? (
+                          <code className="font-mono text-xs text-foreground">{lanUrl}/</code>
+                        ) : (
+                          'l’adresse donnée dans « Clés et accès », carte « Accès depuis le réseau local »'
+                        )}
+                        . Il demande une fois le mot de passe administrateur, puis cette étape se
+                        coche d’elle-même.
+                      </li>
+                    </ul>
                   )}
                   {item.id === 'perception' && perceptionDiagnostic && (
                     <p className="text-sm leading-relaxed text-destructive">

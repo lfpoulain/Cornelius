@@ -545,8 +545,11 @@ export class SessionController {
   setBrowserAudioReady(ready: boolean): void {
     if (this.browserAudioReady === ready) return;
     this.browserAudioReady = ready;
-    if (!ready) this.close('Préparation du microphone sur le miroir.');
-    else this.resumeAutomatic();
+    // Une conversation de satellite ne passe pas par le navigateur : recharger le miroir ou
+    // l’ouvrir dans un autre onglet ne la coupe pas (comme dans tick()).
+    if (!ready) {
+      if (!this.satelliteSession()) this.close('Préparation du microphone sur le miroir.');
+    } else this.resumeAutomatic();
     this.publish();
   }
 

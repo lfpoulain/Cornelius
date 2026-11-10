@@ -70,7 +70,7 @@ La carte « Avant la première conversation » (« Tout est prêt » une fois fi
 1. **Clé OpenAI** (ou **Clé Mistral** si Mistral est le fournisseur choisi) : bouton « Saisir la clé », qui ouvre **Clés et accès**, carte **Clés et jetons** (ou `OPENAI_API_KEY`, `MISTRAL_API_KEY` dans `.env`, avec un redémarrage).
 2. **Service caméra (perception)** : le service qui lit la caméra et entend le mot « Cornelius ». S’il est arrêté, relancez Cornelius avec `scripts/start.sh` (`scripts/start.ps1` sous Windows). La raison d’un échec est dans `data/run/logs/perception.err.log`. Bouton « Ouvrir le diagnostic ».
 3. **Caméra choisie** : bouton « Choisir la caméra ». Facultatif si « Cornelius » ouvre la conversation pour tout le monde, sans reconnaissance ni vision locale.
-4. **Miroir ouvert** : l’adresse du miroir est rappelée, avec « Activer et ouvrir le miroir ».
+4. **Miroir ouvert** : sur cet écran, « Activer et ouvrir le miroir » ; si le miroir est un autre écran (tablette, mini-PC derrière le miroir), l’étape donne l’adresse à y ouvrir et se coche d’elle-même dès qu’il s’affiche.
 5. **Voix activée sur le miroir** : le micro et le son autorisés dans le navigateur du miroir.
 6. **Visage enregistré** : nécessaire quand la conversation est réservée aux membres du foyer, facultatif sinon (il permet l’accueil par le prénom). Bouton « Enregistrer un visage ».
 7. **Mot d’appel « Cornelius »** : seulement si le mot « Cornelius » ouvre la conversation. Le modèle doit se trouver dans `models/cornelius.onnx`. Bouton « Guide du mot d’appel ».
@@ -83,7 +83,7 @@ La liste se met à jour d’elle-même. Le parcours complet est décrit dans [Pr
 
 *Pour commencer.* Les clés des services, le mot de passe de cet espace et l’accès depuis les autres appareils de la maison : ce qui se règle une fois, à l’installation.
 
-- **Clés et jetons** : les clés OpenAI, Mistral et mémoire personnalisée, le mot de passe SMTP et les jetons des modules. Une valeur saisie ici compte tout de suite, sans redémarrage, et passe avant celle du fichier `.env` ; l’administration n’en montre ensuite que les quatre derniers caractères. La partie **Mémoire personnalisée** choisit le fournisseur qui extrait les souvenirs (voir [La mémoire](../fonctionnalites/memoire.md#qui-lit-la-conversation)).
+- **Clés et jetons** : les clés OpenAI, Mistral et mémoire personnalisée, le mot de passe SMTP et les jetons des modules. Une valeur saisie ici compte tout de suite, sans redémarrage, et passe avant celle du fichier `.env` ; l’administration n’en montre ensuite que les quatre derniers caractères. La partie **Extraction des souvenirs** choisit qui les extrait après une conversation : OpenAI (par défaut), Mistral ou votre propre serveur, dont l’adresse et le modèle ne sont demandés que dans ce cas (voir [La mémoire](../fonctionnalites/memoire.md#qui-lit-la-conversation)).
 - **Mot de passe administrateur** : le mot de passe de cet espace, 8 caractères au moins. Tant qu’il vaut celui de départ, aucun autre appareil ne peut se connecter.
 - **Accès depuis le réseau local** : l’adresse HTTPS à ouvrir depuis un téléphone ou un autre ordinateur de la maison. Voir [Accès depuis le réseau local](reseau-local.md).
 
@@ -117,7 +117,7 @@ Carte « Voix de Cornelius » :
 
 Carte « Délégation : recherches et actions » : le modèle qui fait les recherches, les cartes et les commandes. « Normal », « Rapide » (par défaut) ou « Ultra rapide ». Changer de mode pendant une conversation la termine, après confirmation. « Ultra rapide » ne fonctionne pas si votre compte OpenAI garde ses données en Europe. La liste « Modèle de délégation » vaut « Selon le mode » par défaut (GPT-6 Luna, ou GPT-6 Astra en ultra rapide) ; elle propose aussi `gpt-6-luna`, `gpt-6-astra` et, après « Charger la liste », les modèles du serveur Live (`GET /models`). Un modèle choisi remplace celui du mode, la vitesse et le raisonnement du mode restant appliqués ; le changer pendant une conversation la termine, après confirmation. Cette carte n’apparaît pas avec Mistral.
 
-Carte « Temps de conversation » : les minutes et les conversations d’aujourd’hui, du mois et du mois précédent, mises à jour à chaque fermeture. Un coût n’est estimé que pour le temps passé avec Mistral, facturé à la minute, et seulement si son prix par minute est saisi.
+Carte « Temps de conversation » : les minutes et les conversations d’aujourd’hui, du mois et du mois précédent, mises à jour à chaque fermeture. Un coût n’est estimé que pour le temps passé avec Mistral, facturé à la minute, et seulement si son prix par minute est saisi : le champ « Prix par minute (Mistral) » n’apparaît qu’avec Mistral, ou tant que du temps Mistral ou un prix reste enregistré.
 
 ## Personnaliser Cornelius
 
@@ -214,7 +214,7 @@ Voir [Ouverture et présence](../fonctionnalites/ouverture-et-presence.md).
 *Le miroir.* La taille de l’orbe, et les images affichées quand personne n’est devant le miroir. Voir [L’écran de veille](miroir.md#lécran-de-veille).
 
 - **Taille de l’orbe** : de 50 à 150 % de sa taille d’origine, appliquée en direct sur le miroir ; « Revenir à 100 % » la remet à l’origine.
-- **Source des images** permet de choisir les images locales ou un [album Google Photos partagé](../fonctionnalites/google-photos.md). Collez le lien obtenu par **Partager → Créer un lien**, réglez la fréquence et enregistrez pour vérifier l’accès et afficher l’aperçu. Cette connexion expérimentale ne nécessite ni clé API ni accès à votre compte Google ; les photos restent sur Google. Les grands albums peuvent être incomplets.
+- **Source des images** permet de choisir les images locales ou un [album Google Photos partagé](../fonctionnalites/google-photos.md). Collez le lien obtenu par **Partager → Créer un lien**, réglez la fréquence et enregistrez pour vérifier l’accès et afficher l’aperçu. Cette connexion expérimentale ne nécessite ni clé API ni accès à votre compte Google ; les photos restent sur Google. Les grands albums peuvent être incomplets. Avec l’album, la carte des images devient « Images locales de secours », repliée : elles ne s’affichent que si l’album est indisponible.
 - **Afficher des images au repos** : désactivé par défaut. Sans image, l’écran reste noir.
 - **L’orbe revient** : « Au moindre mouvement » (par défaut) ou « Selon le réveil de Cornelius », qui suit ce qui ouvre la conversation (présence, regard ou mot « Cornelius », réglés dans « Quand il écoute »). La carte dit ce que cela donne avec vos réglages.
 - **Transition** : « Aspiration » (par défaut), « Cendres », « Onde », « Mosaïque », « Rideau », « Fondu », « Au hasard » ou « Sans transition ».

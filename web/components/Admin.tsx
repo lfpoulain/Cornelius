@@ -578,6 +578,7 @@ export function Admin({
                     <GettingStarted
                       items={readiness}
                       perceptionDiagnostic={devices?.perception.diagnostic ?? null}
+                      lanUrl={devices?.network?.lan ? (devices.network.urls[0] ?? null) : null}
                       openaiBlocked={state.openaiBlocked}
                       onGo={goTo}
                       onActivateMirror={() =>
@@ -610,7 +611,11 @@ export function Admin({
                     <DelegationSettings state={state} run={run} />
                   )}
                   {section === 'assistant' && (
-                    <VoiceUsageCard phase={state.session.phase} run={run} />
+                    <VoiceUsageCard
+                      phase={state.session.phase}
+                      provider={state.voiceProvider}
+                      run={run}
+                    />
                   )}
                   {(section === 'voice' || section === 'camera' || section === 'audio') && (
                     <Devices section={section} state={state} status={devices} run={run} />

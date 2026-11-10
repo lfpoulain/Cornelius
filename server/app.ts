@@ -153,8 +153,20 @@ const nameSchema = compile<{ name: string }>({
 /** Jeton des déclencheurs externes (Home Assistant, baguette, bouton). */
 const TRIGGER_TOKEN_SECRET = 'CORNELIUS_TRIGGER_TOKEN';
 /** Routes appelées par une machine avec un jeton : ni cookie ni en-tête Origin. */
-function triggerRoute(url: string): boolean {
-  return url.split('?')[0]!.startsWith('/api/trigger/');
+function triggerRoute(path: string): boolean {
+  return path.startsWith('/api/trigger/');
+}
+/**
+ * Chemin tel que le routeur le comprend : sans la requête, et décodé. Le routeur décode les
+ * `%xx` avant de chercher la route (`/%61pi/state` est servi par `/api/state`) : un contrôle
+ * fait sur l'adresse brute se contourne. Null : encodage invalide.
+ */
+export function requestPath(url: string): string | null {
+  try {
+    return decodeURIComponent(url.split('?')[0]!);
+  } catch {
+    return null;
+  }
 }
 function equalSecret(input: string, expected: string): boolean {
   return timingSafeEqual(
@@ -728,14 +740,14 @@ export async function createApp(
   const lanPairingMessage =
     'Appareil non autorisé : connectez-vous une fois avec le mot de passe administrateur pour en faire un miroir.';
   /** Pages, fichiers de l'interface et connexion : servis à tout appareil du réseau local. */
-  function lanPublic(url: string): boolean {
-    const path = url.split('?')[0]!;
+  function lanPublic(path: string): boolean {
     if (['/api/health', '/api/auth', '/api/login', '/api/logout'].includes(path)) return true;
     return !(
       path.startsWith('/api/') ||
       path.startsWith('/events') ||
       path.startsWith('/audio') ||
       path.startsWith('/wake-audio') ||
+      path.startsWith('/voice-audio') ||
       path.startsWith('/camera-stream')
     );
   }
@@ -759,17 +771,20 @@ export async function createApp(
       return reply.code(403).send({ error: 'Accès réservé au réseau local.' });
     if (!allowedHostname(request.hostname, lan, config.allowedHosts ?? []))
       return reply.code(403).send({ error: 'Hôte non autorisé.' });
+    // Tous les contrôles ci-dessous lisent le chemin décodé, celui que le routeur servira.
+    const path = requestPath(request.url);
+    if (path === null) return reply.code(400).send({ error: 'Adresse invalide.' });
     // La perception et le générateur d'images tournent sur la machine : jamais par le réseau.
     if (
-      (request.url.startsWith('/perception') || request.url.startsWith('/image-generation')) &&
+      (path.startsWith('/perception') || path.startsWith('/image-generation')) &&
       !fromLoopback(request)
     )
       return reply.code(403).send({ error: 'Réservé à cet ordinateur.' });
     // Déclencheurs externes (Home Assistant) : leur jeton remplace cookie et origine.
-    if (triggerRoute(request.url)) return;
+    if (triggerRoute(path)) return;
     // Le miroir n'a pas de mot de passe sur la machine. Depuis un autre appareil, ses données
     // (état, son, événements) demandent une session d'administration ou un appareil autorisé.
-    if (!fromMachine(request) && !lanPublic(request.url) && !lanAuthorized(request))
+    if (!fromMachine(request) && !lanPublic(path) && !lanAuthorized(request))
       return reply.code(401).send({ error: lanPairingMessage });
     const origin = request.headers.origin;
     const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
@@ -778,11 +793,12 @@ export async function createApp(
     if (
       (origin && !config.origins.includes(origin) && !sameOrigin) ||
       ((mutation ||
-        request.url.startsWith('/events') ||
-        request.url.startsWith('/perception') ||
-        request.url.startsWith('/audio') ||
-        request.url.startsWith('/wake-audio') ||
-        request.url.startsWith('/camera-stream')) &&
+        path.startsWith('/events') ||
+        path.startsWith('/perception') ||
+        path.startsWith('/audio') ||
+        path.startsWith('/wake-audio') ||
+        path.startsWith('/voice-audio') ||
+        path.startsWith('/camera-stream')) &&
         !origin)
     ) {
       return reply.code(403).send({ error: 'Origine non autorisée.' });

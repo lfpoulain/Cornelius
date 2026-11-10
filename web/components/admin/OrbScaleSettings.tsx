@@ -55,7 +55,7 @@ export function OrbScaleSettings({ state, run }: { state: MirrorState; run: RunA
           </output>
         </div>
         {value !== 100 && (
-          <Button variant="ghost" size="sm" onClick={() => save(100)}>
+          <Button variant="outline" size="sm" onClick={() => save(100)}>
             Revenir à 100 %
           </Button>
         )}

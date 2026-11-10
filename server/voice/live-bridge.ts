@@ -29,6 +29,9 @@ function connectionErrorMessage(error: unknown): string {
     : 'Connexion à la session vocale Mistral impossible.';
 }
 /** Compatibility boundary: existing authorization, tool dispatch and card handling stay local. */
+/** Trames gardées entre « connected » et la connexion rendue : le son d’avant le mot, rejoué. */
+const EARLY_AUDIO_FRAMES = 128;
+
 export function createVoiceGateway(adapter: VoiceProviderAdapter): LiveGateway {
   return {
     provider: 'mistral',
@@ -185,6 +188,7 @@ export function createVoiceGateway(adapter: VoiceProviderAdapter): LiveGateway {
             break;
         }
       };
+      const early: Buffer[] = [];
       const ready = adapter
         .connect(config, onEvent)
         .then(async (value) => {
@@ -193,6 +197,7 @@ export function createVoiceGateway(adapter: VoiceProviderAdapter): LiveGateway {
             return;
           }
           connection = value;
+          for (const pcm of early.splice(0)) value.audio(pcm);
         })
         .catch((error: unknown) => {
           if (!disposed) {
@@ -208,7 +213,10 @@ export function createVoiceGateway(adapter: VoiceProviderAdapter): LiveGateway {
         });
       return {
         sendAudio(pcm) {
-          connection?.audio(pcm);
+          // L’adaptateur annonce « connected » avant de rendre la connexion : le son rejoué à ce
+          // moment (une question dite d’une traite sur un satellite) attend ici, borné.
+          if (connection) connection.audio(pcm);
+          else if (!disposed && early.length < EARLY_AUDIO_FRAMES) early.push(pcm);
         },
         send(raw) {
           const event = record(raw);

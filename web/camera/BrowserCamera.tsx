@@ -115,15 +115,28 @@ export function BrowserCamera({
         0.7,
       );
     };
-    void (async () => {
+    // Reprise : une webcam débranchée puis rebranchée, ou occupée au démarrage du miroir, est
+    // rouverte toute seule (2 s, puis de plus en plus rarement). Sans cela, la présence restait
+    // indisponible jusqu’au rechargement de la page.
+    let reopen: ReturnType<typeof setTimeout> | undefined;
+    let reopenMs = 2000;
+    let started = false;
+    let reported: string | null = null;
+    const report = (error: unknown) => {
+      const text = error instanceof Error ? error.message : String(error);
+      // Une seule ligne au journal par cause, pas une par tentative.
+      if (text === reported) return;
+      reported = text;
+      reportDiagnostic('error', 'caméra du navigateur du miroir', error);
+    };
+    const later = () => {
+      clearTimeout(reopen);
+      reopen = setTimeout(() => void open(), reopenMs);
+      reopenMs = Math.min(reopenMs * 2, 30_000);
+    };
+    const open = async () => {
+      if (disposed) return;
       try {
-        if (!window.isSecureContext)
-          throw new Error(
-            'Caméra du miroir indisponible : ouvrez le miroir en HTTPS ou sur localhost.',
-          );
-        if (!navigator.mediaDevices?.getUserMedia)
-          throw new Error('Ce navigateur ne permet pas l’accès à la caméra.');
-        if (!context) throw new Error('Impossible de préparer les images de la caméra du miroir.');
         const captured = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: {
@@ -134,30 +147,50 @@ export function BrowserCamera({
         });
         if (disposed) return void captured.getTracks().forEach((track) => track.stop());
         stream = captured;
-        for (const track of captured.getVideoTracks()) track.onended = release;
+        for (const track of captured.getVideoTracks())
+          track.onended = () => {
+            if (disposed || stream !== captured) return;
+            release();
+            later();
+          };
         video.srcObject = captured;
         await video.play();
-        if (!disposed) {
+        if (disposed) return;
+        reopenMs = 2000;
+        reported = null;
+        if (!started) {
+          started = true;
           connect();
           tick();
         }
       } catch (error) {
-        if (!disposed) {
-          const message =
-            error instanceof Error && error.name === 'NotAllowedError'
-              ? new Error(
-                  'Accès à la caméra refusé : autorisez la caméra dans le navigateur du miroir.',
-                )
-              : error;
-          reportDiagnostic('error', 'caméra du navigateur du miroir', message);
-          release();
-        }
+        if (disposed) return;
+        release();
+        // Un refus ne se lève pas tout seul : l’autorisation se donne dans le navigateur.
+        if (error instanceof Error && ['NotAllowedError', 'SecurityError'].includes(error.name))
+          return report(
+            new Error(
+              'Accès à la caméra refusé : autorisez la caméra dans le navigateur du miroir.',
+            ),
+          );
+        report(error);
+        later();
       }
-    })();
+    };
+    if (!window.isSecureContext)
+      report(
+        new Error('Caméra du miroir indisponible : ouvrez le miroir en HTTPS ou sur localhost.'),
+      );
+    else if (!navigator.mediaDevices?.getUserMedia)
+      report(new Error('Ce navigateur ne permet pas l’accès à la caméra.'));
+    else if (!context)
+      report(new Error('Impossible de préparer les images de la caméra du miroir.'));
+    else void open();
     return () => {
       disposed = true;
       clearTimeout(timer);
       clearTimeout(retry);
+      clearTimeout(reopen);
       clearTimeout(connectTimer);
       socket?.close();
       release();

@@ -131,6 +131,11 @@ test('satellite : session Live sur WebSocket, voix seule, sans navigateur ni cam
   assert.equal(f.controller.snapshot().state.activeProfile, null);
   f.advance(6000);
   assert.equal(f.controller.sessionState().phase, 'ready');
+  // Le miroir est rechargé ou ouvert dans un autre onglet : la conversation du bureau continue.
+  f.controller.setBrowserAudioReady(true);
+  f.controller.setBrowserAudioReady(false);
+  assert.equal(f.controller.sessionState().phase, 'ready');
+  assert.deepEqual(f.controller.sessionState().satellite, bureau);
 });
 
 test('satellite : son relayé, semi-duplex pendant que Cornelius parle', (t) => {

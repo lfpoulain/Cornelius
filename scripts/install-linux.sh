@@ -149,6 +149,14 @@ fi
 # --- Accélération de la vision locale (ONNX Runtime) -----------------------------------
 step "Vision locale : moteur ONNX"
 has_nvidia() { command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; }
+# Les paquets onnxruntime, onnxruntime-gpu et onnxruntime-migraphx écrivent dans le même dossier.
+# Sur une installation relancée, requirements.txt remet la version processeur par-dessus la
+# version GPU ; la désinstaller efface alors les fichiers communs, et pip croit la version GPU
+# déjà en place. Si le moteur ne se charge plus, on le remet de force, sans ses dépendances.
+repair_onnx() {
+  .venv/bin/python -c 'import onnxruntime' >/dev/null 2>&1 && return 0
+  .venv/bin/python -m pip install --disable-pip-version-check --force-reinstall --no-deps "$@"
+}
 if [ "$arch" = arm64 ] && [ "$gpu" != auto ] && [ "$gpu" != cpu ]; then
   die "--gpu $gpu n’est pas proposé en ARM64 : la vision locale y tourne sur le processeur."
 fi
@@ -159,6 +167,7 @@ case "$gpu" in
   nvidia)
     .venv/bin/python -m pip uninstall -y onnxruntime onnxruntime-migraphx >/dev/null 2>&1 || true
     .venv/bin/python -m pip install --disable-pip-version-check -r perception/requirements-gpu.txt
+    repair_onnx "$(sed -n 's/^\(onnxruntime-gpu\)\[[^]]*\]\(==.*\)$/\1\2/p' perception/requirements-gpu.txt | head -n 1)"
     ;;
   amd)
     [ -d /opt/rocm ] || die "ROCm est absent (/opt/rocm) : installez-le d’abord (docs/installation/gpu.md)."
@@ -167,6 +176,7 @@ gardez --gpu cpu pour la vision et utilisez ROCm pour la génération d’images
     .venv/bin/python -m pip uninstall -y onnxruntime onnxruntime-gpu >/dev/null 2>&1 || true
     .venv/bin/python -m pip install --disable-pip-version-check onnxruntime-migraphx \
       -f "https://repo.radeon.com/rocm/manylinux/rocm-rel-$ROCM_RELEASE/"
+    repair_onnx onnxruntime-migraphx -f "https://repo.radeon.com/rocm/manylinux/rocm-rel-$ROCM_RELEASE/"
     ;;
   cpu)
     if [ "$small" = 1 ]; then echo "Vision locale désactivée sur cette machine."
