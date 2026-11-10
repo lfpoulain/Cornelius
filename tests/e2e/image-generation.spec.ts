@@ -1,9 +1,10 @@
 import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
-import type {
-  DevicesStatus,
-  ImageGenerationModel,
-  ModelDownload,
-  StateEvent,
+import {
+  IMAGE_GENERATION_MODELS,
+  type DevicesStatus,
+  type ImageGenerationModel,
+  type ModelDownload,
+  type StateEvent,
 } from '../../shared/types';
 import { origin, screenshots } from './env';
 
@@ -121,7 +122,11 @@ test('image : choisir ne télécharge rien, installer se confirme, progresse, é
   const fake: Parameters<typeof fakeImageGeneration>[1] = {
     model: 'flux2-klein-4b',
     enabled: false,
-    installations: {},
+    // Tous les modèles absents, quoi que contienne ce poste : un modèle déjà installé dans
+    // models/ ne doit pas changer le parcours.
+    installations: Object.fromEntries(
+      IMAGE_GENERATION_MODELS.map((model) => [model, download('missing')]),
+    ),
   };
   const publish = await fakeImageGeneration(page, fake);
   await page.route('**/api/admin/image-generation', async (route) => {

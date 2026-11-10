@@ -34,7 +34,13 @@ test('vision : choisir ne télécharge rien, installer se confirme, progresse, �
     modelId: '450m',
     device: 'auto',
     mode: 'scene',
-    downloads: { '450m': download('missing'), '3b': download('present', { variant: 'gpu' }) },
+    // Les trois modèles sont fixés, quoi que contienne ce poste : un modèle déjà installé dans
+    // models/ ne doit pas changer le parcours.
+    downloads: {
+      '450m': download('missing'),
+      '1.6b': download('missing'),
+      '3b': download('present', { variant: 'gpu' }),
+    },
   };
   let socket: WebSocketRoute | undefined;
   let last: { status: DevicesStatus } | null = null;
