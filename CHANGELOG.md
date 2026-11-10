@@ -6,6 +6,17 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-12 : satellite Android
+
+**Ajouté**
+
+- Page [Le satellite Android](docs/fonctionnalites/satellite-android.md) : un téléphone comme satellite vocal, voix seule, mot d’appel calculé sur le téléphone. L’application est tierce, séparée du dépôt, et ne demande aucun changement du serveur ; la page l’annonce dès son en-tête.
+- L’accès hors du réseau local par un tunnel WireGuard : un seul port UDP ouvert, une adresse privée présentée à Cornelius, et les quatre pièges de la double redirection.
+
+**Modifié**
+
+- [Les satellites audio](docs/fonctionnalites/satellites.md) et [la documentation](docs/README.md) renvoient vers la page du satellite Android.
+
 ### 2026-11-11 : installation des modules et mises à jour
 
 **Ajouté**

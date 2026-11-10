@@ -16,6 +16,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 | réussir le premier lancement | [Premier démarrage](installation/premier-demarrage.md) |
 | choisir ce qui ouvre la conversation | [Ouverture et présence](fonctionnalites/ouverture-et-presence.md), [Mot d’appel](fonctionnalites/mot-d-appel.md) |
 | parler à Cornelius depuis une autre pièce | [Les satellites audio](fonctionnalites/satellites.md) |
+| utiliser mon téléphone comme satellite | [Le satellite Android](fonctionnalites/satellite-android.md) |
 | ajouter la météo, les transports ou une commande | [Les modules](modules/README.md) |
 | recevoir une image du miroir sur mon téléphone | [L’envoi par e-mail](fonctionnalites/envoi-par-e-mail.md) |
 | régler un réveil, un minuteur ou un rappel | [Les alarmes et les rappels](fonctionnalites/alarmes-et-rappels.md) |
@@ -46,6 +47,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 - [Ouverture et présence](fonctionnalites/ouverture-et-presence.md) : ce qui ouvre, fait durer et ferme une conversation.
 - [Le mot d’appel](fonctionnalites/mot-d-appel.md) : ouvrir la conversation en disant « Cornelius ».
 - [Les satellites audio](fonctionnalites/satellites.md) : un micro et un haut-parleur dans une autre pièce, installés et associés sans saisie.
+- [Le satellite Android](fonctionnalites/satellite-android.md) : un téléphone comme satellite vocal, y compris hors du réseau local.
 - [La personnalité](fonctionnalites/personnalite.md) : le caractère de Cornelius et les repères de chaque personne.
 - [La mémoire](fonctionnalites/memoire.md) : ce que Cornelius retient et comment le gérer.
 - [La vision locale](fonctionnalites/vision-locale.md) : décrire ce qui se trouve devant le miroir, sans envoyer d’image.

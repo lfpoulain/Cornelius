@@ -100,6 +100,7 @@ Le journal de Cornelius (rubrique **Journal**) note la connexion de chaque satel
 ## Voir aussi
 
 - [Le protocole des satellites](../developpement/satellites-protocole.md)
+- [Le satellite Android](satellite-android.md)
 - [Le mot d’appel](mot-d-appel.md)
 - [Ouverture et présence](ouverture-et-presence.md)
 - [Accès depuis le réseau local](../utilisation/reseau-local.md)
