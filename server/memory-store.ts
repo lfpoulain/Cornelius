@@ -245,7 +245,6 @@ export class MemoryRepository {
       if (!policy?.enabled || policy.version !== stored.version)
         return reject('Politique ou version mémoire modifiée.');
       if (!validators.memoryChanges(proposal)) return reject('Proposition hors contrat.');
-      const changes = proposal.changes;
       const evidence = new Map(
         turns
           .filter(
@@ -257,6 +256,20 @@ export class MemoryRepository {
           .map((turn) => [turn.id, turn]),
       );
       const existing = new Map(this.list(stored.profileId).map((fact) => [fact.id, fact]));
+      const anywhere = this.db.prepare('SELECT 1 FROM memories WHERE id = ?');
+      // Les petits modèles locaux confondent souvent ajout et correction : un « update » vers un
+      // identifiant inventé, ou un « add » qui en porte un. Sans souvenir à viser, c'est un ajout ;
+      // un oubli sans souvenir n'a rien à faire. Un identifiant connu, de ce profil ou d'un autre,
+      // garde la vérification stricte ci-dessous, et chaque fait reste soumis à ses preuves.
+      const changes = proposal.changes.flatMap((change) => {
+        if (
+          change.memoryId !== null &&
+          (existing.has(change.memoryId) || anywhere.get(change.memoryId))
+        )
+          return [change];
+        if (change.operation === 'forget') return [];
+        return [{ ...change, operation: 'add' as const, memoryId: null }];
+      });
       const touched = new Set<string>();
       for (const change of changes) {
         if (change.evidenceTurnIds.some((id) => !evidence.has(id)))
