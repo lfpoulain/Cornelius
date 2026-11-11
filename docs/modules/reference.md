@@ -259,14 +259,17 @@ Adaptez la correspondance aux statuts réels du fournisseur. `retryable` informe
 | Champ | Limite |
 | --- | --- |
 | `title` | 1 à 80 caractères |
+| `icon` | Facultatif : icône de la valeur principale, un nom de `cardIcons` |
 | `primaryValue` | `null` ou 1 à 120 caractères |
 | `subtitle` | `null` ou 1 à 120 caractères |
 | `description` | `null` ou 1 à 500 caractères |
-| `items` | 5 lignes `{ label, value }` au plus ; 1 à 80 et 1 à 160 caractères |
+| `items` | 5 lignes `{ label, value, icon? }` au plus ; 1 à 80 et 1 à 160 caractères ; `icon` facultatif, devant le libellé |
 | `sources` | Facultatif ; 3 chaînes distinctes au plus, de 1 à 128 caractères ; les modules fournis y mettent leur `id` |
 | `summary` | 1 à 500 caractères : des faits courts à dire, pas une consigne au modèle |
 
-Un champ vide vaut `null`, jamais `''`. Aucun HTML, code ou instruction : du texte et des faits. L’oral et la carte DOIVENT venir du même relevé. Un relevé `stale` DEVRAIT être annoncé comme « dernier relevé connu ».
+Un champ vide vaut `null`, jamais `''`. Aucun HTML, code ou instruction : du texte et des faits.
+
+Les icônes (`icon`) viennent d’une liste fermée, `cardIcons` de `#cornelius/addons` (noms Lucide : météo et alertes, par exemple `sun`, `cloud-rain`, `snowflake`, `thermometer`, `triangle-alert`). Elles sont décoratives : le texte qui suit DOIT dire la même chose, et l’oral (`summary`) ne les cite pas. Un nom hors de la liste rend la carte non conforme. Un module qui veut aussi fonctionner sur un cœur plus ancien vérifie que `cardIcons` existe avant d’en envoyer une (un cœur qui ne connaît pas `icon` refuse la carte). L’oral et la carte DOIVENT venir du même relevé. Un relevé `stale` DEVRAIT être annoncé comme « dernier relevé connu ».
 
 Le cœur ajoute `schemaVersion`, `cardType`, `addonId`, `instanceRef`, `snapshotId` et `stale`, puis vérifie la carte. **En cas de refus** (champ trop long, trop de lignes, chaîne vide) ou si `present` lève une exception, l’outil échoue en `malformed` et Cornelius dit « Données reçues mais illisibles. ». Le journal note « Carte de module non conforme » avec les premières erreurs, ou « Présentation de carte impossible ». Le miroir garde trois cartes au plus.
 
@@ -278,9 +281,10 @@ Le cœur ajoute `schemaVersion`, `cardType`, `addonId`, `instanceRef`, `snapshot
 | --- | --- |
 | `layout` | `'metric'` (une valeur en grand) ou `'list'` (des lignes) |
 | `title` | 1 à 80 caractères |
+| `icon` | Facultatif : icône de la valeur, un nom de `cardIcons` |
 | `value` | `null` ou 1 à 120 caractères |
 | `subtitle` | `null` ou 1 à 120 caractères |
-| `items` | 3 lignes `{ label, value }` au plus ; 1 à 80 et 1 à 160 caractères |
+| `items` | 3 lignes `{ label, value, icon? }` au plus ; 1 à 80 et 1 à 160 caractères ; `icon` facultatif |
 | `showCollectedAt` | Facultatif, vrai par défaut ; faux masque la date du relevé (utile pour un calcul local comme l’heure), sauf en repli |
 | `refreshAt` | Facultatif : instant ISO 8601 où cette présentation cesse d’être juste sans nouvelle collecte |
 
@@ -464,6 +468,7 @@ Les mêmes exports qu’avant restent disponibles : `validateAddonDefinition`, `
 
 | Cornelius | Ajouts compatibles v1 |
 | --- | --- |
+| Prochaine version | Icônes des cartes et de l’affichage permanent : `icon` sur la valeur et sur les lignes, liste `cardIcons` |
 | 0.2.0 | `display` ; `arguments` des outils et `context.args` ; `context.timeZone` ; `refreshAt` de l’affichage permanent ; présentation d’un relevé vide ; fraîcheur jusqu’à 24 heures ; client HTTP : redirections, encodage, `truncated`, `url`, User-Agent, `cacheMs` ; formulaire : listes déroulantes et listes répétées ; `clearLabel` ; `createTestModule` |
 | 0.1.0 | Contrat v1, outil à la demande (`query`), secrets, recherche assistée, affichage permanent, `minCoreVersion` |
 

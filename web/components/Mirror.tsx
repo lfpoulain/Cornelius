@@ -6,6 +6,7 @@ import type { MirrorConnection } from '../useMirror';
 import { BrowserCamera } from '../camera/BrowserCamera';
 import { Orb } from './Orb';
 import { AmbientModules } from './AmbientModules';
+import { CardIconView } from './card-icons';
 import { AlarmRinging } from './AlarmRinging';
 import { AlarmBand } from './AlarmBand';
 import { Screensaver, type ScreensaverScene } from './Screensaver';
@@ -612,14 +613,24 @@ const Card = memo(function Card({
         </header>
 
         <div className="card-body">
-          {content.primaryValue && <p className="card-value">{content.primaryValue}</p>}
+          {content.primaryValue && (
+            <p className="card-value">
+              {content.cardType === 'module' && content.icon && (
+                <CardIconView name={content.icon} />
+              )}
+              {content.primaryValue}
+            </p>
+          )}
           {content.subtitle && <p className="card-subtitle">{content.subtitle}</p>}
           {content.description && <p className="card-description">{content.description}</p>}
           {content.items.length > 0 && (
             <dl className="card-items">
               {content.items.map((item, index) => (
                 <div key={`${item.label}-${index}`}>
-                  <dt>{item.label}</dt>
+                  <dt>
+                    {'icon' in item && item.icon && <CardIconView name={item.icon} />}
+                    {item.label}
+                  </dt>
                   <dd>{item.value}</dd>
                 </div>
               ))}

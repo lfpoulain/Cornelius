@@ -19,6 +19,10 @@
       "minLength": 1,
       "maxLength": 80
     },
+    "icon": {
+      "description": "Icône facultative de la valeur (liste cardIcons du contrat).",
+      "enum": ["cloud", "cloud-drizzle", "cloud-fog", "cloud-hail", "cloud-lightning", "cloud-moon", "cloud-moon-rain", "cloud-rain", "cloud-snow", "cloud-sun", "cloud-sun-rain", "droplets", "haze", "moon", "snowflake", "sun", "sunrise", "sunset", "thermometer", "thermometer-snowflake", "thermometer-sun", "tornado", "triangle-alert", "umbrella", "wind"]
+    },
     "value": {
       "type": ["string", "null"],
       "minLength": 1,
@@ -46,7 +50,8 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 160
-          }
+          },
+          "icon": { "$ref": "#/properties/icon" }
         }
       }
     }

@@ -1,3 +1,4 @@
+import { CardIconView } from './card-icons';
 import { useEffect, useMemo, useState } from 'react';
 import type { AmbientDisplay } from '../../shared/addons';
 import { ambientProfile } from '../../shared/ambient';
@@ -62,13 +63,21 @@ export function AmbientModules({ state, now }: { state: MirrorState; now: number
             {/* Un seul en-tête : le nom choisi pour cette source (« Météo maison »), plus précis
                 que le titre générique du module (« Météo »). */}
             <h2 className="ambient-heading">{display.label}</h2>
-            {content?.value && <p className="ambient-value">{content.value}</p>}
+            {content?.value && (
+              <p className="ambient-value">
+                {content.icon && <CardIconView name={content.icon} />}
+                {content.value}
+              </p>
+            )}
             {content?.subtitle && <p className="ambient-subtitle">{content.subtitle}</p>}
             {!!content?.items.length && (
               <dl className="ambient-items">
                 {content.items.map((item, index) => (
                   <div key={index}>
-                    <dt>{item.label}</dt>
+                    <dt>
+                      {item.icon && <CardIconView name={item.icon} />}
+                      {item.label}
+                    </dt>
                     <dd>{item.value}</dd>
                   </div>
                 ))}
