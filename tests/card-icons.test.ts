@@ -88,3 +88,11 @@ test('une icône rendue par present() arrive dans la carte et l’affichage perm
   const ordinaire = await sans.read();
   assert.equal(ordinaire.ok && 'icon' in ordinaire.card, false);
 });
+
+test('la référence du contrat documente chaque nom de cardIcons', () => {
+  const reference = readFileSync(new URL('../docs/modules/reference.md', import.meta.url), 'utf8');
+  const debut = reference.indexOf('### Les icônes des cartes');
+  assert.ok(debut > 0, 'section « Les icônes des cartes »');
+  const section = reference.slice(debut, reference.indexOf('\n## ', debut));
+  for (const nom of cardIcons) assert.ok(section.includes(`\`${nom}\``), nom);
+});
