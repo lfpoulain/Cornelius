@@ -1,4 +1,4 @@
-import type { ToolResult } from '../shared/addons.js';
+import { toolResult, type ToolResult } from '../shared/addons.js';
 import type { SatelliteHub } from './satellites.js';
 import type { SatelliteStore } from './satellites-store.js';
 
@@ -23,13 +23,8 @@ export const satelliteVolumeTool = {
 };
 
 function result(status: ToolResult['status'], summary: string, level: number | null): ToolResult {
-  return {
-    schemaVersion: 1,
-    status,
+  return toolResult(status, summary, {
     result: level === null ? null : { level },
-    snapshotId: null,
-    actionRunId: null,
-    summary,
     error:
       status === 'succeeded'
         ? null
@@ -38,7 +33,7 @@ function result(status: ToolResult['status'], summary: string, level: number | n
             message: summary,
             retryable: false,
           },
-  };
+  });
 }
 
 /**

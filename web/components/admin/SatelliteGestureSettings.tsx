@@ -11,11 +11,20 @@ import {
 } from '../../../shared/satellite-gestures';
 import { Button } from '../ui/button';
 import type { RunAction } from './types';
+import { useUnsavedChanges } from './unsaved';
 
 export function SatelliteGestureSettings({ id, run }: { id: string; run: RunAction }) {
   const [config, setConfig] = useState<GestureConfig>(defaultGestureConfig);
   const [loaded, setLoaded] = useState(false);
   const [dirty, setDirty] = useState(false);
+  // Quitter la rubrique avec des gestes non enregistrés demande confirmation.
+  useUnsavedChanges(dirty);
+  // Dernière configuration affichée, pour savoir au retour d’un enregistrement si elle a
+  // encore changé entre-temps.
+  const latest = useRef(config);
+  useEffect(() => {
+    latest.current = config;
+  }, [config]);
   const [status, setStatus] = useState('');
   const [lights, setLights] = useState<{ id: string; name: string }[]>([]);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -65,7 +74,10 @@ export function SatelliteGestureSettings({ id, run }: { id: string; run: RunActi
           if (!disposed) setStatus('Réglages des gestes indisponibles.');
         });
     load();
-    const timer = setInterval(load, 2000);
+    // Onglet masqué : personne ne lit l’état, la relecture attend son retour.
+    const timer = setInterval(() => {
+      if (!document.hidden) load();
+    }, 2000);
     return () => {
       disposed = true;
       clearInterval(timer);
@@ -205,16 +217,19 @@ export function SatelliteGestureSettings({ id, run }: { id: string; run: RunActi
         <Button
           type="button"
           disabled={!loaded || !dirty}
-          onClick={() =>
+          onClick={() => {
+            const sent = config;
             void run('Associations de gestes enregistrées.', () =>
               request(`/api/admin/satellites/${id}/gestures`, {
                 method: 'PUT',
-                body: JSON.stringify(config),
+                body: JSON.stringify(sent),
               }),
             ).then((ok) => {
-              if (ok) setDirty(false);
-            })
-          }
+              // Une modification faite pendant l’envoi reste à enregistrer : sans cela la
+              // relecture suivante la remplacerait par ce qui vient d’être envoyé.
+              if (ok && latest.current === sent) setDirty(false);
+            });
+          }}
         >
           Enregistrer les gestes
         </Button>

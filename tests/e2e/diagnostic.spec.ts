@@ -1,12 +1,5 @@
-import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
-
-async function login(page: Page, path = '/admin') {
-  await page.goto(path);
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
-}
+import { test, expect, type WebSocketRoute } from '@playwright/test';
+import { login } from './env';
 
 test('le diagnostic montre la santé des sources et le journal des actions', async ({ page }) => {
   await login(page);

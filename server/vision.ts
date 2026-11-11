@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import lookSchema from '../schemas/vision-look.schema.json' with { type: 'json' };
 import { compile } from '../shared/validation.js';
 import type { DatabaseSync } from 'node:sqlite';
-import type { ToolResult } from '../shared/addons.js';
+import { toolFailure, toolResult, type ToolResult } from '../shared/addons.js';
 import type {
   Scope,
   VisionDevice,
@@ -389,42 +389,33 @@ export class VisionBridge {
     },
     args: unknown,
   ): Promise<ToolResult> {
-    const failure = (summary: string, code = 'unavailable', retryable = false): ToolResult => ({
-      schemaVersion: 1,
-      status: 'failed',
-      result: null,
-      snapshotId: null,
-      actionRunId: null,
-      summary,
-      error: { code, message: summary, retryable },
-    });
     if (!validateLook(args))
-      return failure(
+      return toolFailure(
         'Fournis une question visuelle non vide de 500 caractères maximum dans question.',
         'invalid_params',
       );
     const question = args.question.trim();
-    if (this.mode === 'off') return failure('La vision est désactivée.');
-    if (!this.worker) return failure('Le service caméra n’est pas démarré.');
+    if (this.mode === 'off') return toolFailure('La vision est désactivée.');
+    if (!this.worker) return toolFailure('Le service caméra n’est pas démarré.');
     // Mode voix : la caméra s’allume avec la conversation, laisser le temps à sa première image.
     if (this.controller.sessionState().mode === 4) await this.cameraReady(input.signal);
     const state = this.controller.snapshot().state;
-    if (state.session.phase !== 'ready') return failure('La session vocale n’est pas prête.');
-    if (state.presence.health !== 'ok') return failure('La caméra locale est indisponible.');
+    if (state.session.phase !== 'ready') return toolFailure('La session vocale n’est pas prête.');
+    if (state.presence.health !== 'ok') return toolFailure('La caméra locale est indisponible.');
     const scope = this.controller.scope();
-    if (input.signal.aborted) return failure('Demande annulée.');
+    if (input.signal.aborted) return toolFailure('Demande annulée.');
     if (
       input.interactionId !== scope.interactionId ||
       input.profileId !== (state.activeProfile?.id ?? null)
     )
-      return failure('Demande de vision périmée.');
+      return toolFailure('Demande de vision périmée.');
     this.syncInteraction(scope);
     for (const pending of this.pending.values()) {
       if (!this.isCurrent(pending))
         this.cancel(pending, 'La scène a changé avant la fin de l’analyse.');
     }
     if ([...this.pending.values()].some((pending) => pending.trigger === 'tool'))
-      return failure('Une question visuelle est déjà en cours.', 'busy', true);
+      return toolFailure('Une question visuelle est déjà en cours.', 'busy', true);
     // Une demande explicite remplace l'analyse d'ouverture, sans en réutiliser la réponse.
     this.dropPending('Analyse d’ouverture remplacée par la question visuelle.');
     this.sceneRequestedInteractionId = scope.interactionId;
@@ -440,9 +431,9 @@ export class VisionBridge {
         question,
       );
     } catch (error) {
-      return failure((error as Error).message);
+      return toolFailure((error as Error).message);
     }
-    if (input.signal.aborted) return failure('Demande annulée.');
+    if (input.signal.aborted) return toolFailure('Demande annulée.');
     const current = this.controller.sessionState();
     const presence = this.controller.presenceScope();
     if (
@@ -455,16 +446,10 @@ export class VisionBridge {
       !this.sameEngagement(presence.engagementId, state.presence.engagementId) ||
       this.now() - caption.capturedAt > validityMs
     )
-      return failure('La scène a changé avant la fin de l’analyse.');
-    return {
-      schemaVersion: 1,
-      status: 'succeeded',
+      return toolFailure('La scène a changé avant la fin de l’analyse.');
+    return toolResult('succeeded', caption.description.slice(0, 500), {
       result: { question, description: caption.description, capturedAt: caption.capturedAt },
-      snapshotId: null,
-      actionRunId: null,
-      summary: caption.description.slice(0, 500),
-      error: null,
-    };
+    });
   }
 
   /** Attend au plus `cameraWarmupMs` une image saine ; l’appelant vérifie ensuite l’état. */

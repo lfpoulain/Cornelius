@@ -3,7 +3,7 @@ import test, { type TestContext } from 'node:test';
 import { createServer } from 'node:net';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
-import { HomeAssistant, normalizeEntity } from '../server/home-assistant.js';
+import { HomeAssistant, normalizeEntity, sensorReading } from '../server/home-assistant.js';
 import { HomeAssistantRepository } from '../server/home-assistant-store.js';
 import { HOME_ASSISTANT_CUT, HOME_ASSISTANT_UNREACHABLE } from '../server/home-assistant-socket.js';
 import { openDatabase } from '../server/storage.js';
@@ -710,4 +710,24 @@ test('gestes satellite : lampes sélectionnées sans identité, protection vocal
   f.home.setAccess({ enabled: false, revision: f.home.view().revision });
   assert.equal((await f.home.runSatelliteGesture(command(), signal())).status, 'failed');
   assert.equal(f.fake.calls.length, count);
+});
+
+test('l’heure de fin lue à un capteur suit le fuseau du foyer', () => {
+  const entity: Parameters<typeof sensorReading>[0] = {
+    id: 'sensor.lave_linge_fin',
+    name: 'Fin du lave-linge',
+    aliases: [],
+    domain: 'sensor',
+    state: '2026-01-15T12:00:00.000Z',
+    brightness: false,
+    brightnessPct: null,
+    observedAt: null,
+    deviceClass: 'timestamp',
+  };
+  const now = Date.parse('2026-01-15T11:30:00.000Z');
+  // Sans réglage, le fuseau de Paris ; sinon celui du foyer (CORNELIUS_TIMEZONE).
+  assert.equal(sensorReading(entity, now).endsAtLocal, '13:00');
+  const montreal = sensorReading(entity, now, 'America/Montreal');
+  assert.equal(montreal.endsAtLocal, '07:00');
+  assert.equal(montreal.remainingMinutes, 30);
 });

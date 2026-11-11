@@ -4,8 +4,9 @@ import type {
   OutputTranscriptDeltaEvent,
 } from 'openai/resources/live/live';
 import type { Scope } from '../shared/types.js';
-import type { ToolResult } from '../shared/addons.js';
+import { toolFailure, toolResult, type ToolResult } from '../shared/addons.js';
 import type { MemoryBatch, MemoryFact, MemoryTurn } from '../shared/memory.js';
+import { stripAccents } from '../shared/text.js';
 import { compile, validators } from '../shared/validation.js';
 import type { SessionController } from './controller.js';
 import type { DiagnosticLog } from './logs.js';
@@ -55,8 +56,7 @@ const recallSchema = compile<{ query: string | null; limit: number }>({
     limit: { type: 'integer', minimum: 1, maximum: 10 },
   },
 });
-const normalize = (value: string) =>
-  value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase('fr');
+const normalize = (value: string) => stripAccents(value).toLocaleLowerCase('fr');
 
 export class PersonalMemory {
   private capture: Capture | null = null;
@@ -391,19 +391,12 @@ export class PersonalMemory {
   recall(scope: Scope, args: unknown): ToolResult {
     const identity = this.identity(scope);
     if (!recallSchema(args) || !identity)
-      return {
-        schemaVersion: 1,
-        status: 'failed',
-        result: null,
-        snapshotId: null,
-        actionRunId: null,
-        summary: 'Mémoire indisponible pour cette demande ou cette présence.',
-        error: {
-          code: 'unavailable',
-          message: 'Mémoire non autorisée ou demande invalide.',
-          retryable: false,
-        },
-      };
+      return toolFailure(
+        'Mémoire indisponible pour cette demande ou cette présence.',
+        'unavailable',
+        false,
+        'Mémoire non autorisée ou demande invalide.',
+      );
     const terms = args.query ? normalize(args.query).split(/\W+/u).filter(Boolean) : [];
     const memories = this.repository
       .list(identity.profileId)
@@ -424,17 +417,13 @@ export class PersonalMemory {
         expiresAt: memory.expiresAt,
         updatedAt: memory.updatedAt,
       }));
-    return {
-      schemaVersion: 1,
-      status: 'succeeded',
-      result: { memories },
-      snapshotId: null,
-      actionRunId: null,
-      summary: memories.length
+    return toolResult(
+      'succeeded',
+      memories.length
         ? `${memories.length} souvenir(s) personnel(s) retrouvé(s).`
         : 'Aucun souvenir correspondant.',
-      error: null,
-    };
+      { result: { memories } },
+    );
   }
   async settled() {
     await Promise.all([...this.jobs.values()].map((job) => job.task));

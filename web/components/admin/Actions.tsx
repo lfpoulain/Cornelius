@@ -15,7 +15,7 @@ import type { ActionConfirmationView, ActionRunView, HttpActionView, RunAction }
 import { ActionForm } from './ActionForm';
 import { useAdminResource } from './useAdminResource';
 import { refreshConfirmations, useConfirmations } from './useConfirmations';
-import { ConfirmAction, LoadingCard } from './shared';
+import { ConfirmAction, LoadError, LoadingCard } from './shared';
 import {
   errorCodeLabel,
   formatWhen,
@@ -40,13 +40,26 @@ function runDetail(run: ActionRunView): string {
 const confirmationLabel = (value: string) =>
   value === 'required' ? 'Avec votre accord' : 'Sans accord';
 
-export function Actions({ profiles, run }: { profiles: Profile[]; run: RunAction }) {
+export function Actions({
+  profiles,
+  run,
+  onActions,
+}: {
+  profiles: Profile[];
+  run: RunAction;
+  /** Commandes telles qu’elles viennent d’être lues : l’en-tête du module suit la liste. */
+  onActions?: (actions: HttpActionView[]) => void;
+}) {
   const [adding, setAdding] = useState(false);
   const load = useCallback(async () => {
     const [actions, runs] = await Promise.all([api.actions(), api.actionRuns()]);
     return { actions, runs };
   }, []);
   const { data, error: loadError, loading, reload } = useAdminResource(load);
+  const loadedActions = data?.actions;
+  useEffect(() => {
+    if (loadedActions) onActions?.(loadedActions);
+  }, [loadedActions, onActions]);
   // Relues toutes les 3 s tant que la page est visible : une demande arrive pendant une
   // conversation, sans qu’il faille actualiser.
   const { list: confirmations, error: confirmationsError } = useConfirmations();
@@ -59,17 +72,7 @@ export function Actions({ profiles, run }: { profiles: Profile[]; run: RunAction
     void reload();
   }, [confirmationKey, reload]);
 
-  if (loadError && !data)
-    return (
-      <Alert variant="destructive">
-        <AlertDescription className="gap-3">
-          <p>{loadError}</p>
-          <Button variant="outline" size="sm" onClick={() => void reload()}>
-            Réessayer
-          </Button>
-        </AlertDescription>
-      </Alert>
-    );
+  if (loadError && !data) return <LoadError error={loadError} loading={loading} onRetry={reload} />;
   if (!data) return <LoadingCard label="Lecture des commandes enregistrées…" />;
   const { actions, runs } = data;
 

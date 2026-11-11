@@ -25,14 +25,6 @@ import {
   type PresencePerson,
 } from './steady-people';
 
-export const phaseLabels: Record<SessionPhase, string> = {
-  idle: 'En veille',
-  connecting: 'Connexion en cours',
-  ready: 'Prêt',
-  closing: 'Fermeture en cours',
-  blocked: 'Session indisponible',
-};
-
 /** Statut annoncé au lecteur d’écran, dans les mots du miroir. */
 const mirrorPhaseLabels: Record<SessionPhase, string> = {
   idle: 'En veille.',

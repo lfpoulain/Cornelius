@@ -55,8 +55,6 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 <!-- npm:début -->
 | Paquet | Version | Licence | Rôle |
 | --- | --- | --- | --- |
-| @bufbuild/protobuf | 1.10.1 | (Apache-2.0 AND BSD-3-Clause) | exécution |
-| @datastructures-js/deque | 1.0.8 | MIT | exécution |
 | @dimforge/rapier3d-compat | 0.12.0 | Apache-2.0 | outil |
 | @emnapi/core | 1.11.1 | MIT | outil |
 | @emnapi/runtime | 1.11.1 | MIT | outil |
@@ -110,15 +108,6 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | @jridgewell/sourcemap-codec | 1.6.0 | MIT | outil |
 | @jridgewell/trace-mapping | 0.3.31 | MIT | outil |
 | @leichtgewicht/ip-codec | 2.0.5 | MIT | exécution |
-| @livekit/mutex | 1.1.1 | Apache-2.0 | exécution |
-| @livekit/rtc-ffi-bindings-darwin-arm64 | 0.12.56 | Apache-2.0 | exécution |
-| @livekit/rtc-ffi-bindings-darwin-x64 | 0.12.56 | Apache-2.0 | exécution |
-| @livekit/rtc-ffi-bindings-linux-arm64-gnu | 0.12.56 | Apache-2.0 | exécution |
-| @livekit/rtc-ffi-bindings-linux-x64-gnu | 0.12.56 | Apache-2.0 | exécution |
-| @livekit/rtc-ffi-bindings-win32-x64-msvc | 0.12.56 | Apache-2.0 | exécution |
-| @livekit/rtc-ffi-bindings | 0.12.56 | Apache-2.0 | exécution |
-| @livekit/rtc-node | 0.13.28 | Apache-2.0 | exécution |
-| @livekit/typed-emitter | 3.0.0 | MIT | exécution |
 | @lukeed/ms | 2.0.2 | MIT | exécution |
 | @mistralai/mistralai | 3.1.0 | Apache-2.0 | exécution |
 | @modelcontextprotocol/sdk | 1.32.1 | MIT | exécution |
@@ -279,7 +268,6 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | call-bound | 1.0.4 | MIT | exécution |
 | class-variance-authority | 0.7.1 | Apache-2.0 | exécution |
 | clsx | 2.1.1 | MIT | exécution |
-| colorette | 2.0.20 | MIT | exécution |
 | content-disposition | 2.0.1 | MIT | exécution |
 | content-type | 1.0.5 | MIT | exécution |
 | content-type | 2.1.0 | MIT | exécution |
@@ -290,7 +278,6 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | cors | 2.8.6 | MIT | exécution |
 | cross-spawn | 7.0.6 | MIT | exécution |
 | csstype | 3.2.3 | MIT | exécution |
-| dateformat | 4.6.3 | MIT | exécution |
 | debug | 4.4.3 | MIT | exécution |
 | depd | 2.0.0 | MIT | exécution |
 | dequal | 2.0.3 | MIT | exécution |
@@ -313,12 +300,10 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | eventsource | 3.0.7 | MIT | exécution |
 | express-rate-limit | 8.7.1 | MIT | exécution |
 | express | 5.3.0 | MIT | exécution |
-| fast-copy | 4.2.0 | MIT | exécution |
 | fast-decode-uri-component | 1.0.1 | MIT | exécution |
 | fast-deep-equal | 3.1.3 | MIT | exécution |
 | fast-json-stringify | 7.0.1 | MIT | exécution |
 | fast-querystring | 1.1.2 | MIT | exécution |
-| fast-safe-stringify | 2.1.1 | MIT | exécution |
 | fast-uri | 3.1.8 | BSD-3-Clause | exécution |
 | fast-uri | 4.1.5 | BSD-3-Clause | exécution |
 | fastify-plugin | 6.0.0 | MIT | exécution |
@@ -340,7 +325,6 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | graceful-fs | 4.2.11 | ISC | outil |
 | has-symbols | 1.1.0 | MIT | exécution |
 | hasown | 2.0.4 | MIT | exécution |
-| help-me | 5.0.0 | MIT | exécution |
 | hono | 4.13.13 | MIT | exécution |
 | http-errors | 2.0.1 | MIT | exécution |
 | iconv-lite | 0.7.3 | MIT | exécution |
@@ -352,7 +336,6 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | isexe | 2.0.0 | ISC | exécution |
 | jiti | 2.7.0 | MIT | outil |
 | jose | 6.2.13 | MIT | exécution |
-| joycon | 3.1.1 | MIT | exécution |
 | json-schema-ref-resolver | 3.0.0 | MIT | exécution |
 | json-schema-traverse | 1.0.0 | MIT | exécution |
 | json-schema-typed | 8.0.2 | BSD-2-Clause | exécution |
@@ -392,7 +375,6 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | mime-types | 3.0.2 | MIT | exécution |
 | mime | 3.0.0 | MIT | exécution |
 | minimatch | 10.2.6 | BlueOak-1.0.0 | exécution |
-| minimist | 1.2.8 | MIT | exécution |
 | minipass | 7.1.3 | BlueOak-1.0.0 | exécution |
 | ms | 2.1.3 | MIT | exécution |
 | multicast-dns | 7.2.5 | MIT | exécution |
@@ -410,12 +392,9 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | path-to-regexp | 8.4.2 | MIT | exécution |
 | picocolors | 1.1.1 | ISC | outil |
 | picomatch | 4.0.7 | MIT | outil |
-| pino-abstract-transport | 2.0.0 | MIT | exécution |
 | pino-abstract-transport | 3.0.0 | MIT | exécution |
-| pino-pretty | 13.2.0 | MIT | exécution |
 | pino-std-serializers | 7.1.0 | MIT | exécution |
 | pino | 10.3.1 | MIT | exécution |
-| pino | 9.14.0 | MIT | exécution |
 | pkce-challenge | 5.0.1 | MIT | exécution |
 | pkijs | 3.4.1 | BSD-3-Clause | exécution |
 | playwright-core | 1.63.0 | Apache-2.0 | outil |
@@ -425,7 +404,6 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | process-warning | 4.0.1 | MIT | exécution |
 | process-warning | 5.1.0 | MIT | exécution |
 | proxy-addr | 2.0.8 | MIT | exécution |
-| pump | 3.0.4 | MIT | exécution |
 | pvtsutils | 1.3.6 | MIT | exécution |
 | pvutils | 1.2.0 | MIT | exécution |
 | qs | 6.16.1 | BSD-3-Clause | exécution |
@@ -467,17 +445,14 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | side-channel-weakmap | 1.0.2 | MIT | exécution |
 | side-channel | 1.1.1 | MIT | exécution |
 | sonic-boom | 4.2.1 | MIT | exécution |
-| sonic-boom | 5.0.2 | MIT | exécution |
 | source-map-js | 1.2.1 | BSD-3-Clause | outil |
 | split2 | 4.2.0 | ISC | exécution |
 | statuses | 2.0.2 | MIT | exécution |
 | stream-shift | 1.0.3 | MIT | exécution |
 | string_decoder | 1.3.0 | MIT | exécution |
-| strip-json-comments | 5.0.3 | MIT | exécution |
 | tailwind-merge | 3.7.0 | MIT | exécution |
 | tailwindcss | 4.3.3 | MIT | outil |
 | tapable | 2.3.3 | MIT | outil |
-| thread-stream | 3.2.0 | MIT | exécution |
 | thread-stream | 4.2.0 | MIT | exécution |
 | three | 0.186.0 | MIT | exécution |
 | thunky | 1.1.0 | MIT | exécution |

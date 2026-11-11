@@ -95,6 +95,7 @@ export function CoreUpdateCard({ run }: { run: RunAction }) {
                 <ConfirmAction
                   message="Mettre à jour maintenant ? Cornelius sera indisponible quelques minutes."
                   confirmLabel="Mettre à jour"
+                  returnFocusTo={trigger}
                   onCancel={() => setConfirming(false)}
                   onConfirm={() => {
                     setConfirming(false);

@@ -1,10 +1,8 @@
-import { useEffect, useState } from 'react';
 import type { DevicesStatus } from '../../../shared/types';
 import type { RunAction } from './types';
 import { request } from '../../api';
 import { FineTuning } from './FineTuning';
-import { decimalText, parseDecimal } from './format';
-import { DecimalInput, Field, SaveBar } from './shared';
+import { DecimalInput, Field, SaveBar, useDecimalDraft } from './shared';
 import { ChoiceGroup, type ChoiceOption } from '../ui/choice-card';
 
 /** Du plus souple au plus strict : le chiffre exact se règle dans « Réglage fin ». */
@@ -27,15 +25,10 @@ export function RecognitionSettings({
   run: RunAction;
 }) {
   const saved = status?.perception.recognitionThreshold;
-  const [threshold, setThreshold] = useState(saved === undefined ? '' : decimalText(saved));
-  useEffect(() => {
-    if (saved !== undefined) setThreshold(decimalText(saved));
-  }, [saved]);
-  const value = parseDecimal(threshold);
+  const draft = useDecimalDraft(saved);
+  const value = draft.value ?? Number.NaN;
   const valid = Number.isFinite(value) && value >= MIN && value <= MAX;
-  // « 0,420 » pour 0,42 n’est pas une modification ; une saisie vide ou invalide en est une.
-  const dirty =
-    saved !== undefined && threshold !== decimalText(saved) && !(valid && value === saved);
+  const dirty = saved !== undefined && draft.dirty;
   const preset =
     saved === undefined
       ? null
@@ -87,8 +80,8 @@ export function RecognitionSettings({
             id="recognition-threshold"
             disabled={saved === undefined}
             aria-invalid={!valid || undefined}
-            value={threshold}
-            onChange={(event) => setThreshold(event.target.value)}
+            value={draft.text}
+            onChange={(event) => draft.setText(event.target.value)}
           />
         </Field>
       </FineTuning>
@@ -97,7 +90,7 @@ export function RecognitionSettings({
         count={dirty ? 1 : 0}
         error={valid ? null : `Indiquez une valeur de ${decimal(MIN)} à ${decimal(MAX)}.`}
         onSave={() => void save(value)}
-        onCancel={() => saved !== undefined && setThreshold(decimalText(saved))}
+        onCancel={draft.reset}
       />
     </div>
   );

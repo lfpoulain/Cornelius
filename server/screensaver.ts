@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import {
@@ -8,6 +8,7 @@ import {
   type ScreensaverImageType,
   type ScreensaverView,
 } from '../shared/screensaver.js';
+import { defaultUserAgent } from './addons/http.js';
 import type { DiagnosticLog } from './logs.js';
 import { collectionUrl, screensaverCollection } from './screensaver-collection.js';
 
@@ -63,7 +64,6 @@ const extensions: Record<ScreensaverImageType, string> = {
   'image/webp': '.webp',
 };
 const idPattern = /^[0-9a-f-]{36}$/u;
-const userAgent = 'Cornelius/0.2 (https://github.com/lfpoulain/Cornelius)';
 
 /** Format reconnu aux premiers octets du fichier, quel que soit le type annoncé. */
 export function imageType(data: Uint8Array): ScreensaverImageType | null {
@@ -173,6 +173,11 @@ export class ScreensaverLibrary {
   private downloading = false;
   private downloadError: string | null = null;
   private listeners = new Set<() => void>();
+  // La liste coûte une lecture de la base et un accès au disque par image, et elle est
+  // demandée plusieurs fois par changement (publication, empreinte, réponse de la route) :
+  // elle est calculée une fois, puis gardée jusqu’au prochain ajout ou retrait.
+  private listed: readonly ScreensaverImage[] | null = null;
+  private listedRevision: string | null = null;
 
   constructor(
     private readonly db: DatabaseSync,
@@ -199,8 +204,8 @@ export class ScreensaverLibrary {
   }
 
   list(): ScreensaverImage[] {
-    return this.rows().flatMap((row) => {
-      const file = this.file(row.id);
+    this.listed ??= this.rows().flatMap((row) => {
+      const file = this.locate(row.id, row.type);
       if (!file) return [];
       // Image ajoutée avant que Cornelius ne note les dimensions : lues une fois, puis gardées.
       const size =
@@ -219,6 +224,13 @@ export class ScreensaverLibrary {
         },
       ];
     });
+    // Copie : l’appelant peut trier ou filtrer sans toucher à la liste gardée.
+    return [...this.listed];
+  }
+
+  private invalidate() {
+    this.listed = null;
+    this.listedRevision = null;
   }
 
   private rememberSize(id: string, data: Uint8Array) {
@@ -234,10 +246,13 @@ export class ScreensaverLibrary {
 
   /** Empreinte de la liste : le miroir la relit quand elle change. */
   revision(): string {
-    const ids = this.list().map((image) => image.id);
-    return ids.length
-      ? createHash('sha256').update(ids.join('\n')).digest('base64url').slice(0, 16)
-      : '';
+    if (this.listedRevision === null) {
+      const ids = this.list().map((image) => image.id);
+      this.listedRevision = ids.length
+        ? createHash('sha256').update(ids.join('\n')).digest('base64url').slice(0, 16)
+        : '';
+    }
+    return this.listedRevision;
   }
 
   view(): ScreensaverView {
@@ -257,13 +272,17 @@ export class ScreensaverLibrary {
     if (!idPattern.test(id)) return null;
     const row = this.db.prepare('SELECT type FROM screensaver_images WHERE id = ?').get(id) as
       { type: ScreensaverImageType } | undefined;
-    if (!row) return null;
-    const path = join(this.root, id + extensions[row.type]);
-    if (!existsSync(path)) return null;
-    const stat = statSync(path);
-    return stat.isFile() && stat.size <= SCREENSAVER_IMAGE_MAX_BYTES
-      ? { path, type: row.type }
-      : null;
+    return row ? this.locate(id, row.type) : null;
+  }
+
+  /** Fichier d’une image dont le type est déjà connu : un seul accès au disque. */
+  private locate(
+    id: string,
+    type: ScreensaverImageType,
+  ): { path: string; type: ScreensaverImageType } | null {
+    const path = join(this.root, id + extensions[type]);
+    const stat = statSync(path, { throwIfNoEntry: false });
+    return stat?.isFile() && stat.size <= SCREENSAVER_IMAGE_MAX_BYTES ? { path, type } : null;
   }
 
   /** Ajoute une image envoyée depuis l’administration ; null si ce n’est pas une image reconnue. */
@@ -288,6 +307,7 @@ export class ScreensaverLibrary {
         this.now(),
       );
     this.rememberSize(id, data);
+    this.invalidate();
     this.changed();
     return this.list().find((image) => image.id === id) ?? null;
   }
@@ -306,7 +326,10 @@ export class ScreensaverLibrary {
       removed += Number(result.changes);
     }
     // Un seul avis au miroir, même pour vingt images.
-    if (removed) this.changed();
+    if (removed) {
+      this.invalidate();
+      this.changed();
+    }
     return removed;
   }
 
@@ -332,7 +355,7 @@ export class ScreensaverLibrary {
       if (installed.has(painting.key)) continue;
       try {
         const response = await this.fetcher(collectionUrl(painting), {
-          headers: { 'User-Agent': userAgent },
+          headers: { 'User-Agent': defaultUserAgent },
           signal: AbortSignal.timeout(60_000),
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);

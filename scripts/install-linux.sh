@@ -96,8 +96,7 @@ fi
 # --- Node.js 24 (fichier .nvmrc) -----------------------------------------------------
 step "Node.js"
 node_ok() {
-  command -v node >/dev/null 2>&1 &&
-    node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a===24&&b>=2?0:1)'
+  command -v node >/dev/null 2>&1 && node_supported
 }
 if ! node_ok && command -v fnm >/dev/null 2>&1; then
   fnm install "$(cat .nvmrc)" && eval "$(fnm env)" && fnm use "$(cat .nvmrc)"
@@ -279,7 +278,7 @@ npm run --silent password -- --if-default || warn "mot de passe inchangé : npm 
 step "Terminé"
 port="$(server_port)"
 echo "Administration : http://127.0.0.1:$port/admin"
-https_port="$(sed -n 's/^CORNELIUS_HTTPS_PORT=\([0-9][0-9]*\).*/\1/p' .env | tail -n 1)"
+https_port="$(env_number CORNELIUS_HTTPS_PORT)"
 lan_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
 if [ -n "$lan_ip" ] && ! grep -Eqi '^CORNELIUS_LAN=(0|false|non|no)\s*$' .env; then
   echo "Depuis un autre appareil : https://$lan_ip:${https_port:-$((port + 443))}/admin (certificat à accepter)."

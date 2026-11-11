@@ -7,7 +7,7 @@ import type { PersonalMemory } from '../memory.js';
 import type { ConnectClientEvent, ConnectServerEvent } from 'openai/resources/live/sideband';
 import type { LiveCreateResponse } from 'openai/resources/live/live';
 import type { DisplayCard, ImageCard, LunaCardRequest, Scope } from '../../shared/types.js';
-import type { ToolResult } from '../../shared/addons.js';
+import { toolFailure, type ToolResult } from '../../shared/addons.js';
 import type { AddonReadOutcome } from '../addons/runtime.js';
 import type { SessionController, SessionTransport } from '../controller.js';
 import { SATELLITE_VOLUME_TOOL, satelliteVolumeTool } from '../satellite-volume.js';
@@ -213,17 +213,6 @@ function cardAnnouncement(card: LunaCardRequest): string {
   if (main) return card.title + ' — ' + main;
   const details = card.items.map((item) => item.label + ' : ' + item.value);
   return [card.title, ...details].join(' — ');
-}
-function failureToolResult(summary: string): ToolResult {
-  return {
-    schemaVersion: 1,
-    status: 'failed',
-    result: null,
-    snapshotId: null,
-    actionRunId: null,
-    summary,
-    error: { code: 'unavailable', message: summary, retryable: false },
-  };
 }
 
 // Son des satellites : PCM16 mono 16 kHz dans les deux sens, sans conversion.
@@ -438,7 +427,7 @@ export class LiveTransport implements SessionTransport {
       return;
     }
     // Profil rattaché au satellite (choisi dans l’administration), ou conversation anonyme.
-    const profileId = this.controller.snapshot().state.activeProfile?.id ?? null;
+    const profileId = this.controller.activeProfile()?.id ?? null;
     const {
       client: _client,
       audio,
@@ -486,15 +475,15 @@ export class LiveTransport implements SessionTransport {
       !active.satelliteId &&
         this.controller.sessionState().mode !== 4 &&
         this.controller.greetingMode() === 'name' &&
-        this.controller.snapshot().state.activeProfile?.name
-        ? 'Bonjour ' + this.controller.snapshot().state.activeProfile!.name + '.'
+        this.controller.activeProfile()?.name
+        ? 'Bonjour ' + this.controller.activeProfile()!.name + '.'
         : undefined,
       !active.satelliteId &&
         this.controller.sessionState().mode !== 4 &&
         this.controller.greetingMode() === 'free' &&
-        this.controller.snapshot().state.activeProfile?.name
+        this.controller.activeProfile()?.name
         ? 'Salue ' +
-            JSON.stringify(this.controller.snapshot().state.activeProfile!.name) +
+            JSON.stringify(this.controller.activeProfile()!.name) +
             ' en une courte phrase, à ta manière et selon les préférences de style du foyer et de la personne. Retourne seulement la phrase à prononcer.'
         : undefined,
     );
@@ -530,7 +519,7 @@ export class LiveTransport implements SessionTransport {
             (profileId !== null || !ANONYMOUS_EXCLUDED_TOOLS.test(tool.name)),
       ),
       this.integrations.personality?.(profileId),
-      this.controller.snapshot().state.delegationMode,
+      this.controller.getDelegationMode(),
       {
         webSearch: this.controller.isWebSearchEnabled(),
         voice: this.controller.getSpeechVoice(),
@@ -638,7 +627,7 @@ export class LiveTransport implements SessionTransport {
     this.logs?.write('info', 'openai', 'Offre média reçue', { interactionId: scope.interactionId });
     active.offer = sdp;
     this.memory?.open(active.scope);
-    active.toolsProfileId = this.controller.snapshot().state.activeProfile?.id ?? null;
+    active.toolsProfileId = this.controller.activeProfile()?.id ?? null;
     // No retry: a timed-out creation may still be open remotely.
     active.response = gateway
       .create(this.configuration(active.toolsProfileId), sdp, active.abort.signal)
@@ -698,6 +687,10 @@ export class LiveTransport implements SessionTransport {
             : 'Connexion Live impossible ; clôture à confirmer. Vérifiez le réseau.',
         );
         if (refused) {
+          // `controller.close()` vient d’armer le délai de clôture, mais rien de distant n’est
+          // ouvert : sans l’annuler ici, il resterait posé sur cette session déjà terminée et
+          // la session suivante n’aurait plus de délai de secours (`??=` ne le recrée pas).
+          this.clearCloseTimer();
           active.finalized = true;
           this.controller.sessionClosed(active.scope.interactionId!);
         }
@@ -749,12 +742,14 @@ export class LiveTransport implements SessionTransport {
     this.closeTimer ??= setTimeout(() => this.finalize(active), 5000);
     this.closeTimer.unref();
   }
+  private clearCloseTimer() {
+    if (!this.closeTimer) return;
+    clearTimeout(this.closeTimer);
+    this.closeTimer = null;
+  }
   private finalize(active: ActiveSession) {
     if (active.finalized || this.active !== active) return;
-    if (this.closeTimer) {
-      clearTimeout(this.closeTimer);
-      this.closeTimer = null;
-    }
+    this.clearCloseTimer();
     this.memory?.close(active.scope);
     active.finalized = true;
     active.abort.abort();
@@ -843,8 +838,7 @@ export class LiveTransport implements SessionTransport {
       scope.interactionId !== active.scope.interactionId
     )
       return;
-    const state = this.controller.snapshot().state;
-    const profileId = state.activeProfile?.id ?? null;
+    const profileId = this.controller.activeProfile()?.id ?? null;
     if (!profileId) return;
     if (active.toolsProfileId !== profileId) {
       const preferences = this.integrations.personality?.(profileId);
@@ -890,7 +884,7 @@ export class LiveTransport implements SessionTransport {
   private greet(active: ActiveSession) {
     if (!active.started || active.finalized || active.closing || active.blocked || active.greeted)
       return;
-    const profileName = this.controller.snapshot().state.activeProfile?.name ?? null;
+    const profileName = this.controller.activeProfile()?.name ?? null;
     if (!profileName) return;
     // Satellite rattaché : la personne vient de dire « Cornelius » et sa demande, sans salut.
     if (active.satelliteId) {
@@ -1292,7 +1286,7 @@ export class LiveTransport implements SessionTransport {
           item.call_id,
           active.satelliteId
             ? this.satelliteVolume(active.satelliteId, args)
-            : failureToolResult('Le volume se règle seulement sur un satellite.'),
+            : toolFailure('Le volume se règle seulement sur un satellite.'),
         );
         this.finishTool(active, delegation);
         return;
@@ -1319,7 +1313,7 @@ export class LiveTransport implements SessionTransport {
             this.now() + 60_000,
           );
         if (accepted) {
-          const displayed = this.controller.snapshot().state.cards[0];
+          const displayed = this.controller.displayedCards()[0];
           if (displayed) {
             this.rememberTurnCard(active, countKey, 'luna', displayed.id, tokens);
             const references = this.references(active, delegationId || delegation);
@@ -1436,8 +1430,7 @@ export class LiveTransport implements SessionTransport {
     if (this.alarmNotices.interactionId !== active.scope.interactionId)
       this.alarmNotices = { interactionId: active.scope.interactionId, keys: new Set() };
     if (this.alarmNotices.keys.has(key)) return 'seen';
-    const state = this.controller.snapshot().state;
-    if (state.voice.phase !== 'idle' || this.now() - this.lastAgentAnnouncementAt < 8000)
+    if (this.controller.voicePhase() !== 'idle' || this.now() - this.lastAgentAnnouncementAt < 8000)
       return 'busy';
     if (
       !this.deliver(active, {
@@ -1465,8 +1458,7 @@ export class LiveTransport implements SessionTransport {
       !sameScope(active.scope, this.controller.scope())
     )
       return false;
-    const state = this.controller.snapshot().state;
-    if (state.voice.phase !== 'idle' || this.now() - this.lastAgentAnnouncementAt < 8000)
+    if (this.controller.voicePhase() !== 'idle' || this.now() - this.lastAgentAnnouncementAt < 8000)
       return false;
     const description = (
       task.output ??
@@ -1508,8 +1500,8 @@ export class LiveTransport implements SessionTransport {
     args: unknown,
   ) {
     const bridge = this.integrations.agents!;
-    const profileId = this.controller.snapshot().state.activeProfile?.id ?? null;
-    let tool = failureToolResult(
+    const profileId = this.controller.activeProfile()?.id ?? null;
+    let tool = toolFailure(
       'Une personne seule et reconnue doit être devant le miroir pour utiliser son agent.',
     );
     try {
@@ -1532,7 +1524,7 @@ export class LiveTransport implements SessionTransport {
         sameScope(active.scope, this.controller.scope())
       ) {
         if (profileId && !this.agentAudience(profileId))
-          tool = failureToolResult(
+          tool = toolFailure(
             'Le résultat personnel attend que cette personne soit seule et reconnue.',
           );
         this.sendItem(active, callId, tool);
@@ -1540,7 +1532,7 @@ export class LiveTransport implements SessionTransport {
       }
     } catch {
       if (!active.closing && !active.finalized && this.active === active)
-        this.sendItem(active, callId, failureToolResult('Hermes est indisponible.'));
+        this.sendItem(active, callId, toolFailure('Hermes est indisponible.'));
     } finally {
       this.finishTool(active, delegation);
     }
@@ -1555,10 +1547,10 @@ export class LiveTransport implements SessionTransport {
     args: unknown,
   ) {
     const bridge = this.integrations.addons!;
-    const profileId = this.controller.snapshot().state.activeProfile?.id ?? null;
+    const profileId = this.controller.activeProfile()?.id ?? null;
     const rawRef = object(args).instanceRef;
     const instanceRef = typeof rawRef === 'string' && rawRef.trim() ? rawRef.trim() : null;
-    let tool: ToolResult = failureToolResult('Résultat indisponible.');
+    let tool: ToolResult = toolFailure('Résultat indisponible.');
     try {
       const invoked = await bridge.invoke(name, profileId, instanceRef, active.abort.signal, args);
       if (invoked) {
@@ -1578,7 +1570,7 @@ export class LiveTransport implements SessionTransport {
           );
           if (shown) {
             this.append(active, 'card-displayed', cardDisplayRule);
-            const displayed = this.controller.snapshot().state.cards[0];
+            const displayed = this.controller.displayedCards()[0];
             if (displayed) {
               const tokens = cardTokens(invoked.outcome.card);
               // Une carte Luna déjà posée pour la même demande et qui redit ce résultat part.
@@ -1613,7 +1605,7 @@ export class LiveTransport implements SessionTransport {
   ) {
     let result: ToolResult;
     // Une personne reconnue (ou choisie dans l’administration) doit être active à l’appel.
-    const recognized = this.controller.snapshot().state.activeProfile !== null;
+    const recognized = this.controller.activeProfile() !== null;
     try {
       result = await this.integrations.homeAssistant!.run(
         args,
@@ -1622,7 +1614,7 @@ export class LiveTransport implements SessionTransport {
         recognized,
       );
     } catch {
-      result = failureToolResult('Home Assistant indisponible.');
+      result = toolFailure('Home Assistant indisponible.');
     }
     this.sendItem(active, callId, result);
     this.finishTool(active, delegation);
@@ -1637,7 +1629,7 @@ export class LiveTransport implements SessionTransport {
     const parsed = object(args);
     const actionRef = typeof parsed.actionRef === 'string' ? parsed.actionRef : null;
     const confirmationId = typeof parsed.confirmationId === 'string' ? parsed.confirmationId : null;
-    const profileId = this.controller.snapshot().state.activeProfile?.id ?? null;
+    const profileId = this.controller.activeProfile()?.id ?? null;
     let tool: ToolResult;
     try {
       tool = actionRef
@@ -1649,21 +1641,22 @@ export class LiveTransport implements SessionTransport {
             confirmationId,
             signal: active.abort.signal,
           })
-        : failureToolResult('Action inconnue.');
+        : toolFailure('Action inconnue.');
     } catch (error) {
       this.logs?.write('warn', 'openai', 'Action HTTP interrompue', {
         interactionId: active.scope.interactionId,
         error,
       });
-      tool = failureToolResult('Action indisponible.');
+      tool = toolFailure('Action indisponible.');
     }
     this.sendItem(active, callId, tool);
     this.finishTool(active, delegation);
   }
   private async runMail(active: ActiveSession, delegation: string, callId: string, args: unknown) {
-    const state = this.controller.snapshot().state;
+    const profile = this.controller.activeProfile();
     // « Cette image » : la carte image affichée dans cette conversation, s’il y en a une.
-    const shown = state.cards
+    const shown = this.controller
+      .displayedCards()
       .map((card) =>
         card.content.cardType === 'image'
           ? /^\/api\/generated-images\/([a-f0-9-]{36})\.webp$/u.exec(card.content.imageUrl)?.[1]
@@ -1674,8 +1667,8 @@ export class LiveTransport implements SessionTransport {
     try {
       tool = await this.integrations.mail!.run(
         {
-          profileId: state.activeProfile?.id ?? null,
-          profileName: state.activeProfile?.name ?? null,
+          profileId: profile?.id ?? null,
+          profileName: profile?.name ?? null,
           interactionId: active.scope.interactionId,
           callId,
           shownImageId: shown ?? null,
@@ -1687,7 +1680,7 @@ export class LiveTransport implements SessionTransport {
         interactionId: active.scope.interactionId,
         error,
       });
-      tool = failureToolResult('Envoi par e-mail indisponible.');
+      tool = toolFailure('Envoi par e-mail indisponible.');
     }
     this.sendItem(active, callId, tool);
     this.finishTool(active, delegation);
@@ -1699,13 +1692,13 @@ export class LiveTransport implements SessionTransport {
     name: string,
     args: unknown,
   ) {
-    const state = this.controller.snapshot().state;
+    const profile = this.controller.activeProfile();
     let tool: ToolResult;
     try {
       const outcome = this.integrations.alarms!.run(
         {
-          profileId: state.activeProfile?.id ?? null,
-          profileName: state.activeProfile?.name ?? null,
+          profileId: profile?.id ?? null,
+          profileName: profile?.name ?? null,
           satelliteId: active.satelliteId,
         },
         name,
@@ -1722,7 +1715,7 @@ export class LiveTransport implements SessionTransport {
         tool: name,
         error,
       });
-      tool = failureToolResult('Alarmes indisponibles.');
+      tool = toolFailure('Alarmes indisponibles.');
     }
     this.sendItem(active, callId, tool);
     this.finishTool(active, delegation);
@@ -1733,7 +1726,7 @@ export class LiveTransport implements SessionTransport {
     callId: string,
     args: unknown,
   ) {
-    const profileId = this.controller.snapshot().state.activeProfile?.id ?? null;
+    const profileId = this.controller.activeProfile()?.id ?? null;
     let tool: ToolResult;
     try {
       tool = await this.vision!.look(
@@ -1749,7 +1742,7 @@ export class LiveTransport implements SessionTransport {
         interactionId: active.scope.interactionId,
         error,
       });
-      tool = failureToolResult('Vision locale indisponible.');
+      tool = toolFailure('Vision locale indisponible.');
     }
     this.sendItem(active, callId, tool);
     this.finishTool(active, delegation);
@@ -1762,13 +1755,13 @@ export class LiveTransport implements SessionTransport {
     args: unknown,
   ) {
     const bridge = this.integrations.imageGeneration!;
-    const profileId = this.controller.snapshot().state.activeProfile?.id ?? null;
+    const profileId = this.controller.activeProfile()?.id ?? null;
     let outcome: { tool: ToolResult; card: ImageCard | null };
     try {
       if (name === 'image__recall') {
         outcome = bridge.recall
           ? bridge.recall(args, profileId)
-          : { tool: failureToolResult('Rappel d’image indisponible.'), card: null };
+          : { tool: toolFailure('Rappel d’image indisponible.'), card: null };
       } else {
         // Une demande explicite coupe l’illustration automatique et toute image en cours.
         this.cancelAutoIllustration();
@@ -1779,7 +1772,7 @@ export class LiveTransport implements SessionTransport {
         interactionId: active.scope.interactionId,
         error,
       });
-      outcome = { tool: failureToolResult('Génération d’image indisponible.'), card: null };
+      outcome = { tool: toolFailure('Génération d’image indisponible.'), card: null };
     }
     // Le résultat de l’outil suffit : Luna l’annonce une fois. Une consigne ou un commentaire
     // de plus faisait dire deux fois que l’image était affichée.
@@ -1819,7 +1812,7 @@ export class LiveTransport implements SessionTransport {
           { prompt, seed: null },
           abort.signal,
           true,
-          this.controller.snapshot().state.activeProfile?.id ?? null,
+          this.controller.activeProfile()?.id ?? null,
         );
         if (
           outcome.card &&

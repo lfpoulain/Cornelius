@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { CircleAlert, Plus, ScanFace, UserRound } from 'lucide-react';
 import type { Profile } from '../../../shared/types';
 import { duplicateNameMessage, sameNameProfile } from '../../../shared/profile-names';
@@ -171,6 +171,8 @@ function ProfileRow({
   }, [fresh]);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // « Supprimer » cède sa place à la confirmation : la ref lui rend le focus à la fermeture.
+  const deleteButton = useRef<HTMLButtonElement>(null);
   const [name, setName] = useState(profile.name);
   const duplicate = sameNameProfile(profiles, name, profile.id);
   useUnsavedChanges(editing && name.trim() !== profile.name);
@@ -283,7 +285,12 @@ function ProfileRow({
           </div>
         </form>
       ) : deleting ? (
-        <DeleteProfile profile={profile} run={run} onClose={() => setDeleting(false)} />
+        <DeleteProfile
+          profile={profile}
+          run={run}
+          returnFocusTo={deleteButton}
+          onClose={() => setDeleting(false)}
+        />
       ) : (
         <div className="flex flex-wrap gap-1">
           <Button
@@ -303,6 +310,7 @@ function ProfileRow({
             Renommer
           </Button>
           <Button
+            ref={deleteButton}
             variant="danger-outline"
             size="sm"
             aria-label={'Supprimer ' + profile.name}
@@ -325,11 +333,29 @@ function DeleteProfile({
   profile,
   run,
   onClose,
+  returnFocusTo,
 }: {
   profile: Profile;
   run: RunAction;
   onClose: () => void;
+  /** Bouton « Supprimer » de la ligne, remonté quand la confirmation se ferme. */
+  returnFocusTo: RefObject<HTMLElement | null>;
 }) {
+  const container = useRef<HTMLDivElement>(null);
+  const cancel = useRef<HTMLButtonElement>(null);
+  // Comme ConfirmAction : le focus va sur « Annuler » (une Entrée réflexe ne supprime rien),
+  // puis revient au bouton d’origine s’il était resté dans la confirmation.
+  useEffect(() => {
+    cancel.current?.focus();
+    return () => {
+      const now = document.activeElement;
+      const lost = !now || now === document.body || !now.isConnected;
+      if (!lost && !container.current?.contains(now)) return;
+      // Après une suppression, la ligne entière a disparu : la ref est vide.
+      const target = returnFocusTo.current;
+      if (target?.isConnected) target.focus({ preventScroll: true });
+    };
+  }, [returnFocusTo]);
   const [hasFace, setHasFace] = useState(false);
   useEffect(() => {
     let current = true;
@@ -345,7 +371,18 @@ function DeleteProfile({
     };
   }, [profile.id]);
   return (
-    <Alert variant="destructive" role="group" aria-label={'Supprimer ' + profile.name}>
+    <Alert
+      ref={container}
+      variant="destructive"
+      role="group"
+      aria-label={'Supprimer ' + profile.name}
+      onKeyDown={(event) => {
+        // Échap annule, sans fermer au passage un panneau englobant.
+        if (event.key !== 'Escape') return;
+        event.stopPropagation();
+        onClose();
+      }}
+    >
       <AlertDescription className="space-y-3">
         <p>
           Supprimer définitivement {profile.name} ? Son visage, ses souvenirs, son style et ses
@@ -375,7 +412,7 @@ function DeleteProfile({
               Oublier seulement le visage
             </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button ref={cancel} variant="ghost" size="sm" onClick={onClose}>
             Annuler
           </Button>
         </div>

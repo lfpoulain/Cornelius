@@ -1,3 +1,4 @@
+import { stripAccents } from '../../shared/text.js';
 import type { CardContent } from '../../shared/types.js';
 
 /**
@@ -16,9 +17,7 @@ export function cardTokens(content: CardContent): Set<string> {
     .filter((value): value is string => typeof value === 'string')
     .join(' ');
   const tokens = new Set<string>();
-  for (const raw of text
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
+  for (const raw of stripAccents(text)
     .toLocaleLowerCase('fr')
     .split(/[^\p{L}\p{N}]+/u)) {
     if (!raw || (raw.length < 3 && !/\p{N}/u.test(raw))) continue;

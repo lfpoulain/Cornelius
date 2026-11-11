@@ -45,9 +45,11 @@ export function RecognitionTester({ profiles }: { profiles: Profile[] }) {
   const face = live?.faces[0];
 
   return (
-    <div className="admin-tester" aria-live="polite">
+    // Seule la ligne d’état est annoncée : les scores, réécrits toutes les 400 ms, noieraient
+    // un lecteur d’écran.
+    <div className="admin-tester">
       {!live || !face ? (
-        <p className="admin-tester-empty">
+        <p className="admin-tester-empty" aria-live="polite">
           <ScanFace className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           {failed
             ? 'Ressemblances indisponibles : le service caméra ne répond pas.'
@@ -57,7 +59,7 @@ export function RecognitionTester({ profiles }: { profiles: Profile[] }) {
         </p>
       ) : (
         <>
-          <div className="admin-tester-head">
+          <div className="admin-tester-head" aria-live="polite">
             {face.identity ? (
               <p className="text-success">
                 <UserRoundCheck className="size-4" aria-hidden="true" />

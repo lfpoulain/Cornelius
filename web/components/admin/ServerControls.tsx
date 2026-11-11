@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { RotateCw } from 'lucide-react';
 import { api } from '../../api';
 import type { RunAction } from './types';
@@ -102,6 +102,8 @@ export function AdminPasswordCard({
 /** Relance le serveur : utile après une modification du fichier .env. */
 export function RestartServerCard({ run }: { run: RunAction }) {
   const [confirming, setConfirming] = useState(false);
+  // Le bouton cède sa place à la confirmation : la ref lui rend le focus après « Annuler ».
+  const trigger = useRef<HTMLButtonElement>(null);
   return (
     <Card>
       <CardHeader>
@@ -116,6 +118,7 @@ export function RestartServerCard({ run }: { run: RunAction }) {
           <ConfirmAction
             message="Redémarrer le serveur maintenant ? Une conversation en cours sera coupée."
             confirmLabel="Redémarrer"
+            returnFocusTo={trigger}
             onCancel={() => setConfirming(false)}
             onConfirm={() => {
               setConfirming(false);
@@ -123,7 +126,7 @@ export function RestartServerCard({ run }: { run: RunAction }) {
             }}
           />
         ) : (
-          <Button variant="outline" size="sm" onClick={() => setConfirming(true)}>
+          <Button ref={trigger} variant="outline" size="sm" onClick={() => setConfirming(true)}>
             <RotateCw aria-hidden="true" />
             Redémarrer le serveur
           </Button>

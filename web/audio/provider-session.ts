@@ -1,6 +1,6 @@
 import type { Scope } from '../../shared/types';
 import { takeAudioConnection } from './connection';
-import { reportMediaFailure, type AudioFailure, type AudioLevels } from './session';
+import { deviceErrors, reportMediaFailure, type AudioFailure, type AudioLevels } from './session';
 
 /** Server-side provider pipeline. Only scoped PCM crosses the local WebSocket. */
 export function createProviderAudioSession(
@@ -116,13 +116,7 @@ export function createProviderAudioSession(
       });
       resume();
     })
-    .catch((error) =>
-      fail(
-        ['NotAllowedError', 'NotFoundError', 'NotReadableError'].includes(error?.name)
-          ? 'device'
-          : 'transport',
-      ),
-    );
+    .catch((error) => fail(deviceErrors.has(error?.name) ? 'device' : 'transport'));
   function dispose() {
     if (disposed) return;
     disposed = true;

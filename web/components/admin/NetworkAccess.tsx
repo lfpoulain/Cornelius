@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { TriangleAlert } from 'lucide-react';
 import type { NetworkStatus } from '../../../shared/types';
 import { api } from '../../api';
@@ -19,6 +19,8 @@ export function NetworkAccess({
   run: RunAction;
 }) {
   const [confirming, setConfirming] = useState(false);
+  // Le bouton cède sa place à la confirmation : la ref lui rend le focus après « Annuler ».
+  const trigger = useRef<HTMLButtonElement>(null);
   if (!network) return null;
   const trusted = network.trustedDevices ?? 0;
   return (
@@ -66,6 +68,7 @@ export function NetworkAccess({
               <ConfirmAction
                 message="Retirer l’autorisation de tous les appareils du réseau ? Chacun devra se reconnecter."
                 confirmLabel="Retirer les autorisations"
+                returnFocusTo={trigger}
                 onCancel={() => setConfirming(false)}
                 onConfirm={() => {
                   setConfirming(false);
@@ -73,7 +76,7 @@ export function NetworkAccess({
                 }}
               />
             ) : (
-              <Button variant="outline" size="sm" onClick={() => setConfirming(true)}>
+              <Button ref={trigger} variant="outline" size="sm" onClick={() => setConfirming(true)}>
                 Retirer les autorisations
               </Button>
             ))}

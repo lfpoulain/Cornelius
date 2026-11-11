@@ -115,10 +115,23 @@ function openingWake(opening: Opening): string {
       : `Réglé sur la présence : l’image part dès qu’une personne${who} se présente.`;
 }
 
+/** Réglages comparables d’un coup d’œil, quel que soit l’ordre de leurs champs. */
+function settingsKey(settings: Settings): string {
+  return JSON.stringify([
+    settings.enabled,
+    settings.intervalMs,
+    settings.returnDelayMs,
+    settings.transition,
+    settings.wake,
+    settings.durationMs,
+    settings.fit,
+  ]);
+}
+
 /** Écran de veille : activation et rythme, puis les images proposées au miroir. */
 export function ScreensaverSettings({ state, run }: { state: MirrorState; run: RunAction }) {
   const [source, setSource] = useState<'local' | 'google-photos'>('local');
-  const saved: Settings = state.screensaver
+  const confirmed: Settings = state.screensaver
     ? {
         enabled: state.screensaver.enabled,
         intervalMs: state.screensaver.intervalMs,
@@ -129,6 +142,14 @@ export function ScreensaverSettings({ state, run }: { state: MirrorState; run: R
         fit: state.screensaver.fit,
       }
     : DEFAULT_SCREENSAVER;
+  // Derniers réglages demandés, affichés tant que le serveur ne les a pas confirmés : un second
+  // choix rapide part de ceux-ci, sinon il renverrait l’ancienne valeur du premier.
+  const [requested, setRequested] = useState<Settings | null>(null);
+  const confirmedKey = settingsKey(confirmed);
+  useEffect(() => {
+    setRequested((value) => (value && settingsKey(value) === confirmedKey ? null : value));
+  }, [confirmedKey]);
+  const saved = requested ?? confirmed;
   const wakeOptions: ChoiceOption<ScreensaverWake>[] = [
     {
       value: 'presence',
@@ -141,9 +162,16 @@ export function ScreensaverSettings({ state, run }: { state: MirrorState; run: R
       description: openingWake(currentOpening(state)),
     },
   ];
-  const save = (label: string, changes: Partial<Settings>) => {
+  const save = async (label: string, changes: Partial<Settings>) => {
     const next = { ...saved, ...changes };
-    return run(label, () => api.screensaverSettings(next), { key: 'screensaver', payload: next });
+    setRequested(next);
+    const ok = await run(label, () => api.screensaverSettings(next), {
+      key: 'screensaver',
+      payload: next,
+    });
+    // Refusé : l’affichage revient à ce que le serveur a gardé.
+    if (!ok) setRequested((current) => (current === next ? null : current));
+    return ok;
   };
   const imageCount = state.screensaver?.imageCount ?? 0;
   return (

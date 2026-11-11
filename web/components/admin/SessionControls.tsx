@@ -12,7 +12,7 @@ import type { RunAction } from './types';
 import { isSessionActive, plural } from './format';
 import { api } from '../../api';
 import { activateMirror, activateMirrorLabel } from './activate-mirror';
-import { phaseLabels } from '../Mirror';
+import { phaseLabels } from '../phase-labels';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import './SessionControls.css';

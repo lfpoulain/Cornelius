@@ -181,10 +181,50 @@ test('un fournisseur mémoire sans secours ne demande jamais un autre service', 
     },
   );
   await assert.rejects(withMemoryFallback(primary, null)(input, new AbortController().signal));
-  assert.deepEqual(called, [
-    'http://model.test/v1/responses',
-    'http://model.test/v1/chat/completions',
-  ]);
+  assert.deepEqual(called, ['http://model.test/v1/responses']);
+});
+
+test('Chat Completions ne remplace Responses que si le serveur ne la connaît pas', async () => {
+  for (const [status, fallsBack] of [
+    [404, true],
+    [405, true],
+    [501, true],
+    [401, false],
+    [429, false],
+    [500, false],
+  ] as const) {
+    const called: string[] = [];
+    const extract = createCompatibleMemoryExtractor(
+      'fixture-key',
+      'http://model.test/v1',
+      'local-model',
+      async (url) => {
+        called.push(String(url).replace('http://model.test/v1/', ''));
+        return String(url).endsWith('/responses')
+          ? Response.json({ error: { message: 'refus' } }, { status })
+          : Response.json({
+              choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(proposal) } }],
+            });
+      },
+    );
+    const result = extract(input, new AbortController().signal);
+    if (fallsBack) assert.deepEqual(await result, proposal, String(status));
+    else await assert.rejects(result, String(status));
+    assert.deepEqual(called, fallsBack ? ['responses', 'chat/completions'] : ['responses']);
+  }
+  // Une réponse reçue mais inutilisable ne vaut pas « API inconnue ».
+  const called: string[] = [];
+  const incomplete = createCompatibleMemoryExtractor(
+    'fixture-key',
+    'http://model.test/v1',
+    'local-model',
+    async (url) => {
+      called.push(String(url));
+      return Response.json({ object: 'response', status: 'incomplete', output: [] });
+    },
+  );
+  await assert.rejects(incomplete(input, new AbortController().signal), /incomplète/);
+  assert.deepEqual(called, ['http://model.test/v1/responses']);
 });
 
 test('le client compatible attend aussi longtemps que celui d’OpenAI avant de céder', async () => {

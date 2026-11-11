@@ -1,19 +1,11 @@
-import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
+import { test, expect, type WebSocketRoute } from '@playwright/test';
 import type { StateEvent } from '../../shared/types';
-import { origin } from './env';
-
-async function login(page: Page) {
-  await page.goto('/admin#voice');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
-}
+import { login, origin } from './env';
 
 test('l’accueil et les personnes reconnues se règlent dans « Quand il écoute » et persistent', async ({
   page,
 }) => {
-  await login(page);
+  await login(page, '/admin#voice');
   const greeting = page.getByRole('group', { name: 'Accueil à l’ouverture' });
   await expect(greeting.getByRole('radio', { name: /« Bonjour » et le prénom/ })).toBeChecked();
   const silent = greeting.getByRole('radio', { name: /Pas d’accueil/ });
@@ -43,7 +35,7 @@ test('l’accueil et les personnes reconnues se règlent dans « Quand il écout
 });
 
 test('le module Web retire et rend la recherche web, réglage conservé', async ({ page }) => {
-  await login(page);
+  await login(page, '/admin#voice');
   const open = async () => {
     await page.getByRole('button', { name: 'Modules', exact: true }).click();
     await page.locator('#module-web > summary').click();

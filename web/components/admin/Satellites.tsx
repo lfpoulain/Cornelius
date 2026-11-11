@@ -237,6 +237,9 @@ function SatelliteCard({
   const [name, setName] = useState(satellite.name);
   const [profileId, setProfileId] = useState(satellite.profileId ?? '');
   const [confirming, setConfirming] = useState<'token' | 'remove' | null>(null);
+  // Les deux boutons cèdent leur place à la confirmation : chaque ref rend le focus au sien.
+  const tokenButton = useRef<HTMLButtonElement>(null);
+  const removeButton = useRef<HTMLButtonElement>(null);
   const changed = name.trim() !== satellite.name || profileId !== (satellite.profileId ?? '');
   const id = 'satellite-' + satellite.id;
   const save = async () => {
@@ -326,6 +329,7 @@ function SatelliteCard({
           <ConfirmAction
             message={`Créer un nouveau jeton pour « ${satellite.name} » ? L’ancien cesse aussitôt de fonctionner : il faudra saisir le nouveau dans le satellite.`}
             confirmLabel="Nouveau jeton"
+            returnFocusTo={tokenButton}
             onCancel={() => setConfirming(null)}
             onConfirm={() => {
               setConfirming(null);
@@ -342,6 +346,7 @@ function SatelliteCard({
           <ConfirmAction
             message={`Retirer « ${satellite.name} » ? Il est déconnecté et son jeton ne fonctionne plus.`}
             confirmLabel="Retirer"
+            returnFocusTo={removeButton}
             onCancel={() => setConfirming(null)}
             onConfirm={() => {
               setConfirming(null);
@@ -352,10 +357,20 @@ function SatelliteCard({
           />
         ) : (
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => setConfirming('token')}>
+            <Button
+              ref={tokenButton}
+              size="sm"
+              variant="outline"
+              onClick={() => setConfirming('token')}
+            >
               Nouveau jeton
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setConfirming('remove')}>
+            <Button
+              ref={removeButton}
+              size="sm"
+              variant="outline"
+              onClick={() => setConfirming('remove')}
+            >
               Retirer
             </Button>
           </div>

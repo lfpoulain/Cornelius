@@ -1,14 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { origin } from './env';
+import { login, origin } from './env';
 
 test('l’ouverture se règle en deux questions, avec une seule écriture par cas', async ({
   page,
 }) => {
-  await page.goto('/admin#voice');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin#voice');
   const triggers = page.getByRole('group', { name: 'Ce qui l’ouvre' });
   const audiences = page.getByRole('group', { name: 'Qui peut l’ouvrir' });
   const summary = page.locator('.admin-opening-summary');
@@ -63,11 +59,7 @@ test('l’ouverture se règle en deux questions, avec une seule écriture par ca
 test('« Quand il écoute » range ses cartes dans l’ordre, les réglages avancés repliés', async ({
   page,
 }) => {
-  await page.goto('/admin#voice');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin#voice');
   const settings = page.locator('.admin-settings');
   await expect(settings.locator('[data-slot="card-title"]').first()).toBeVisible();
   expect(await settings.locator('[data-slot="card-title"]').allTextContents()).toEqual([
@@ -99,11 +91,7 @@ test('deux choix d’ouverture rapprochés sont enregistrés tous les deux', asy
     if (first) await new Promise((resolve) => setTimeout(resolve, 1_500));
     await route.fulfill({ response });
   });
-  await page.goto('/admin#voice');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin#voice');
   const members = page
     .getByRole('group', { name: 'Qui peut l’ouvrir' })
     .getByRole('radio', { name: /Les membres du foyer/ });
@@ -130,11 +118,7 @@ test('deux choix d’ouverture rapprochés sont enregistrés tous les deux', asy
 test('la délégation permet Luna normal, Luna rapide et Astra ultra rapide, avec choix conservé', async ({
   page,
 }) => {
-  await page.goto('/admin#assistant');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin#assistant');
   // Le choix du modèle vit dans « Voix et modèles », avec le fournisseur et la voix.
   await expect(page.getByRole('heading', { level: 1, name: 'Voix et modèles' })).toBeVisible();
   const options = page.getByRole('group', { name: 'Mode de délégation', exact: true });
@@ -160,11 +144,7 @@ test('la délégation permet Luna normal, Luna rapide et Astra ultra rapide, ave
 test('« Micro gardé prêt » se règle dans les réglages avancés, hors de l’ouverture', async ({
   page,
 }) => {
-  await page.goto('/admin#voice');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin#voice');
   const opening = page.locator('[data-slot="card"]').filter({
     has: page.getByRole('heading', { name: 'Ouverture de la conversation' }),
   });
@@ -196,11 +176,7 @@ test('« Micro gardé prêt » se règle dans les réglages avancés, hors de l�
 test('le son d’ouverture se choisit dans un seul groupe, « Aucun son » compris, et persiste', async ({
   page,
 }) => {
-  await page.goto('/admin#voice');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin#voice');
   const group = page.getByRole('group', { name: 'Son joué à l’ouverture' });
   const none = group.getByRole('radio', { name: 'Aucun son', exact: true });
   const bell = group.getByRole('radio', { name: 'Cloche', exact: true });

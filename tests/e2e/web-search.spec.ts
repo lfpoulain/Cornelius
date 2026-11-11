@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { screenshots } from './env';
+import { login, screenshots } from './env';
 
 test('les cartes web affichent les citations OpenAI comme liens accessibles', async ({ page }) => {
   const snapshot = await (await page.request.get('/api/state')).json();
@@ -67,11 +67,7 @@ test('les cartes web affichent les citations OpenAI comme liens accessibles', as
 });
 
 test('le module Web parle de Cornelius, pas du modèle interne', async ({ page }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Modules', exact: true }).click();
   const module = page.locator('#module-web');
   await module.locator(':scope > summary').click();

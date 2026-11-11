@@ -5,7 +5,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { WebSocket } from 'ws';
 import imageGenerateSchema from '../schemas/image-generate.schema.json' with { type: 'json' };
 import imageRecallSchema from '../schemas/image-recall.schema.json' with { type: 'json' };
-import type { ToolResult } from '../shared/addons.js';
+import { toolFailure, toolResult, type ToolResult } from '../shared/addons.js';
 import {
   IMAGE_GENERATION_MODEL_DEFAULT,
   IMAGE_GENERATION_MODELS,
@@ -23,6 +23,7 @@ import {
   type OpenAIImageQuality,
   type Scope,
 } from '../shared/types.js';
+import { stripAccents } from '../shared/text.js';
 import { compile } from '../shared/validation.js';
 import type { DiagnosticLog } from './logs.js';
 import { OPENAI_IMAGE_SIZE, openAIImageError, type OpenAIImageCreator } from './openai-images.js';
@@ -86,9 +87,7 @@ const isOpenAIModel = (model: string): model is OpenAIImageModel =>
 /** Mots significatifs, sans accents, pour retrouver une image par son sujet. */
 function words(text: string): Set<string> {
   return new Set(
-    text
-      .normalize('NFD')
-      .replace(/\p{M}/gu, '')
+    stripAccents(text)
       .toLowerCase()
       .split(/[^\p{L}\p{N}]+/u)
       .filter((word) => word.length >= 3),
@@ -96,18 +95,7 @@ function words(text: string): Set<string> {
 }
 
 function failure(summary: string, code = 'unavailable', retryable = false): ImageGenerationOutcome {
-  return {
-    card: null,
-    tool: {
-      schemaVersion: 1,
-      status: 'failed',
-      result: null,
-      snapshotId: null,
-      actionRunId: null,
-      summary,
-      error: { code, message: summary, retryable },
-    },
-  };
+  return { card: null, tool: toolFailure(summary, code, retryable) };
 }
 
 export class ImageGeneration {
@@ -540,15 +528,10 @@ export class ImageGeneration {
     const { image, position } = picked;
     return {
       card: this.card(image.id, image.prompt, image.model),
-      tool: {
-        schemaVersion: 1,
-        status: 'succeeded',
+      tool: toolResult('succeeded', 'L’image a été réaffichée sur le miroir.', {
         result: { position, prompt: image.prompt, createdAt: image.createdAt },
         snapshotId: image.id,
-        actionRunId: null,
-        summary: 'L’image a été réaffichée sur le miroir.',
-        error: null,
-      },
+      }),
     };
   }
 
@@ -637,9 +620,7 @@ export class ImageGeneration {
       const card = this.card(pending.id, pending.input.prompt, pending.model);
       pending.resolve({
         card,
-        tool: {
-          schemaVersion: 1,
-          status: 'succeeded',
+        tool: toolResult('succeeded', 'L’image a été créée et affichée sur le miroir.', {
           result: {
             imageUrl: card.imageUrl,
             model: card.model,
@@ -647,10 +628,7 @@ export class ImageGeneration {
             height: card.height,
           },
           snapshotId: pending.id,
-          actionRunId: null,
-          summary: 'L’image a été créée et affichée sur le miroir.',
-          error: null,
-        },
+        }),
       });
       this.logs?.write(
         'info',

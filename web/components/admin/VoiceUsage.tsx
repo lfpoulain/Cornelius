@@ -3,8 +3,8 @@ import type { SessionState } from '../../../shared/types';
 import type { VoiceProvider } from '../../../shared/voice-provider';
 import type { VoiceUsagePeriod } from '../../../shared/voice-usage';
 import { api } from '../../api';
-import { decimalText, parseDecimal } from './format';
-import { DecimalInput, Field, ResourceState, SaveBar } from './shared';
+import { decimalText } from './format';
+import { DecimalInput, Field, ResourceState, SaveBar, useDecimalDraft } from './shared';
 import type { RunAction } from './types';
 import { useAdminResource } from './useAdminResource';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -57,17 +57,17 @@ export function VoiceUsageCard({
     if (phase === 'idle' && previousPhase.current !== 'idle') void reload();
     previousPhase.current = phase;
   }, [phase, reload]);
-  const [price, setPrice] = useState('');
+  // Brouillons calés sur les valeurs, pas sur l’objet : chaque relecture (fin d’une
+  // conversation) en rend un nouveau, et une saisie en cours serait effacée.
+  const price = useDecimalDraft(saved?.perMinute);
+  const parsed = price.value;
   const [currency, setCurrency] = useState<'$' | '€'>('$');
+  const savedCurrency = saved?.currency;
   useEffect(() => {
-    if (!saved) return;
-    setPrice(saved.perMinute === null ? '' : decimalText(saved.perMinute));
-    setCurrency(saved.currency);
-  }, [saved]);
-  const parsed = price.trim() ? parseDecimal(price) : null;
+    if (savedCurrency !== undefined) setCurrency(savedCurrency);
+  }, [savedCurrency]);
   const valid = parsed === null || (Number.isFinite(parsed) && parsed >= 0 && parsed <= 10);
-  const dirty =
-    !!saved && (currency !== saved.currency || (parsed ?? null) !== (saved.perMinute ?? null));
+  const dirty = !!saved && (currency !== saved.currency || price.dirty);
   // Le prix par minute ne sert qu’avec Mistral : il reste visible tant que du temps Mistral est
   // compté ou qu’un prix est enregistré, pour pouvoir le corriger ou l’effacer.
   const metered =
@@ -107,9 +107,9 @@ export function VoiceUsageCard({
             >
               <DecimalInput
                 id="voice-price"
-                value={price}
+                value={price.text}
                 aria-invalid={!valid || undefined}
-                onChange={(event) => setPrice(event.target.value)}
+                onChange={(event) => price.setText(event.target.value)}
               />
             </Field>
             <Field id="voice-currency" label="Monnaie" className="max-w-28">
@@ -135,7 +135,7 @@ export function VoiceUsageCard({
             })
           }
           onCancel={() => {
-            setPrice(saved?.perMinute == null ? '' : decimalText(saved.perMinute));
+            price.reset();
             setCurrency(saved?.currency ?? '$');
           }}
         />

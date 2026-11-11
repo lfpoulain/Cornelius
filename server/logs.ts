@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, renameSync, statSync, unlinkSync } from 'node:fs';
+import { appendFileSync, mkdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { LogEntry, LogLevel } from '../shared/logs.js';
 
@@ -7,6 +7,8 @@ export class DiagnosticLog {
   private entries: LogEntry[] = [];
   private sequence = 0;
   private diskFailed = false;
+  /** Taille du fichier courant, suivie en mémoire ; null tant qu’il n’a pas été préparé. */
+  private fileBytes: number | null = null;
   constructor(
     private options: {
       file?: string;
@@ -88,17 +90,13 @@ export class DiagnosticLog {
     const file = this.options.file;
     if (!file || this.diskFailed) return;
     try {
-      mkdirSync(dirname(file), { recursive: true });
-      if (
-        existsSync(file) &&
-        statSync(file).size + Buffer.byteLength(line) > (this.options.maxBytes ?? 5 * 1024 * 1024)
-      ) {
-        if (existsSync(file + '.3')) unlinkSync(file + '.3');
-        for (let i = 2; i >= 1; i--)
-          if (existsSync(file + '.' + i)) renameSync(file + '.' + i, file + '.' + (i + 1));
-        renameSync(file, file + '.1');
+      try {
+        this.append(file, line);
+      } catch {
+        // Dossier ou fichier retiré pendant que le serveur tourne : on repart du disque, une fois.
+        this.fileBytes = null;
+        this.append(file, line);
       }
-      appendFileSync(file, line, { mode: 0o600 });
     } catch (error) {
       this.diskFailed = true;
       this.write(
@@ -108,6 +106,27 @@ export class DiagnosticLog {
         { error },
       );
     }
+  }
+  /**
+   * Une ligne de journal ne coûte qu’un ajout au fichier : le dossier est créé et la taille
+   * lue une seule fois, puis la taille est suivie en mémoire pour décider de la rotation.
+   */
+  private append(file: string, line: string) {
+    const bytes = Buffer.byteLength(line);
+    if (this.fileBytes === null) {
+      mkdirSync(dirname(file), { recursive: true });
+      this.fileBytes = statSync(file, { throwIfNoEntry: false })?.size ?? 0;
+    }
+    if (this.fileBytes > 0 && this.fileBytes + bytes > (this.options.maxBytes ?? 5 * 1024 * 1024)) {
+      rmSync(file + '.3', { force: true });
+      for (let i = 2; i >= 1; i--)
+        if (statSync(file + '.' + i, { throwIfNoEntry: false }))
+          renameSync(file + '.' + i, file + '.' + (i + 1));
+      renameSync(file, file + '.1');
+      this.fileBytes = 0;
+    }
+    appendFileSync(file, line, { mode: 0o600 });
+    this.fileBytes += bytes;
   }
   snapshot() {
     return {

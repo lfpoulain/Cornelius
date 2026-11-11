@@ -3,7 +3,7 @@ import { satelliteGesturesMigration } from './satellite-gestures.js';
 import { googlePhotosMigration } from './google-photos.js';
 import { customProviderMigration } from './custom-provider.js';
 import { isVoiceProvider, type VoiceProvider } from '../shared/voice-provider.js';
-import { ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
+import { ORB_SCALE_DEFAULT, ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
 import { DEFAULT_CARD_SETTINGS, type CardSettings } from '../shared/cards.js';
 import { DEFAULT_LIVE_VOICE, isLiveVoice, type LiveVoice } from '../shared/voices.js';
 import {
@@ -722,7 +722,7 @@ export class SessionPreferences {
   getOrbScale(): number {
     return Number(
       this.db.prepare('SELECT orb_scale FROM display_preferences WHERE id = 1').get()?.orb_scale ??
-        100,
+        ORB_SCALE_DEFAULT,
     );
   }
   setOrbScale(scale: number): void {

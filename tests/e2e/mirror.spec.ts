@@ -2,7 +2,7 @@ import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
 import { crc32, deflateSync } from 'node:zlib';
 import type { AmbientDisplay } from '../../shared/addons';
 import type { DisplayCard, StateEvent } from '../../shared/types';
-import { origin, screenshots } from './env';
+import { login, origin, screenshots } from './env';
 
 /** État simulé du miroir : /api/state et le WebSocket servent le même instantané. */
 async function mirrorFixture(page: Page, change: (state: StateEvent['state']) => void) {
@@ -174,11 +174,7 @@ test('le miroir garde son orbe centré et propose uniquement l’activation init
     // En veille, rien ne part vers OpenAI : l’orbe est grise.
     await expect.poll(async () => (await litPixels()).chroma).toBeLessThan(45);
     await page.screenshot({ path: `${screenshots}/mirror-sleeping.png` });
-    await admin.goto(url + '/admin');
-    await admin
-      .getByLabel('Mot de passe administrateur')
-      .fill('admin-browser-test-only-credentials-1234');
-    await admin.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+    await login(admin, url + '/admin');
     await expect(admin.locator('.admin-shell')).toHaveCSS('color-scheme', 'dark');
     await admin.getByRole('button', { name: /Le foyer/ }).click();
     for (const name of ['Camille', 'Robin']) {

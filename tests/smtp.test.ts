@@ -106,6 +106,17 @@ test('vérification sans envoi, et erreurs qui disent quoi corriger', async (t) 
   await assert.rejects(verifySmtp(closed), (error: SmtpError) => error.code === 'unreachable');
 });
 
+test('STARTTLS : une réponse glissée en clair derrière le 220 est ignorée', async (t) => {
+  // Sans purge, cette fausse réponse serait lue comme celle du EHLO chiffré : plus aucun
+  // mécanisme de connexion annoncé, et l’envoi échouerait (ou suivrait les choix de l’intrus).
+  const { smtp, server } = await serve(t, {
+    security: 'starttls',
+    injectAfterStarttls: '250-intrus.example.test\r\n250 SIZE 1\r\n',
+  });
+  await sendMail(server, message);
+  assert.equal(smtp.messages.length, 1);
+});
+
 test('STARTTLS absent : jamais de mot de passe en clair', async (t) => {
   const { smtp, server } = await serve(t, { security: 'starttls', starttls: false });
   await assert.rejects(

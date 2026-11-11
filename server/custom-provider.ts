@@ -122,8 +122,12 @@ export function createCompatibleMemoryExtractor(
       );
       if (response.status === 'completed' && response.output_text)
         return parseProposal(response.output_text);
+      throw new Error('Extraction mémoire incomplète.');
     } catch (error) {
-      if (signal.aborted) throw error;
+      // Chat Completions ne remplace l’API Responses que si le serveur ne la connaît pas.
+      // Une clé refusée, un quota atteint, un délai dépassé ou une réponse inutilisable
+      // échoueraient de la même façon : inutile de doubler la requête et son attente.
+      if (signal.aborted || !responsesUnknown(error)) throw error;
     }
     const completion = await client.chat.completions.create(
       {
@@ -149,6 +153,11 @@ export function createCompatibleMemoryExtractor(
       throw new Error('Extraction mémoire incomplète.');
     return parseProposal(content);
   };
+}
+
+/** Le serveur dit ne pas connaître l’API Responses : route absente ou méthode non servie. */
+function responsesUnknown(error: unknown): boolean {
+  return error instanceof OpenAI.APIError && [404, 405, 501].includes(Number(error.status));
 }
 
 function parseProposal(content: string): unknown {

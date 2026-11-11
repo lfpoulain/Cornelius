@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { DEFAULT_GOOGLE_PHOTOS, type GooglePhotosView } from '../../shared/google-photos';
-import { screenshots } from './env';
+import { login, screenshots } from './env';
 
 test('album partagé : choix de source, validation, aperçu, actualisation et annulation', async ({
   page,
@@ -65,11 +65,7 @@ test('album partagé : choix de source, validation, aperçu, actualisation et an
       ),
     }),
   );
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Orbe et écran de veille', exact: true }).click();
   await page.getByRole('radio', { name: 'Album Google Photos', exact: true }).check();
   await expect(
@@ -161,11 +157,7 @@ for (const unavailableAlbum of [false, true]) {
           })
         : route.fulfill({ status: 404 }),
     );
-    await page.goto('/admin');
-    await page
-      .getByLabel('Mot de passe administrateur')
-      .fill('admin-browser-test-only-credentials-1234');
-    await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+    await login(page, '/admin');
     await page.getByRole('button', { name: 'Orbe et écran de veille', exact: true }).click();
     const placeholder = page.getByRole('img', {
       name: unavailableAlbum ? 'Aucune photo disponible' : 'Aperçu indisponible',

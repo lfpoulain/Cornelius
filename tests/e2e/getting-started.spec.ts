@@ -1,14 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { DevicesStatus, MirrorState, StateEvent } from '../../shared/types';
-import { origin, screenshots } from './env';
-
-async function login(page: Page, path = '/admin') {
-  await page.goto(path);
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
-}
+import { login, origin, screenshots } from './env';
 
 const ready: MirrorState = {
   setup: { openaiKey: true, perception: true },

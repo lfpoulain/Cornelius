@@ -3,7 +3,7 @@ import { ArrowRight, RefreshCw } from 'lucide-react';
 
 import type { ReadinessItem } from '../../../shared/readiness';
 import type { MirrorConnection } from '../../useMirror';
-import { phaseLabels } from '../Mirror';
+import { phaseLabels } from '../phase-labels';
 import { api } from '../../api';
 import type { ActionRunView, AddonInstanceView, HttpActionView } from './types';
 import { useAdminResource } from './useAdminResource';

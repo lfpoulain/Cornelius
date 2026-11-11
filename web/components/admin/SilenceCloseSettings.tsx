@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import {
   DEFAULT_SILENCE_CLOSE,
   SILENCE_CLOSE_MAX_MS,
@@ -10,8 +9,7 @@ import type { MirrorState } from '../../../shared/types';
 import { api } from '../../api';
 import type { RunAction } from './types';
 import { FineTuning } from './FineTuning';
-import { decimalText, parseDecimal } from './format';
-import { DecimalInput, Field, SaveBar } from './shared';
+import { DecimalInput, Field, SaveBar, useDecimalDraft } from './shared';
 import { ChoiceGroup, type ChoiceOption } from '../ui/choice-card';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
 
@@ -40,15 +38,11 @@ export function SilenceCloseSettings({ state, run }: { state: MirrorState; run: 
   // sur silence reste donc toujours active.
   const forced = voiceOnlyOpening(currentOpening(state));
   const choice = silenceChoice(saved, forced);
-  const [seconds, setSeconds] = useState(decimalText(saved.delayMs / 1000));
-  useEffect(() => {
-    setSeconds(decimalText(saved.delayMs / 1000));
-  }, [saved.delayMs]);
-  const delayMs = Math.round(parseDecimal(seconds) * 1000);
+  const draft = useDecimalDraft(saved.delayMs / 1000);
+  const delayMs = Math.round((draft.value ?? Number.NaN) * 1000);
   const valid = Number.isFinite(delayMs) && isSilenceClose({ enabled: true, delayMs });
-  // « 20,0 » pour 20 s n’est pas une modification ; une saisie vide ou invalide en est une.
-  const dirty =
-    seconds !== decimalText(saved.delayMs / 1000) && !(valid && delayMs === saved.delayMs);
+  // Arrondi à la milliseconde : « 20,0001 » pour 20 s n’est pas une modification.
+  const dirty = draft.dirty && delayMs !== saved.delayMs;
   const save = (next: { enabled: boolean; delayMs: number }) =>
     run(
       next.enabled
@@ -132,9 +126,9 @@ export function SilenceCloseSettings({ state, run }: { state: MirrorState; run: 
           >
             <DecimalInput
               id="silence-close-delay"
-              value={seconds}
+              value={draft.text}
               aria-invalid={!valid || undefined}
-              onChange={(event) => setSeconds(event.target.value)}
+              onChange={(event) => draft.setText(event.target.value)}
             />
           </Field>
         </FineTuning>
@@ -147,7 +141,7 @@ export function SilenceCloseSettings({ state, run }: { state: MirrorState; run: 
               : `Indiquez un délai de ${SILENCE_CLOSE_MIN_MS / 1000} à ${SILENCE_CLOSE_MAX_MS / 1000} s.`
           }
           onSave={() => void save({ enabled: true, delayMs })}
-          onCancel={() => setSeconds(decimalText(saved.delayMs / 1000))}
+          onCancel={draft.reset}
         />
       </CardContent>
     </Card>

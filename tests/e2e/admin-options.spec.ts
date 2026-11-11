@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
-import { origin } from './env';
+import { expect, test } from '@playwright/test';
+import { login, origin } from './env';
 import { withModuleTokens } from './module-tokens';
 
 const created: string[] = [];
@@ -11,14 +11,6 @@ test.afterEach(async ({ page }) => {
     expect(response.ok()).toBe(true);
   }
 });
-
-async function login(page: Page) {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
-}
 
 test('une source créée désactivée le reste après actualisation', async ({ page }) => {
   await withModuleTokens(page);

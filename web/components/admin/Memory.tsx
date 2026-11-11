@@ -6,7 +6,15 @@ import { api } from '../../api';
 import type { RunAction } from './types';
 import { useAdminResource } from './useAdminResource';
 import { formatWhen, ofName, plural } from './format';
-import { ConfirmAction, Field, KeepHeight, LoadingCard, PersonPicker, SearchInput } from './shared';
+import {
+  ConfirmAction,
+  Field,
+  KeepHeight,
+  LoadError,
+  LoadingCard,
+  PersonPicker,
+  SearchInput,
+} from './shared';
 import { useUnsavedChanges } from './unsaved';
 import { personFromHash, personHref } from './person-links';
 import { Button } from '../ui/button';
@@ -71,14 +79,7 @@ function MemoryLoader({ profile, run }: { profile: Profile; run: RunAction }) {
   const resource = useAdminResource(load);
   if (resource.error && !resource.data)
     return (
-      <Alert variant="destructive">
-        <AlertDescription className="gap-3">
-          <p>{resource.error}</p>
-          <Button variant="outline" size="sm" onClick={() => void resource.reload()}>
-            Réessayer
-          </Button>
-        </AlertDescription>
-      </Alert>
+      <LoadError error={resource.error} loading={resource.loading} onRetry={resource.reload} />
     );
   if (!resource.data) return <LoadingCard label="Chargement des souvenirs…" />;
   // Pas de clé dépendant de la version : un rechargement garde les corrections en cours.

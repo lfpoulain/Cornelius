@@ -18,14 +18,22 @@ import {
 import type { Profile } from '../../../shared/types';
 import { api, errorMessage } from '../../api';
 import { previewAlarmSound } from '../../audio/alarm-sound';
-import { Alert, AlertDescription } from '../ui/alert';
+import { parseDecimal } from './format';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { NativeSelect, NativeSelectOption } from '../ui/native-select';
 import { Switch } from '../ui/switch';
-import { ConfirmAction, Field, LoadingCard, ModulePanel, PresetButton } from './shared';
+import {
+  ConfirmAction,
+  DecimalInput,
+  Field,
+  LoadError,
+  LoadingCard,
+  ModulePanel,
+  PresetButton,
+} from './shared';
 import type { RunAction } from './types';
 import { useAdminResource } from './useAdminResource';
 
@@ -61,7 +69,7 @@ function request(draft: Draft): Omit<AlarmRequest, 'target'> {
     time: timer ? null : draft.time,
     date: timer || draft.days || !draft.date ? null : draft.date,
     days: timer ? 0 : draft.days,
-    durationMs: timer ? Math.round(Number(draft.minutes.replace(',', '.')) * 60_000) || 0 : null,
+    durationMs: timer ? Math.round(parseDecimal(draft.minutes) * 60_000) || 0 : null,
     inMinutes: null,
   };
 }
@@ -181,14 +189,7 @@ export function AlarmSettings({
   if (!current)
     return panel(
       loadError ? (
-        <Alert variant="destructive">
-          <AlertDescription className="gap-3">
-            <p>{loadError}</p>
-            <Button variant="outline" size="sm" onClick={() => void reload()}>
-              Réessayer
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <LoadError error={loadError} loading={loading} onRetry={reload} />
       ) : (
         <LoadingCard label="Lecture des alarmes…" />
       ),
@@ -207,7 +208,7 @@ export function AlarmSettings({
       ? 'le foyer'
       : (profiles.find((profile) => profile.id === profileId)?.name ?? 'profil supprimé');
   const timer = draft.kind === 'timer';
-  const minutes = Number(draft.minutes.replace(',', '.'));
+  const minutes = parseDecimal(draft.minutes);
   const ready = timer
     ? Number.isFinite(minutes) && minutes > 0
     : /^\d{2}:\d{2}$/u.test(draft.time) && (draft.kind !== 'reminder' || !!draft.label.trim());
@@ -331,9 +332,8 @@ export function AlarmSettings({
           </Field>
           {timer ? (
             <Field id="alarms-new-minutes" label="Durée (minutes)">
-              <Input
+              <DecimalInput
                 id="alarms-new-minutes"
-                inputMode="decimal"
                 value={draft.minutes}
                 onChange={(event) => edit({ minutes: event.target.value })}
               />

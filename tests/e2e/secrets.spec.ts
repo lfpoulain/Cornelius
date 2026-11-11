@@ -1,17 +1,10 @@
-import { expect, test, type Page } from '@playwright/test';
-
-async function login(page: Page) {
-  await page.goto('/admin#access');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
-}
+import { expect, test } from '@playwright/test';
+import { login } from './env';
 
 test('un jeton de module se saisit dans Clés et accès, compte aussitôt et s’efface', async ({
   page,
 }) => {
-  await login(page);
+  await login(page, '/admin#access');
   const card = page.locator('#secrets');
   await expect(card.getByRole('heading', { name: 'Clés et jetons' })).toBeVisible();
   const providers = card.getByRole('region', { name: 'Fournisseurs IA' });
@@ -50,7 +43,7 @@ for (const width of [390, 1440]) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 1000 });
-    await login(page);
+    await login(page, '/admin#access');
     const cards = page.locator('#secrets article');
     await expect(cards.first()).toBeVisible();
     for (const card of await cards.all()) {
@@ -112,7 +105,7 @@ for (const width of [390, 1440]) {
 }
 
 test('la clé mémoire active la découverte sans exposer sa valeur', async ({ page }) => {
-  await login(page);
+  await login(page, '/admin#access');
   const key = 'custom-memory-e2e-only-0123456789';
   const field = page.locator('#secrets').getByLabel('Clé mémoire personnalisée', { exact: true });
   await field.fill(key);

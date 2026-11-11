@@ -155,10 +155,14 @@ def load_environment():
     path = ROOT / ".env"
     if not path.exists():
         return
+    values = {}
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.strip() and not line.lstrip().startswith("#") and "=" in line:
             key, value = line.split("=", 1)
-            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+            # Clé en double : la dernière ligne l’emporte, comme pour Node (--env-file).
+            values[key.strip()] = value.strip().strip('"').strip("'")
+    for key, value in values.items():
+        os.environ.setdefault(key, value)
 
 
 def select_device(torch, requested):

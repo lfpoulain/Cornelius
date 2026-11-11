@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { fakeHermes } from '../helpers/hermes.js';
-import { screenshots } from './env';
+import { login, screenshots } from './env';
 
 test('Agents : configuration réelle, découverte, demande, accord, profil et affichage mobile', async ({
   page,
@@ -9,11 +9,7 @@ test('Agents : configuration réelle, découverte, demande, accord, profil et af
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   try {
-    await page.goto('/admin');
-    await page
-      .getByLabel('Mot de passe administrateur')
-      .fill('admin-browser-test-only-credentials-1234');
-    await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+    await login(page, '/admin');
     await page.getByRole('button', { name: 'Le foyer et les visages', exact: true }).click();
     for (const name of ['Alice Hermes navigateur', 'Bob Hermes navigateur']) {
       await page.getByLabel('Prénom ou nom d’affichage').fill(name);
@@ -126,11 +122,7 @@ test('Agents : jeton conservé et vérification explicite en cours, refusée, pa
   let release = () => {};
   let closed = false;
   try {
-    await page.goto('/admin');
-    await page
-      .getByLabel('Mot de passe administrateur')
-      .fill('admin-browser-test-only-credentials-1234');
-    await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+    await login(page, '/admin');
     await page.getByRole('button', { name: 'Le foyer et les visages', exact: true }).click();
     const name = 'Hermes erreurs navigateur';
     await page.getByLabel('Prénom ou nom d’affichage').fill(name);
@@ -275,11 +267,7 @@ test('Agents sans personne : Hermes expliqué et un bouton pour ajouter quelqu�
     value.state.profiles = [];
     await route.fulfill({ response, json: value });
   });
-  await page.goto('/admin#agents');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin#agents');
   await expect(page.getByRole('heading', { level: 1, name: 'Agents' })).toBeVisible();
   await expect(
     page.getByText('Hermes est un agent personnel installé à part', { exact: false }),

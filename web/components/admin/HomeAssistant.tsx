@@ -82,7 +82,12 @@ export function HomeAssistantSettings({
   const changes =
     selected.filter((id) => !saved.includes(id)).length +
     saved.filter((id) => !selected.includes(id)).length;
+  // Vrai dès qu’une lecture a rempli le formulaire : avant cela, une relecture périodique
+  // réussie tient lieu de première lecture.
+  const loaded = useRef(false);
   const accept = (next: HomeAssistantView) => {
+    loaded.current = true;
+    setLoadError('');
     setView(next);
     setUrl(next.url);
     setToken('');
@@ -95,10 +100,11 @@ export function HomeAssistantSettings({
     api
       .homeAssistant()
       .then((next) => {
-        if (active) accept(next);
+        // Une relecture périodique a pu aboutir avant : la saisie commencée depuis reste.
+        if (active && !loaded.current) accept(next);
       })
       .catch((error) => {
-        if (active) setLoadError(errorMessage(error));
+        if (active && !loaded.current) setLoadError(errorMessage(error));
       });
     return () => {
       active = false;
@@ -115,7 +121,11 @@ export function HomeAssistantSettings({
       api
         .homeAssistant()
         .then((next) => {
-          if (active) newest(next);
+          if (!active) return;
+          // Première lecture échouée : celle-ci remplit l’adresse et la révision, et efface
+          // l’erreur ; sans cela les enregistrements partiraient avec la révision 0.
+          if (!loaded.current) accept(next);
+          else newest(next);
         })
         .catch(() => {});
     }, 3000);

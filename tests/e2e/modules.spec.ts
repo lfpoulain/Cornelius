@@ -1,16 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { origin, screenshots } from './env';
+import { login, origin, screenshots } from './env';
 import { withModuleTokens } from './module-tokens';
 
 test('les modules se filtrent par personne, se recherchent et gardent leurs favoris', async ({
   page,
 }) => {
   await withModuleTokens(page);
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   // Connexion terminée avant la requête : sinon, lancé seul, le test crée le profil sans cookie.
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   const result = await page.request.post('/api/admin/profiles', {
@@ -54,11 +50,7 @@ test('un jeton manquant est expliqué en tête du module et bloque l’ajout de 
   page,
 }) => {
   await withModuleTokens(page, false);
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Modules', exact: true }).click();
   const weather = page
     .locator('[data-slot="card"]')
@@ -98,11 +90,7 @@ test('un réglage invalide est signalé sous son champ, en français, sans rien 
   page,
 }) => {
   await withModuleTokens(page);
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Modules', exact: true }).click();
   let created = 0;
   await page.route('**/api/admin/addons/instances', async (route) => {
@@ -132,11 +120,7 @@ test('un réglage invalide est signalé sous son champ, en français, sans rien 
 test('une source sans identifiant reçoit celui de son nom et la page dit quoi prononcer', async ({
   page,
 }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   const response = await page.request.post('/api/admin/addons/instances', {
     headers: { origin },
     data: {
@@ -194,11 +178,7 @@ test('un module refusé au démarrage est nommé en bas de la page, avec la rais
     ];
     await route.fulfill({ response, json: catalog });
   });
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Modules', exact: true }).click();
   const note = page.getByRole('note', { name: 'Module non chargé' });
   await expect(note).toBeVisible();
@@ -209,11 +189,7 @@ test('les modules sont rangés en trois groupes et se trouvent sans accents, mot
   page,
 }) => {
   await withModuleTokens(page);
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Modules', exact: true }).click();
   const daily = page.getByRole('region', { name: 'Au quotidien' });
   const home = page.getByRole('region', { name: 'Maison' });
@@ -250,11 +226,7 @@ test('les modules sont rangés en trois groupes et se trouvent sans accents, mot
 test('formulaire de source : champs du module d’abord, interrupteurs et liste de fuseaux', async ({
   page,
 }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Modules', exact: true }).click();
   await page.locator('#module-clock > summary').click();
   await page.getByRole('button', { name: 'Ajouter une source' }).click();
@@ -281,11 +253,7 @@ test('formulaire de source : champs du module d’abord, interrupteurs et liste 
 test('formulaire de source : listes déroulantes, choix facultatif et liste répétée', async ({
   page,
 }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Modules', exact: true }).click();
   // Module externe d'essai (tests/e2e/modules) : rangé dans « Maison » par son display.
   const home = page.getByRole('region', { name: 'Maison' });

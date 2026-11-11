@@ -10,7 +10,7 @@ import { createMistralMemoryExtractor } from './voice/memory-extractor.js';
 import { isCardSettings } from '../shared/cards.js';
 import { isLiveVoice } from '../shared/voices.js';
 import { isOrbScale, ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
-import { AdminPassword, newPasswordError } from './admin-password.js';
+import { AdminPassword, equalSecret, newPasswordError } from './admin-password.js';
 import { SecretStore, secretValueError } from './secrets.js';
 import { TrustedDevices } from './trusted-devices.js';
 import { allowedHostname, isLoopback, isPrivateAddress, localAddresses } from './network.js';
@@ -29,7 +29,7 @@ import { PersonalMemory, type MemoryExtractor } from './memory.js';
 import { createMemoryExtractor } from './memory-extractor.js';
 import { registerMemory } from './memory-api.js';
 import { PersonalDataEraser } from './backups.js';
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
@@ -171,12 +171,6 @@ export function requestPath(url: string): string | null {
   } catch {
     return null;
   }
-}
-function equalSecret(input: string, expected: string): boolean {
-  return timingSafeEqual(
-    createHash('sha256').update(input).digest(),
-    createHash('sha256').update(expected).digest(),
-  );
 }
 
 export async function createApp(
@@ -359,12 +353,18 @@ export async function createApp(
       process.env,
     ),
   );
-  const homeAssistant = new HomeAssistant(new HomeAssistantRepository(db), http, logs);
+  const homeAssistant = new HomeAssistant(
+    new HomeAssistantRepository(db),
+    http,
+    logs,
+    undefined,
+    timeZone,
+  );
   homeAssistant.start();
   const imageGeneration = new ImageGeneration(
     db,
     true,
-    () => broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true),
+    () => broadcastDevices(),
     logs,
     now,
     // Une base en mémoire (tests) ne doit jamais purger les images du vrai miroir.
@@ -556,7 +556,7 @@ export async function createApp(
       name,
       source: secretStore.source(name),
     });
-    broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+    broadcastDevices();
   });
   let lastDeviceLog = '';
   let imageGenerationRuntime!: ImageGenerationRuntime;
@@ -652,7 +652,7 @@ export async function createApp(
     db,
     controller,
     () => {
-      broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+      broadcastDevices();
     },
     now,
     undefined,
@@ -662,14 +662,14 @@ export async function createApp(
   // Raspberry Pi : la description de la scène est trop lourde, seule la reconnaissance reste.
   if (config.machine?.small) vision.restrict(smallMachineReason(config.machine));
   const downloads = new ModelDownloads(
-    () => broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true),
+    () => broadcastDevices(),
     (model) => vision.modelInstalled(model),
     undefined,
     options.modelLauncher,
   );
   imageGenerationRuntime = new ImageGenerationRuntime(
     imageGeneration,
-    () => broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true),
+    () => broadcastDevices(),
     imageGenerationToken,
     config.origins[0] ?? 'http://127.0.0.1:3000',
     options.imageGenerationRoot,
@@ -907,7 +907,7 @@ export async function createApp(
     wakeArbiter,
     vision,
     downloads,
-    authorize: (role) => (role === 'admin' ? requireAdmin : async () => {}),
+    requireAdmin,
     devices,
     currentKiosk: (req) =>
       !!kiosk && !!req.cookies[kioskCookie] && kiosk.kioskId === req.cookies[kioskCookie],
@@ -1140,7 +1140,7 @@ export async function createApp(
       return { ok: true };
     },
   );
-  app.get('/api/health', async () => ({ status: 'ok', version: '0.1.0' }));
+  app.get('/api/health', async () => ({ status: 'ok', version: coreVersion }));
   app.get<{ Querystring: { role?: string } }>('/api/auth', async (request, reply) => {
     if (request.query.role === 'admin') {
       const id = adminIdentity(request);
@@ -1205,7 +1205,7 @@ export async function createApp(
       const keep = adminIdentity(request);
       for (const id of [...sessions.keys()]) if (id !== keep) closeAdminSession(id);
       logs.write('info', 'local', 'Mot de passe administrateur changé');
-      broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+      broadcastDevices();
       return { ok: true, source: adminPassword.source() };
     },
   );
@@ -1332,7 +1332,7 @@ export async function createApp(
     trustedDevices.clear();
     for (const [socket, client] of clients)
       if (client.role === 'kiosk' && client.remote) socket.close(1008, lanPairingMessage);
-    broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+    broadcastDevices();
     return { ok: true };
   });
   app.post('/api/logout', async (request, reply) => {
@@ -1590,7 +1590,7 @@ export async function createApp(
     else if (wasBlocked) controller.resumeAutomatic();
     controller.publish();
     // La génération d’image par OpenAI suit le même blocage.
-    broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+    broadcastDevices();
     return controller.snapshot();
   });
   const privacySchema = compile<{ enabled: boolean }>({
@@ -1613,7 +1613,7 @@ export async function createApp(
       });
     controller.setPresenceTimings(request.body);
     perception.refreshPresenceTimings();
-    broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+    broadcastDevices();
     return controller.getPresenceTimings();
   });
   const delegationModeSchema = compile<{ mode: DelegationMode }>({
@@ -1725,7 +1725,7 @@ export async function createApp(
       controller.setVoiceProvider(provider);
       live.setGateway(voiceGateway());
       controller.setSetup({ voiceKey: !!selectedVoiceKey() });
-      broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+      broadcastDevices();
       return controller.snapshot();
     },
   );
@@ -1926,6 +1926,10 @@ export async function createApp(
         socket.send(JSON.stringify({ schemaVersion: 1, type: 'devices', status: devices() }));
     },
   );
+
+  function broadcastDevices() {
+    broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+  }
 
   function broadcast(event: unknown, adminOnly = false) {
     const payload = JSON.stringify(event);

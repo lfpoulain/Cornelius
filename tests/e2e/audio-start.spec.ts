@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { login } from './env';
 
 test.use({
   permissions: ['microphone'],
@@ -8,11 +9,7 @@ test.use({
 test('activer depuis l’administration autorise OpenAI et ouvre le miroir dans sa fenêtre', async ({
   page,
 }) => {
-  await page.goto('/admin#voice');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin#voice');
   await page.getByRole('button', { name: 'Bloquer les services IA', exact: true }).click();
   await expect(page.getByText('Accès aux services IA bloqué', { exact: true })).toBeVisible();
   const panel = page.getByRole('region', { name: 'Conversation' });

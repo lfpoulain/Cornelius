@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   AddonCollectError,
+  toolResult,
   type ActionRun,
   type AddonHttpClient,
   type HttpActionDefinition,
@@ -57,23 +58,6 @@ export function actionSecrets(
       secrets[key.slice(secretEnvPrefix.length)] = value;
   }
   return secrets;
-}
-
-function result(
-  status: ToolResult['status'],
-  summary: string,
-  extra: Partial<ToolResult> = {},
-): ToolResult {
-  return {
-    schemaVersion: 1,
-    status,
-    result: null,
-    snapshotId: null,
-    actionRunId: null,
-    summary,
-    error: null,
-    ...extra,
-  };
 }
 
 /**
@@ -215,7 +199,7 @@ export class ActionExecutor {
       .actionsFor(profileId)
       .find((candidate) => candidate.enabled && candidate.ref === actionRef);
     if (!action)
-      return result('failed', `Action « ${actionRef} » inconnue pour ce profil.`, {
+      return toolResult('failed', `Action « ${actionRef} » inconnue pour ce profil.`, {
         error: {
           code: 'not_found',
           message: 'Action inconnue ou non autorisée.',
@@ -226,7 +210,8 @@ export class ActionExecutor {
   }
 
   async run(input: ActionRunInput): Promise<ToolResult> {
-    if (input.signal.aborted) return result('cancelled', 'Interaction terminée ; action annulée.');
+    if (input.signal.aborted)
+      return toolResult('cancelled', 'Interaction terminée ; action annulée.');
     this.actions.purgeConfirmations(this.now());
     const resolved = this.authorize(input.actionRef, input.profileId);
     if (!('action' in resolved)) return resolved;
@@ -251,7 +236,7 @@ export class ActionExecutor {
         paramsHash: confirmationHash(action, input),
         expiresAt: this.now() + confirmationMs,
       });
-      return result(
+      return toolResult(
         'pending_confirmation',
         `Action « ${action.label} » en attente de validation dans l’administration.`,
         { result: { confirmationId, actionRef: action.ref, label: action.label } },
@@ -274,13 +259,13 @@ export class ActionExecutor {
           confirmation.profileId === input.profileId
         )
           this.actions.deleteConfirmation(input.confirmationId);
-        return result('cancelled', 'Confirmation expirée ou invalide ; action annulée.', {
+        return toolResult('cancelled', 'Confirmation expirée ou invalide ; action annulée.', {
           error: { code: 'invalid_params', message: 'Confirmation invalide.', retryable: false },
         });
       }
       // La validation vient d'un canal authentifié (administration), jamais du modèle.
       if (confirmation.approvedAt === null)
-        return result(
+        return toolResult(
           'failed',
           `Action « ${action.label} » non validée : confirmez-la dans l’administration.`,
           {
@@ -304,7 +289,7 @@ export class ActionExecutor {
         actionRef: action.ref,
         code: error instanceof AddonCollectError ? error.code : 'config_invalid',
       });
-      return result('failed', `Action « ${action.label} » mal configurée.`, {
+      return toolResult('failed', `Action « ${action.label} » mal configurée.`, {
         error: {
           code: 'config_invalid',
           message: error instanceof Error ? error.message : 'Secret manquant.',
@@ -344,15 +329,10 @@ export class ActionExecutor {
           responseStatus: response.status,
           durationMs: this.now() - startedAt,
         });
-        return {
-          schemaVersion: 1,
-          status: 'succeeded',
+        return toolResult('succeeded', `Action « ${action.label} » réussie.`, {
           result: { label: action.label, status: response.status },
-          snapshotId: null,
           actionRunId: finished.id,
-          summary: `Action « ${action.label} » réussie.`,
-          error: null,
-        };
+        });
       }
       if (response.status >= 500) {
         const finished = this.actions.finishRun(run.id, {
@@ -367,15 +347,14 @@ export class ActionExecutor {
           status: 'unknown',
           responseStatus: response.status,
         });
-        return {
-          schemaVersion: 1,
-          status: 'unknown',
-          result: null,
-          snapshotId: null,
-          actionRunId: finished.id,
-          summary: `Résultat incertain pour « ${action.label} ». Ne pas répéter automatiquement.`,
-          error: { code: 'upstream', message: `Statut ${response.status}.`, retryable: false },
-        };
+        return toolResult(
+          'unknown',
+          `Résultat incertain pour « ${action.label} ». Ne pas répéter automatiquement.`,
+          {
+            actionRunId: finished.id,
+            error: { code: 'upstream', message: `Statut ${response.status}.`, retryable: false },
+          },
+        );
       }
       const code =
         response.status === 401
@@ -397,15 +376,10 @@ export class ActionExecutor {
         status: 'failed',
         responseStatus: response.status,
       });
-      return {
-        schemaVersion: 1,
-        status: 'failed',
-        result: null,
-        snapshotId: null,
+      return toolResult('failed', `Action « ${action.label} » refusée (${response.status}).`, {
         actionRunId: finished.id,
-        summary: `Action « ${action.label} » refusée (${response.status}).`,
         error: { code, message: `Statut ${response.status}.`, retryable: false },
-      };
+      });
     } catch (error) {
       const code = error instanceof AddonCollectError ? error.code : 'unavailable';
       // Requête invalide ou destination injoignable : rien n'est parti, l'échec est certain.
@@ -425,15 +399,10 @@ export class ActionExecutor {
           status: 'failed',
           code,
         });
-        return {
-          schemaVersion: 1,
-          status: 'failed',
-          result: null,
-          snapshotId: null,
+        return toolResult('failed', `Action « ${action.label} » non envoyée : ${reason}.`, {
           actionRunId: finished.id,
-          summary: `Action « ${action.label} » non envoyée : ${reason}.`,
           error: { code, message: error.message, retryable: false },
-        };
+        });
       }
       const finished = this.actions.finishRun(run.id, {
         status: 'unknown',
@@ -446,15 +415,14 @@ export class ActionExecutor {
         code,
         timeout: code === 'timeout',
       });
-      return {
-        schemaVersion: 1,
-        status: 'unknown',
-        result: null,
-        snapshotId: null,
-        actionRunId: finished.id,
-        summary: `Résultat incertain pour « ${action.label} ». Ne pas répéter automatiquement.`,
-        error: { code, message: 'Réponse perdue ou délai dépassé.', retryable: false },
-      };
+      return toolResult(
+        'unknown',
+        `Résultat incertain pour « ${action.label} ». Ne pas répéter automatiquement.`,
+        {
+          actionRunId: finished.id,
+          error: { code, message: 'Réponse perdue ou délai dépassé.', retryable: false },
+        },
+      );
     }
   }
 
@@ -467,17 +435,18 @@ export class ActionExecutor {
         : null,
     };
     if (status === 'succeeded')
-      return result('succeeded', `Action « ${action.label} » déjà exécutée.`, {
+      return toolResult('succeeded', `Action « ${action.label} » déjà exécutée.`, {
         ...extra,
         result: { label: action.label, status: responseStatus },
       });
     if (status === 'unknown')
-      return result(
+      return toolResult(
         'unknown',
         `Résultat incertain pour « ${action.label} ». Ne pas répéter.`,
         extra,
       );
-    if (status === 'failed') return result('failed', `Action « ${action.label} » en échec.`, extra);
-    return result('cancelled', `Action « ${action.label} » annulée.`, extra);
+    if (status === 'failed')
+      return toolResult('failed', `Action « ${action.label} » en échec.`, extra);
+    return toolResult('cancelled', `Action « ${action.label} » annulée.`, extra);
   }
 }

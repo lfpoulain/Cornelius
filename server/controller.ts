@@ -1,5 +1,6 @@
 import type { VoiceProvider } from '../shared/voice-provider.js';
 import { DEFAULT_CARD_SETTINGS, type CardSettings } from '../shared/cards.js';
+import { ORB_SCALE_DEFAULT } from '../shared/display.js';
 import { DEFAULT_LIVE_VOICE, type LiveVoice } from '../shared/voices.js';
 import { DEFAULT_SCREENSAVER, type ScreensaverSettings } from '../shared/screensaver.js';
 import { openingFromSettings, settingsForOpening, type Opening } from '../shared/opening.js';
@@ -130,6 +131,11 @@ const voiceIdentityWindowMs = 8000;
 type OpenSource = 'automatic' | 'manual' | 'wake' | 'resume' | 'satellite';
 const satelliteMembersDiagnostic =
   'Satellite : l’ouverture est réservée aux membres reconnus, qu’un satellite ne peut pas voir.';
+const privacyDiagnostic = 'Mode vie privée : plusieurs personnes détectées.';
+const mirrorClosedDiagnostic = 'Ouvrez le miroir pour démarrer une session.';
+const voiceInactiveDiagnostic =
+  'Activez la voix sur le miroir pour autoriser le microphone et le son.';
+const refusedResultPrefix = 'Résultat refusé : ';
 const unknownPersonDiagnostic =
   'Personne non reconnue : seules les personnes du foyer ouvrent une conversation.';
 
@@ -239,7 +245,7 @@ export class SessionController {
   private privacyMode = false;
   private wakeWordEnabled = false;
   private advancedAudioBuffer = false;
-  private orbScale = 100;
+  private orbScale = ORB_SCALE_DEFAULT;
   private voiceProvider: VoiceProvider = 'openai';
   private screensaver: ScreensaverSettings = { ...DEFAULT_SCREENSAVER };
   private screensaverImages = { count: 0, revision: '' };
@@ -293,7 +299,7 @@ export class SessionController {
       this.session.mode === 4 || (preferences?.getWakeWordEnabled?.() ?? false);
     if (this.session.mode === 4) preferences?.setWakeWordEnabled?.(true);
     this.advancedAudioBuffer = preferences?.getAdvancedAudioBuffer?.() ?? false;
-    this.orbScale = preferences?.getOrbScale?.() ?? 100;
+    this.orbScale = preferences?.getOrbScale?.() ?? ORB_SCALE_DEFAULT;
     this.voiceProvider = preferences?.getVoiceProvider?.() ?? 'openai';
     this.screensaver = { ...(preferences?.getScreensaver?.() ?? DEFAULT_SCREENSAVER) };
     this.speechVoice = preferences?.getSpeechVoice?.() ?? DEFAULT_LIVE_VOICE;
@@ -394,12 +400,25 @@ export class SessionController {
     return this.voiceRecognition;
   }
 
-  wakeWordState(): MirrorState['wakeWord'] {
-    return {
-      enabled: this.wakeWordEnabled,
-      ready: this.wakeWordReady,
-      detail: this.wakeWordDetail,
-    };
+  // Accesseurs légers : `snapshot()` relit les profils en base et clone tout l’état, ce qui
+  // est trop cher pour lire un seul champ à chaque appel d’outil ou événement Live.
+  /** Profil actif de la conversation, tel que publié dans `activeProfile`. */
+  activeProfile(): Readonly<Profile> | null {
+    return this.profile;
+  }
+
+  /** Cartes affichées, celle du dessus en premier, telles que publiées dans `cards`. */
+  displayedCards(): readonly Readonly<DisplayCard>[] {
+    const now = this.now();
+    return this.cards.filter((card) => card.expiresAt > now && this.current(card));
+  }
+
+  voicePhase(): VoiceActivity['phase'] {
+    return this.voice.phase;
+  }
+
+  getDelegationMode(): DelegationMode {
+    return this.delegationMode;
   }
 
   /** La veille écoute « Cornelius » : un arrêt manuel ne l’éteint pas, le mot le lève. */
@@ -578,6 +597,16 @@ export class SessionController {
     this.publish();
   }
 
+  /**
+   * Écarte les observations tardives d’un worker remplacé. La liste est bornée : une
+   * perception qui redémarre en boucle ne doit pas la faire grossir sans fin.
+   */
+  private retireProducer(producerBootId: string): void {
+    this.retiredProducers.add(producerBootId);
+    if (this.retiredProducers.size > 64)
+      this.retiredProducers.delete(this.retiredProducers.values().next().value!);
+  }
+
   observe(input: PerceptionObservation): boolean {
     const now = this.now();
     if (
@@ -600,7 +629,7 @@ export class SessionController {
     this.rawObservation = structuredClone(input);
     for (const listener of this.perceptionListeners) listener();
     if (previous && previous.producerBootId !== input.producerBootId) {
-      this.retiredProducers.add(previous.producerBootId);
+      this.retireProducer(previous.producerBootId);
       this.resetPresence();
       this.close('Perception redémarrée.');
       this.changeProfile(null, 'household', false);
@@ -710,9 +739,7 @@ export class SessionController {
   ): void {
     if (previous && previous.producerBootId !== input.producerBootId) {
       // Chaque conversation rallume la caméra : les images d’avant ne reviennent jamais.
-      this.retiredProducers.add(previous.producerBootId);
-      if (this.retiredProducers.size > 64)
-        this.retiredProducers.delete(this.retiredProducers.values().next().value!);
+      this.retireProducer(previous.producerBootId);
     }
     this.rawObservation = structuredClone(input);
     this.observation = structuredClone(input);
@@ -1288,14 +1315,37 @@ export class SessionController {
     return this.engagementId === null ? null : `engaged:${this.engagementId}`;
   }
 
+  /** Plusieurs personnes devant la caméra alors que le mode vie privée l’interdit. */
+  private crowdedPrivacy(): boolean {
+    // La voix seule ne dispose pas d'une observation vidéo pour compter les personnes.
+    return (
+      this.session.mode !== 4 && this.privacyMode && (this.observation?.people.length ?? 0) > 1
+    );
+  }
+
+  /**
+   * Efface un diagnostic d’admission dont la cause a disparu (miroir rouvert, voix activée,
+   * personne seule). Sans cela il restait publié jusqu’à la prochaine conversation, et un
+   * déclencheur externe le renvoyait comme raison d’un refus qui n’en dépendait plus.
+   */
+  private settleDiagnostic(): void {
+    if (
+      (this.diagnostic === privacyDiagnostic && !this.crowdedPrivacy()) ||
+      (this.diagnostic === mirrorClosedDiagnostic && this.browserHealthy()) ||
+      (this.diagnostic === voiceInactiveDiagnostic &&
+        (!this.browserHealthy() || this.browserAudioReady))
+    )
+      this.diagnostic = null;
+  }
+
   private maybeOpen(source: OpenSource = 'automatic'): void {
+    this.settleDiagnostic();
     if (['connecting', 'ready', 'closing'].includes(this.session.phase) || this.session.manualStop)
       return;
     // Le mot d’appel est exigé (toujours vrai sans caméra en veille) : la présence seule n’ouvre pas.
     if (this.wakeWordEnabled && source === 'automatic') return;
-    // La voix seule ne dispose pas d'une observation vidéo pour compter les personnes.
-    if (this.session.mode !== 4 && this.privacyMode && (this.observation?.people.length ?? 0) > 1) {
-      this.diagnostic = 'Mode vie privée : plusieurs personnes détectées.';
+    if (this.crowdedPrivacy()) {
+      this.diagnostic = privacyDiagnostic;
       return;
     }
     const trigger = this.triggerKey(source);
@@ -1310,11 +1360,11 @@ export class SessionController {
     }
     if (trigger === null || (source === 'automatic' && this.consumedTrigger === trigger)) return;
     if (!this.browserHealthy()) {
-      this.diagnostic = 'Ouvrez le miroir pour démarrer une session.';
+      this.diagnostic = mirrorClosedDiagnostic;
       return;
     }
     if (!this.browserAudioReady) {
-      this.diagnostic = 'Activez la voix sur le miroir pour autoriser le microphone et le son.';
+      this.diagnostic = voiceInactiveDiagnostic;
       return;
     }
     const unavailable = this.transport.unavailableReason?.();
@@ -1506,6 +1556,8 @@ export class SessionController {
       satellite: null,
     };
     this.cards = [];
+    // Un résultat refusé concernait cette conversation : il ne dit plus rien une fois finie.
+    if (this.diagnostic?.startsWith(refusedResultPrefix)) this.diagnostic = null;
     this.webSearchActive = false;
     this.closingAt = null;
     this.voiceIdentityUntil = null;
@@ -1547,7 +1599,7 @@ export class SessionController {
     replace = false,
   ): boolean {
     if (!validators.lunaCard(content)) {
-      this.diagnostic = 'Résultat refusé : périmé, déjà traité ou hors du profil actif.';
+      this.diagnostic = refusedResultPrefix + 'périmé, déjà traité ou hors du profil actif.';
       this.publish();
       return false;
     }
@@ -1556,7 +1608,7 @@ export class SessionController {
 
   showImageCard(scope: Scope, callId: string, content: unknown, validUntil: number): boolean {
     if (!validators.imageCard(content)) {
-      this.diagnostic = 'Résultat refusé : image générée invalide.';
+      this.diagnostic = refusedResultPrefix + 'image générée invalide.';
       this.publish();
       return false;
     }
@@ -1624,7 +1676,7 @@ export class SessionController {
     sourceTitles: Record<string, string> = {},
   ): boolean {
     if (!validators.moduleCard(content)) {
-      this.diagnostic = 'Résultat refusé : carte de module invalide.';
+      this.diagnostic = refusedResultPrefix + 'carte de module invalide.';
       this.publish();
       return false;
     }
@@ -1670,7 +1722,7 @@ export class SessionController {
       (afterCardId !== undefined &&
         (this.cards[0]?.id !== afterCardId || this.cards[0].expiresAt <= this.now()))
     ) {
-      this.diagnostic = 'Résultat refusé : périmé, déjà traité ou hors du profil actif.';
+      this.diagnostic = refusedResultPrefix + 'périmé, déjà traité ou hors du profil actif.';
       this.publish();
       return false;
     }
@@ -1881,6 +1933,7 @@ export class SessionController {
       this.release('Clôture non confirmée.');
     }
     this.cards = this.cards.filter((card) => card.expiresAt > now && this.current(card));
+    this.settleDiagnostic();
     this.publish();
   }
 }

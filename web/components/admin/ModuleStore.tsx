@@ -20,7 +20,7 @@ import type { RunAction } from './types';
 import { addonIcon } from './addon-icons';
 import { formatWhen, plural } from './format';
 import { useAdminResource } from './useAdminResource';
-import { ConfirmAction, LoadingCard } from './shared';
+import { ConfirmAction, LoadError, LoadingCard } from './shared';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -67,23 +67,7 @@ export function ModuleStore({ run }: { run: RunAction }) {
   const act = (label: string, task: () => Promise<ModuleStoreView>) =>
     run(label, async () => setView(await task()));
 
-  if (error && !current)
-    return (
-      <Alert variant="destructive">
-        <AlertDescription className="gap-3">
-          <p>Lecture impossible : {error}</p>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-foreground"
-            disabled={loading}
-            onClick={() => void reload()}
-          >
-            Réessayer
-          </Button>
-        </AlertDescription>
-      </Alert>
-    );
+  if (error && !current) return <LoadError error={error} loading={loading} onRetry={reload} />;
   if (!current) return <LoadingCard label="Lecture du catalogue de modules…" />;
   if (!current.available)
     return (
@@ -141,6 +125,7 @@ function RestartNotice({ run }: { run: RunAction }) {
           <ConfirmAction
             message="Redémarrer maintenant ? Une conversation en cours sera coupée."
             confirmLabel="Redémarrer"
+            returnFocusTo={trigger}
             onCancel={() => setConfirming(false)}
             onConfirm={() => {
               setConfirming(false);
@@ -280,6 +265,7 @@ function RepositoryCard({
                     : 'Retirer ce dépôt de la liste ?'
                 }
                 confirmLabel="Retirer"
+                returnFocusTo={removeTrigger}
                 onCancel={() => setRemoving(false)}
                 onConfirm={() => {
                   setRemoving(false);
@@ -368,6 +354,7 @@ function ModuleRow({
             <ConfirmAction
               message={`Désinstaller « ${module.name} » ? Ses sources sont gardées.`}
               confirmLabel="Désinstaller"
+              returnFocusTo={trigger}
               onCancel={() => setConfirming(false)}
               onConfirm={() => {
                 setConfirming(false);

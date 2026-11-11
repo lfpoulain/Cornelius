@@ -329,10 +329,6 @@ export const api = {
       headers: { 'Content-Type': file.type, 'X-File-Name': encodeURIComponent(file.name) },
       timeoutMs: SLOW_REQUEST_TIMEOUT_MS,
     }),
-  removeScreensaverImage: (id: string) =>
-    request<ScreensaverView>('/api/admin/screensaver/images/' + encodeURIComponent(id), {
-      method: 'DELETE',
-    }),
   removeScreensaverImages: (ids: string[]) =>
     post<ScreensaverView>('/api/admin/screensaver/images/remove', { ids }),
   installScreensaverCollection: () =>
@@ -398,7 +394,6 @@ export const api = {
     }),
   installImageGeneration: () =>
     post<ImageGenerationStatus>('/api/admin/image-generation/install', {}),
-  profiles: () => request<Profile[]>('/api/admin/profiles'),
   addProfile: (name: string, memoryEnabled = true) =>
     post<Profile>('/api/admin/profiles', { name, memoryEnabled }),
   renameProfile: (id: string, name: string) =>

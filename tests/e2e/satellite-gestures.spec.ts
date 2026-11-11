@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { fakeHomeAssistant } from '../helpers/home-assistant';
-import { origin } from './env';
+import { login, origin } from './env';
 import { WebSocket } from 'ws';
 import { once } from 'node:events';
 
@@ -12,11 +12,7 @@ test('gestes : ancien satellite, droits HA, sauvegarde et aide desktop/mobile', 
   page.on('pageerror', (e) => errors.push(e.message));
   let socket: WebSocket | undefined;
   try {
-    await page.goto('/admin');
-    await page
-      .getByLabel('Mot de passe administrateur')
-      .fill('admin-browser-test-only-credentials-1234');
-    await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+    await login(page, '/admin');
     const headers = { origin };
     const current = await (await page.request.get('/api/admin/home-assistant')).json();
     const connected = await page.request.put('/api/admin/home-assistant', {

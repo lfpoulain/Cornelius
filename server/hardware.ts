@@ -46,14 +46,14 @@ export function registerHardware(
   app: FastifyInstance,
   services: {
     logs: DiagnosticLog;
-    live: LiveTransport | null;
+    live: LiveTransport;
     controller: SessionController;
     perception: PerceptionBridge;
     /** Départage le miroir et les satellites qui entendent le même « Cornelius ». */
     wakeArbiter: WakeArbiter;
     vision: VisionBridge;
     downloads: ModelDownloads;
-    authorize(role: 'admin' | 'kiosk'): (req: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireAdmin(req: FastifyRequest, reply: FastifyReply): Promise<void>;
     currentKiosk(req: FastifyRequest): boolean;
     workerAuthorized(req: FastifyRequest): boolean;
     devices(): DevicesStatus;
@@ -61,18 +61,18 @@ export function registerHardware(
     faceForgotten?(profileId: string): void;
   },
 ) {
-  const { live, controller, perception, authorize } = services;
+  const { live, controller, perception, requireAdmin } = services;
   const audioCatchupSenders = new Map<string, () => void>();
-  live?.onFirstAssistantResponse((scope) => {
+  live.onFirstAssistantResponse((scope) => {
     const interactionId = scope.interactionId;
     if (interactionId) audioCatchupSenders.get(interactionId)?.();
   });
   const kiosk = async (req: FastifyRequest, reply: FastifyReply) => {
-    await authorize('kiosk')(req, reply);
-    if (!reply.sent && !services.currentKiosk(req))
+    // La page du miroir est publique sur la machine : seul l’onglet courant est exigé.
+    if (!services.currentKiosk(req))
       reply.code(409).send({ error: 'Un autre onglet affiche déjà le miroir.' });
   };
-  app.get('/api/admin/devices', { preHandler: authorize('admin') }, async () => services.devices());
+  app.get('/api/admin/devices', { preHandler: requireAdmin }, async () => services.devices());
 
   const recognitionSettings = compile<{ threshold: number }>({
     type: 'object',
@@ -80,7 +80,7 @@ export function registerHardware(
     required: ['threshold'],
     properties: { threshold: { type: 'number', minimum: 0.2, maximum: 0.65 } },
   });
-  app.patch('/api/admin/recognition', { preHandler: authorize('admin') }, async (req, reply) => {
+  app.patch('/api/admin/recognition', { preHandler: requireAdmin }, async (req, reply) => {
     if (!recognitionSettings(req.body))
       return reply.code(400).send({ error: 'Seuil attendu entre 0,20 et 0,65.' });
     perception.setRecognitionThreshold(req.body.threshold);
@@ -96,7 +96,7 @@ export function registerHardware(
       minFaceRatio: { type: 'number', minimum: 0.05, maximum: 0.3 },
     },
   });
-  app.patch('/api/admin/engagement', { preHandler: authorize('admin') }, async (req, reply) => {
+  app.patch('/api/admin/engagement', { preHandler: requireAdmin }, async (req, reply) => {
     if (!engagementSettings(req.body))
       return reply.code(400).send({ error: 'Réglages d’engagement invalides.' });
     perception.setEngagement(req.body);
@@ -109,7 +109,7 @@ export function registerHardware(
     required: ['mode'],
     properties: { mode: { enum: [...VISION_MODES] } },
   });
-  app.patch('/api/admin/vision', { preHandler: authorize('admin') }, async (req, reply) => {
+  app.patch('/api/admin/vision', { preHandler: requireAdmin }, async (req, reply) => {
     if (!visionSettings(req.body))
       return reply.code(400).send({ error: 'Mode de vision invalide.' });
     try {
@@ -128,7 +128,7 @@ export function registerHardware(
     required: ['model'],
     properties: { model: { enum: [...VISION_MODELS] } },
   });
-  app.patch('/api/admin/vision/model', { preHandler: authorize('admin') }, async (req, reply) => {
+  app.patch('/api/admin/vision/model', { preHandler: requireAdmin }, async (req, reply) => {
     if (!visionModelSettings(req.body))
       return reply.code(400).send({ error: 'Modèle de vision inconnu.' });
     try {
@@ -147,7 +147,7 @@ export function registerHardware(
     required: ['device'],
     properties: { device: { enum: [...VISION_DEVICES] } },
   });
-  app.patch('/api/admin/vision/device', { preHandler: authorize('admin') }, async (req, reply) => {
+  app.patch('/api/admin/vision/device', { preHandler: requireAdmin }, async (req, reply) => {
     if (!visionDeviceSettings(req.body))
       return reply.code(400).send({ error: 'Périphérique de vision inconnu.' });
     try {
@@ -172,7 +172,7 @@ export function registerHardware(
     required: ['source'],
     properties: { source: { enum: ['server', 'browser'] } },
   });
-  app.put('/api/admin/camera/source', { preHandler: authorize('admin') }, async (req, reply) => {
+  app.put('/api/admin/camera/source', { preHandler: requireAdmin }, async (req, reply) => {
     if (!cameraSource(req.body)) return reply.code(400).send({ error: 'Source caméra invalide.' });
     try {
       perception.setCameraSource(req.body.source);
@@ -181,7 +181,7 @@ export function registerHardware(
       return reply.code(409).send({ error: (error as Error).message });
     }
   });
-  app.post('/api/admin/camera/refresh', { preHandler: authorize('admin') }, async (_req, reply) => {
+  app.post('/api/admin/camera/refresh', { preHandler: requireAdmin }, async (_req, reply) => {
     try {
       perception.camera.refresh();
       return { ok: true };
@@ -191,11 +191,11 @@ export function registerHardware(
     }
   });
   // Page Caméra ou Visages ouverte : la caméra reste allumée le temps du réglage.
-  app.post('/api/admin/camera/hold', { preHandler: authorize('admin') }, async () => {
+  app.post('/api/admin/camera/hold', { preHandler: requireAdmin }, async () => {
     perception.holdCamera();
     return { ok: true };
   });
-  app.put('/api/admin/camera/mode', { preHandler: authorize('admin') }, async (req, reply) => {
+  app.put('/api/admin/camera/mode', { preHandler: requireAdmin }, async (req, reply) => {
     if (!isCameraMode(req.body))
       return reply.code(400).send({ error: 'Résolution ou cadence non proposée.' });
     try {
@@ -211,7 +211,7 @@ export function registerHardware(
       return reply.code(400).send({ error: (error as Error).message });
     }
   });
-  app.post('/api/admin/camera/select', { preHandler: authorize('admin') }, async (req, reply) => {
+  app.post('/api/admin/camera/select', { preHandler: requireAdmin }, async (req, reply) => {
     if (!cameraSelection(req.body)) return reply.code(400).send({ error: 'Caméra invalide.' });
     try {
       perception.selectCamera(req.body.id);
@@ -223,7 +223,7 @@ export function registerHardware(
   });
   app.get(
     '/api/admin/camera/frame',
-    { preHandler: authorize('admin'), config: { rateLimit: { max: 8, timeWindow: '1 second' } } },
+    { preHandler: requireAdmin, config: { rateLimit: { max: 8, timeWindow: '1 second' } } },
     async (_req, reply) => {
       try {
         const jpeg = await perception.camera.preview();
@@ -236,16 +236,16 @@ export function registerHardware(
     },
   );
 
-  app.get('/api/admin/recognition/live', { preHandler: authorize('admin') }, async () => ({
+  app.get('/api/admin/recognition/live', { preHandler: requireAdmin }, async () => ({
     live: perception.recognitionLive(),
   }));
-  app.delete('/api/admin/enrollment', { preHandler: authorize('admin') }, async () => {
+  app.delete('/api/admin/enrollment', { preHandler: requireAdmin }, async () => {
     perception.cancelEnrollment();
     return { ok: true };
   });
   app.post<{ Params: { id: string }; Body: { mode?: unknown } | undefined }>(
     '/api/admin/profiles/:id/enroll',
-    { preHandler: authorize('admin') },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       const mode = req.body?.mode ?? 'replace';
       if (mode !== 'replace' && mode !== 'add')
@@ -261,7 +261,7 @@ export function registerHardware(
   );
   app.delete<{ Params: { id: string } }>(
     '/api/admin/profiles/:id/face',
-    { preHandler: authorize('admin') },
+    { preHandler: requireAdmin },
     async (req) => {
       perception.forget(req.params.id);
       services.faceForgotten?.(req.params.id);
@@ -269,7 +269,7 @@ export function registerHardware(
     },
   );
   app.post('/api/media/offer', { preHandler: kiosk, bodyLimit: 65536 }, async (req, reply) => {
-    if (!live || !validateOffer(req.body))
+    if (!validateOffer(req.body))
       return reply.code(400).send({ error: 'Offre média indisponible ou invalide.' });
     try {
       return await live.offer(req.body.scope, req.body.sdp);
@@ -279,8 +279,7 @@ export function registerHardware(
     }
   });
   app.post('/api/media/status', { preHandler: kiosk }, async (req, reply) => {
-    if (!live || !validateMedia(req.body))
-      return reply.code(400).send({ error: 'État média invalide.' });
+    if (!validateMedia(req.body)) return reply.code(400).send({ error: 'État média invalide.' });
     try {
       const { scope, type } = req.body;
       // Le miroir n’a pas de média dans la conversation d’un satellite : rien à signaler.
@@ -317,7 +316,6 @@ export function registerHardware(
   app.get<{
     Querystring: { interactionId?: string; profileEpoch?: string; contextVersion?: string };
   }>('/voice-audio', { websocket: true, preValidation: kiosk }, (socket, req) => {
-    if (!live) return socket.close(1008, 'Voix indisponible.');
     const scope = {
       interactionId: req.query.interactionId ?? null,
       profileEpoch: Number(req.query.profileEpoch),
@@ -391,7 +389,7 @@ export function registerHardware(
     { websocket: true, preValidation: kiosk },
     (socket, req) => {
       const id = req.query.interactionId;
-      if (!live || !id || id !== controller.scope().interactionId)
+      if (!id || id !== controller.scope().interactionId)
         return socket.close(1008, 'Session média périmée.');
       const sendAudioCatchup = () => {
         if (socket.readyState === 1) socket.send(JSON.stringify({ type: 'audio_catchup' }));

@@ -1,4 +1,4 @@
-import { useCallback, useId, useState, type FormEvent } from 'react';
+import { useCallback, useId, useRef, useState, type FormEvent } from 'react';
 import { Boxes, ExternalLink, KeyRound, Sparkles, type LucideIcon } from 'lucide-react';
 import type {
   CustomProviderSettings,
@@ -51,6 +51,8 @@ export function SecretField({
   const [editing, setEditing] = useState(!secret.configured);
   const [value, setValue] = useState('');
   const [confirming, setConfirming] = useState(false);
+  // « Effacer » disparaît pendant la confirmation : la ref lui rend le focus après « Annuler ».
+  const eraseButton = useRef<HTMLButtonElement>(null);
   const id = `secret-${secret.env}`;
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -74,7 +76,7 @@ export function SecretField({
             </Button>
           )}
           {secret.source === 'admin' && !confirming && (
-            <Button variant="ghost" size="sm" onClick={() => setConfirming(true)}>
+            <Button ref={eraseButton} variant="ghost" size="sm" onClick={() => setConfirming(true)}>
               Effacer
             </Button>
           )}
@@ -84,6 +86,7 @@ export function SecretField({
         <ConfirmAction
           message={`Effacer la valeur enregistrée ici pour « ${secret.label} » ? Celle du fichier .env, s’il y en a une, reprendra sa place.`}
           confirmLabel="Effacer"
+          returnFocusTo={eraseButton}
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
             setConfirming(false);

@@ -1,5 +1,5 @@
 import type { AdmissionSoundId } from '../../shared/admission-sound';
-import { audioPreferences } from './preferences';
+import { previewSound, useSpeaker } from './speaker';
 
 // Sons synthétisés localement : aucun fichier audio, aucune licence, aucune requête réseau.
 type Tone = {
@@ -177,17 +177,6 @@ export function playAdmissionSound(
   return end - start;
 }
 
-/** Même sortie que la voix de Cornelius, si le navigateur sait la choisir. */
-export async function useSpeaker(context: AudioContext) {
-  const { speaker } = audioPreferences();
-  const output = context as AudioContext & {
-    sinkId?: string;
-    setSinkId?: (id: string) => Promise<void>;
-  };
-  if (!speaker || !output.setSinkId || output.sinkId === speaker) return;
-  await output.setSinkId(speaker).catch(() => {});
-}
-
 /** Annonce d’une ouverture sur le miroir, dans le contexte audio déjà activé par la voix. */
 export async function announceAdmission(context: AudioContext, sound: AdmissionSoundId) {
   await useSpeaker(context);
@@ -195,10 +184,6 @@ export async function announceAdmission(context: AudioContext, sound: AdmissionS
 }
 
 /** Aperçu dans l’administration : un contexte dédié, ouvert par le clic puis fermé. */
-export async function previewAdmissionSound(sound: AdmissionSoundId) {
-  const context = new AudioContext();
-  await context.resume().catch(() => {});
-  await useSpeaker(context);
-  const duration = playAdmissionSound(context, sound);
-  setTimeout(() => void context.close(), Math.ceil(duration * 1000) + 300);
+export function previewAdmissionSound(sound: AdmissionSoundId) {
+  return previewSound((context) => playAdmissionSound(context, sound));
 }

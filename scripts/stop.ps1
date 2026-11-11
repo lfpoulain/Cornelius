@@ -11,7 +11,7 @@ $state = Get-CorneliusState
 $stopped = @()
 
 # Processus suivis dans le fichier d'état.
-foreach ($name in @('imageGeneration', 'perception', 'frontend', 'backend')) {
+foreach ($name in @('perception', 'frontend', 'backend')) {
   $processId = 0
   if ($state.ContainsKey($name)) { $processId = [int]$state[$name] }
   if ($processId -gt 0 -and (Stop-CorneliusTree -ProcessId $processId)) {

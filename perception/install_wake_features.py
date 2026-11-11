@@ -3,6 +3,9 @@ import hashlib
 from pathlib import Path
 from urllib.request import urlopen
 
+# Même dossier et même environnement Python : l’empreinte n’est écrite qu’une fois.
+from download_models import digest
+
 ROOT = Path(__file__).resolve().parent.parent
 DESTINATION = ROOT / "models" / "openwakeword"
 BASE = "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/"
@@ -10,14 +13,6 @@ FILES = {
     "melspectrogram.onnx": "ba2b0e0f8b7b875369a2c89cb13360ff53bac436f2895cced9f479fa65eb176f",
     "embedding_model.onnx": "70d164290c1d095d1d4ee149bc5e00543250a7316b59f31d056cff7bd3075c1f",
 }
-
-
-def digest(path):
-    value = hashlib.sha256()
-    with path.open("rb") as source:
-        while chunk := source.read(1024 * 1024):
-            value.update(chunk)
-    return value.hexdigest()
 
 
 def main():

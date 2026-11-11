@@ -12,7 +12,8 @@ export interface AudioLevels {
 export type AudioFailure = 'device' | 'transport';
 
 // Erreurs de capture qui exigent une nouvelle autorisation ou un autre périphérique.
-const deviceErrors = new Set([
+// Une seule liste pour tous les fournisseurs : une copie avait perdu OverconstrainedError.
+export const deviceErrors = new Set([
   'NotAllowedError',
   'NotFoundError',
   'NotReadableError',

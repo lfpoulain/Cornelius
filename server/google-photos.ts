@@ -6,6 +6,7 @@ import {
   type GooglePhotosView,
 } from '../shared/google-photos.js';
 import { SCREENSAVER_IMAGE_MAX_BYTES, type ScreensaverImage } from '../shared/screensaver.js';
+import { defaultUserAgent } from './addons/http.js';
 
 export const googlePhotosMigration = `CREATE TABLE IF NOT EXISTS screensaver_google_photos (
   id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -281,7 +282,7 @@ export class GooglePhotosAlbum {
           redirect: 'manual',
           credentials: 'omit',
           signal,
-          headers: { 'User-Agent': 'Cornelius (https://github.com/lfpoulain/Cornelius)' },
+          headers: { 'User-Agent': defaultUserAgent },
         });
       } catch {
         throw new AlbumRequestError(true);

@@ -141,8 +141,22 @@ function AgentPanel({ profile, run }: { profile: Profile; run: RunAction }) {
   const [search, setSearch] = useState('');
   const [taskFilter, setTaskFilter] = useState('all');
   const messageInput = useRef<HTMLTextAreaElement>(null);
+  const removeButton = useRef<HTMLButtonElement>(null);
+  const keepConnection = () => {
+    setRemoving(false);
+    removeButton.current?.focus();
+  };
   const [checking, setChecking] = useState<'save' | 'discover' | null>(null);
+  // Vrai dès qu’une lecture a rempli le formulaire : avant cela, une relecture périodique
+  // réussie tient lieu de première lecture.
+  const loaded = useRef(false);
+  // Compte les enregistrements et retraits : une relecture partie avant l’un d’eux ne doit pas
+  // l’écraser. La révision ne suffit pas à les ordonner, elle repart de 0 après un retrait.
+  const writes = useRef(0);
   const accept = (next: AgentAdminView) => {
+    loaded.current = true;
+    writes.current++;
+    setError('');
     setView(next);
     setTaskId((current) => (next.tasks.some((t) => t.id === current) ? current : ''));
     setUrl(next.connection.url);
@@ -156,21 +170,25 @@ function AgentPanel({ profile, run }: { profile: Profile; run: RunAction }) {
     void api
       .agent(profile.id)
       .then((next) => {
-        if (mounted) accept(next);
+        // Une relecture périodique a pu aboutir avant : la saisie commencée depuis reste.
+        if (mounted && !loaded.current) accept(next);
       })
       .catch((e) => {
-        if (mounted) setError(errorMessage(e));
+        if (mounted && !loaded.current) setError(errorMessage(e));
       });
     // Une lecture périodique qui échoue ne doit pas laisser un bandeau d’erreur figé :
     // il disparaît dès que la lecture suivante réussit.
     const timer = setInterval(() => {
       if (document.hidden) return;
+      const started = writes.current;
       void api
         .agent(profile.id)
         .then((next) => {
           if (!mounted) return;
-          setView(next);
           setPollError('');
+          // Première lecture échouée : celle-ci remplit le formulaire et efface l’erreur.
+          if (!loaded.current) accept(next);
+          else if (started === writes.current) setView(next);
         })
         .catch((e) => {
           if (mounted) setPollError(errorMessage(e));
@@ -191,6 +209,8 @@ function AgentPanel({ profile, run }: { profile: Profile; run: RunAction }) {
     if (checking) return;
     setChecking(save ? 'save' : 'discover');
     setVerifyError('');
+    // Une relecture en route pendant l’enregistrement est déjà ancienne à son retour.
+    if (save) writes.current++;
     try {
       const next = save
         ? await api.saveAgent(profile.id, { url, token, description, enabled, revision })
@@ -359,28 +379,32 @@ function AgentPanel({ profile, run }: { profile: Profile; run: RunAction }) {
                     onChange={(e) => setUrl(e.target.value)}
                   />
                 </Field>
-                <Field
-                  id="agent-token"
-                  label="Jeton de connexion"
-                  help={
-                    c.hasToken
-                      ? 'Le jeton enregistré est masqué. Saisissez un nouveau jeton uniquement pour le remplacer ; laissez vide pour le conserver à la même adresse.'
-                      : 'Le jeton API configuré dans Hermes.'
-                  }
-                >
-                  <Input
+                {/* Le badge reste hors du Field : avec deux enfants, l’aide ne serait plus reliée
+                    au champ par aria-describedby. */}
+                <div className="space-y-2">
+                  <Field
                     id="agent-token"
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder={
-                      c.hasToken ? 'Jeton enregistré (masqué)' : 'Saisir le jeton Hermes'
+                    label="Jeton de connexion"
+                    help={
+                      c.hasToken
+                        ? 'Le jeton enregistré est masqué. Saisissez un nouveau jeton uniquement pour le remplacer ; laissez vide pour le conserver à la même adresse.'
+                        : 'Le jeton API configuré dans Hermes.'
                     }
-                    maxLength={4096}
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                  />
+                  >
+                    <Input
+                      id="agent-token"
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder={
+                        c.hasToken ? 'Jeton enregistré (masqué)' : 'Saisir le jeton Hermes'
+                      }
+                      maxLength={4096}
+                      value={token}
+                      onChange={(e) => setToken(e.target.value)}
+                    />
+                  </Field>
                   {c.hasToken && <Badge variant="secondary">Jeton enregistré</Badge>}
-                </Field>
+                </div>
                 <Field
                   id="agent-description"
                   label="À quoi sert cet agent ?"
@@ -413,6 +437,7 @@ function AgentPanel({ profile, run }: { profile: Profile; run: RunAction }) {
                   </Button>
                   {c.hasToken && (
                     <Button
+                      ref={removeButton}
                       type="button"
                       variant="danger-outline"
                       onClick={() => setRemoving(!removing)}
@@ -455,9 +480,21 @@ function AgentPanel({ profile, run }: { profile: Profile; run: RunAction }) {
                 ) : null}
               </form>
               {removing && (
-                <Alert className="mt-4">
+                // Pas ConfirmAction : son bouton d’annulation dit « Annuler », ici « Conserver ».
+                // Mêmes égards : boîte d’alerte nommée par sa question, focus sur le refus,
+                // Échap referme et rend le focus au bouton d’origine.
+                <Alert
+                  className="mt-4"
+                  role="alertdialog"
+                  aria-labelledby="agent-remove-question"
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Escape') return;
+                    e.stopPropagation();
+                    keepConnection();
+                  }}
+                >
                   <AlertDescription>
-                    <p>
+                    <p id="agent-remove-question">
                       Retirer cette connexion et ses références de tâches du miroir ? Les tâches et
                       l’historique restent dans Hermes.
                     </p>
@@ -473,7 +510,7 @@ function AgentPanel({ profile, run }: { profile: Profile; run: RunAction }) {
                       >
                         Retirer du miroir
                       </Button>
-                      <Button variant="outline" onClick={() => setRemoving(false)}>
+                      <Button variant="outline" autoFocus onClick={keepConnection}>
                         Conserver
                       </Button>
                     </div>

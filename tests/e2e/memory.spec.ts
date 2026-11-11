@@ -1,17 +1,13 @@
 import { expect, test } from '@playwright/test';
 import type { MemoryView } from '../../shared/memory';
-import { screenshots } from './env';
+import { login, screenshots } from './env';
 
 test('mémoire : consultation, correction, oubli, désactivation et affichage mobile', async ({
   page,
 }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Le foyer et les visages', exact: true }).click();
   await page.getByLabel('Prénom ou nom d’affichage').fill('Camille mémoire');
   await page.getByRole('button', { name: 'Ajouter au foyer', exact: true }).click();
@@ -206,11 +202,7 @@ test('mémoire sans personne : un bouton mène à l’ajout d’une personne', a
     value.state.profiles = [];
     await route.fulfill({ response, json: value });
   });
-  await page.goto('/admin#memory');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin#memory');
   await expect(page.getByRole('heading', { level: 1, name: 'Mémoire' })).toBeVisible();
   await page.getByRole('link', { name: 'Ajouter une personne' }).click();
   await expect(

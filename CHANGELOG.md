@@ -13,6 +13,24 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 - **Installer des modules** : nouvelle rubrique de l’administration. Le dépôt officiel cornelius-modules et d’autres dépôts git publics (GitHub, GitLab, Gitea, Forgejo, Codeberg) y proposent leurs modules, à installer ou désinstaller d’un clic. Le catalogue est lu sans exécuter de code ; les dépôts sont copiés à un commit précis dans `data/modules` (`CORNELIUS_MANAGED_MODULES_DIR`), sans git. Les mises à jour des dépôts sont cherchées chaque jour et appliquées à la demande ; tout prend effet au redémarrage, rappelé par un bandeau.
 - **Mise à jour de Cornelius** : carte dans **État du système**. Sur `main`, dernière version publiée ; sur une autre branche, la branche distante. `scripts/update.sh` et `scripts/update.ps1` arrêtent Cornelius, avancent le dépôt (avance rapide seulement, refusée sur des fichiers modifiés), mettent à jour les dépendances, recompilent et relancent, puis reviennent en arrière en cas d’échec. Sous Home Assistant, la mise à jour reste celle de l’application.
 
+### 2026-11-11 : suites de l’audit du code
+
+**Corrigé**
+
+- **Administration** : Agents et Home Assistant se rétablissent quand la première lecture a échoué ; une relecture ancienne n’écrase plus un enregistrement récent d’agent ; « Tester le micro » ne se lance plus deux fois et libère le micro si l’on quitte la rubrique ; le prix par minute en cours de saisie n’est plus écrasé à la fin d’une conversation ; le compteur des commandes HTTP suit les ajouts ; les gestes des satellites non enregistrés demandent confirmation avant de quitter la rubrique ; « Annuler » est grisé pendant la vérification d’une source ; deux choix rapprochés de l’écran de veille s’enregistrent tous les deux ; le curseur de l’orbe ne revient plus en arrière pendant le glissement.
+- **Accessibilité** : le focus revient au bouton d’origine après une confirmation annulée (réseau local, satellites, serveur, clés, profils, agent) ; la suppression d’un profil se ferme avec Échap ; le testeur de reconnaissance n’annonce plus ses scores en continu ; deux formulaires du même module n’ont plus d’identifiants en double.
+- **Voix** : avec Mistral, un micro débranché est reconnu comme une panne de périphérique et le miroir propose de réactiver la voix.
+- **Perception** : une erreur d’allumage de caméra (modèles de visages absents…) est affichée dans l’administration au lieu d’être avalée ou de couper la liaison ; une erreur d’analyse ou de commande ne fait plus tomber la détection de parole et le mot d’appel ; en caméra du navigateur, une même image n’est plus analysée ni comptée plusieurs fois ; le mot d’appel se recharge après une erreur passagère.
+- **Serveur** : un minuteur de clôture resté armé après une création refusée ; des diagnostics (« Ouvrez le miroir… ») qui restaient publiés après la disparition de leur cause ; les tampons SMTP vidés après STARTTLS ; le repli de la mémoire personnalisée sur Chat Completions limité aux réponses 404, 405 et 501 ; l’heure de fin d’un capteur Home Assistant dans le fuseau du foyer ; un satellite trop lent déconnecté au lieu d’accumuler le son ; `/api/health` et les User-Agent annoncent la version réelle.
+- **Scripts** : `PORT` de `.env` lu comme le fait Node (guillemets, espaces, dernière occurrence) sous Linux et Windows ; Node 25 et plus refusé au démarrage, comme le demande `package.json` ; `dev.sh` s’arrête dès que Vite meurt.
+
+**Modifié**
+
+- **Chargement** : l’administration ne télécharge plus three.js ni la pile audio du miroir ; les modèles de visages et du mot d’appel ne sont plus relus du disque à chaque allumage de caméra ou retour en veille ; le transport Live ne reconstruit plus l’état complet pour lire un seul champ ; le journal et la liste de l’écran de veille font moins d’accès disque.
+- **Retiré** : la dépendance `@livekit/rtc-node`, jamais utilisée ; huit classes CSS, deux fonctions d’API et quelques méthodes serveur mortes.
+- **Doublons** : une seule alerte « Lecture impossible · Réessayer » (`LoadError`) et un seul brouillon décimal (`useDecimalDraft`) dans l’administration ; côté serveur, les résultats d’outil passent par `toolResult` et `toolFailure`.
+- **Tests** : une seule aide de connexion pour les tests navigateur (`tests/e2e/env.ts`) ; `forbidOnly` en CI ; les `push` ne lancent la CI que sur `main` et `beta`.
+
 ### 2026-11-10 : administration réorganisée
 
 **Modifié**

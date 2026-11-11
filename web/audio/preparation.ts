@@ -1,4 +1,5 @@
 import { audioPreferences, captureKey } from './preferences';
+import { useSpeaker } from './speaker';
 
 type Preparation = { ready: boolean; busy: boolean; error: string | null };
 let state: Preparation = { ready: false, busy: false, error: null };
@@ -77,14 +78,9 @@ function sharedContext(): AudioContext {
 }
 /** Sortie choisie dans l’administration, appliquée pendant la préparation et non à l’ouverture. */
 async function applySpeaker(value: AudioContext) {
-  const { speaker } = audioPreferences();
-  const output = value as AudioContext & {
-    sinkId?: unknown;
-    setSinkId?: (id: string) => Promise<void>;
-  };
-  if (!speaker || !output.setSinkId || output.sinkId === speaker) return;
+  // Délai borné : un setSinkId qui ne répond pas ne doit pas bloquer « Activer la voix ».
   await Promise.race([
-    output.setSinkId(speaker).catch(() => {}),
+    useSpeaker(value),
     new Promise<void>((resolve) => setTimeout(resolve, 1000)),
   ]);
 }

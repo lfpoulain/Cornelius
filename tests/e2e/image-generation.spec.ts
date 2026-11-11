@@ -6,21 +6,13 @@ import {
   type ModelDownload,
   type StateEvent,
 } from '../../shared/types';
-import { origin, screenshots } from './env';
+import { login, origin, screenshots } from './env';
 
 // PNG 1 × 1 : le miroir n’a besoin que d’un fichier image valide.
 const pixel = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
   'base64',
 );
-
-async function login(page: Page) {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
-}
 
 const download = (state: ModelDownload['state'], extra: Partial<ModelDownload> = {}) => ({
   state,

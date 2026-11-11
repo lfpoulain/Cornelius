@@ -1,11 +1,13 @@
 import { defineConfig } from '@playwright/test';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { origin, port } from './tests/e2e/env';
+import { adminPassword, origin, port } from './tests/e2e/env';
 
 export default defineConfig({
   testDir: './tests/e2e',
   testMatch: '**/*.spec.ts',
+  // Un test.only oublié ferait passer l’intégration continue en n’exécutant qu’un parcours.
+  forbidOnly: !!process.env.CI,
   fullyParallel: false,
   workers: 1,
   timeout: 45_000,
@@ -19,7 +21,7 @@ export default defineConfig({
     env: {
       PORT: String(port),
       CORNELIUS_DATABASE: ':memory:',
-      CORNELIUS_ADMIN_PASSWORD: 'admin-browser-test-only-credentials-1234',
+      CORNELIUS_ADMIN_PASSWORD: adminPassword,
       CORNELIUS_LOGIN_RATE_LIMIT: '200',
       // Le serveur de test reste sur cette machine : ni port ouvert sur le réseau local avec le
       // mot de passe de test, ni second « Cornelius » annoncé aux satellites de la maison.

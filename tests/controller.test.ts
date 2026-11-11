@@ -1902,3 +1902,19 @@ test('fin de parole : un seul délai, toujours actif quand la caméra est étein
   f.advance(1);
   assert.equal(f.state().session.phase, 'closing');
 });
+
+test('un diagnostic d’admission disparaît avec sa cause', (t) => {
+  const f = fixture(t);
+  // Miroir fermé : la personne qui regarde n’ouvre rien, et le diagnostic dit pourquoi.
+  f.observe();
+  f.advance(400, { browser: false });
+  assert.equal(f.transport.opened.length, 0);
+  assert.match(f.state().diagnostic ?? '', /Ouvrez le miroir/);
+  // Elle repart, puis le miroir est ouvert : plus rien à signaler, même sans conversation.
+  f.observe({ presence: false, engaged: false, people: [] });
+  f.advance(10_000, { browser: false });
+  assert.match(f.state().diagnostic ?? '', /Ouvrez le miroir/);
+  f.advance(1000);
+  assert.equal(f.transport.opened.length, 0);
+  assert.equal(f.state().diagnostic, null);
+});

@@ -287,6 +287,12 @@ export class SatelliteHub {
   play(satelliteId: string, pcm: Buffer): void {
     const connection = this.connections.get(satelliteId);
     if (connection?.conversation !== 'ready' || connection.socket.readyState !== 1) return;
+    // Même borne que la lecture du miroir : un satellite qui ne lit plus (Wi-Fi saturé, carte
+    // figée) ferait grossir la file d’envoi en mémoire tant que Cornelius parle.
+    if (connection.socket.bufferedAmount > 256_000) {
+      connection.socket.close(1013, 'Lecture audio trop lente.');
+      return;
+    }
     connection.socket.send(pcm);
   }
 

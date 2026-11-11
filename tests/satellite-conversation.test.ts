@@ -265,6 +265,7 @@ test('satellite : réservé aux membres, déconnexion pendant la conversation', 
 
 class FakeSocket extends EventEmitter {
   readyState = 1;
+  bufferedAmount = 0;
   sent: (string | Buffer)[] = [];
   send(value: string | Buffer) {
     this.sent.push(value);
@@ -360,7 +361,11 @@ test('concentrateur : son d’avant le mot rejoué, voix vers le satellite, dét
   hub.connect(other as unknown as WebSocket, store.create('Cuisine').satellite);
   other.receive({ type: 'hello', protocol: 1, firmware: '0.1.0' });
   assert.deepEqual(other.messages().at(-1), { type: 'listen', enabled: false });
-  socket.close();
+  // Un satellite qui ne lit plus la voix est coupé au lieu d’accumuler le son en mémoire.
+  socket.bufferedAmount = 300_000;
+  f.emit(delta(tone(8000)));
+  assert.equal(socket.sent.filter(Buffer.isBuffer).length, 1);
+  assert.equal(socket.readyState, 3);
   assert.equal(f.controller.sessionState().reason, 'Satellite déconnecté.');
 });
 

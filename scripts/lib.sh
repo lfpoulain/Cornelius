@@ -10,21 +10,25 @@ init_dirs() {
   mkdir -p "$LOG_DIR"
 }
 
+# Nombre d’une clé de .env, lu comme Node (--env-file) et comme lib.ps1 : espaces autour du
+# signe égal, guillemets facultatifs, « export » et commentaire de fin de ligne admis ; la
+# dernière ligne l’emporte. Sans cela, PORT="3100" faisait attendre le serveur sur 3000.
+env_number() {
+  [ -f "$ROOT/.env" ] || return 0
+  sed -n "s/^[[:space:]]*\(export[[:space:]][[:space:]]*\)\{0,1\}$1[[:space:]]*=[[:space:]]*[\"']\{0,1\}\([0-9][0-9]*\)[\"']\{0,1\}[[:space:]]*\(#.*\)\{0,1\}\$/\2/p" "$ROOT/.env" | tail -n 1
+}
+
 # Port du serveur : celui de .env, sinon 3000.
 server_port() {
-  local port=""
-  if [ -f "$ROOT/.env" ]; then
-    port="$(sed -n 's/^PORT=\([0-9][0-9]*\).*/\1/p' "$ROOT/.env" | tail -n 1)"
-  fi
+  local port
+  port="$(env_number PORT)"
   echo "${port:-3000}"
 }
 
 # Port de l’interface de développement (Vite) : CORNELIUS_DEV_PORT de .env, sinon 5173.
 dev_port() {
-  local port=""
-  if [ -f "$ROOT/.env" ]; then
-    port="$(sed -n 's/^CORNELIUS_DEV_PORT=\([0-9][0-9]*\).*/\1/p' "$ROOT/.env" | tail -n 1)"
-  fi
+  local port
+  port="$(env_number CORNELIUS_DEV_PORT)"
   echo "${port:-5173}"
 }
 
@@ -120,13 +124,19 @@ wait_http() {
   node "$ROOT/scripts/wait-server.mjs" "$1" "${2:-60}" "${3:-}"
 }
 
+# Version de Node admise : celle de package.json (engines : >=24.2.0 <25). Une seule règle pour
+# l’installation et le démarrage ; lib.ps1 applique la même.
+node_supported() {
+  node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a===24&&b>=2?0:1)'
+}
+
 # Vérifie ce dont le serveur a besoin (Node 24.2, dépendances, .env) ; arrête le script sinon.
 check_prerequisites() {
   local problems=()
   if ! command -v node >/dev/null 2>&1; then
     problems+=("Node.js est introuvable dans le PATH : installez Node.js 24 (fichier .nvmrc).")
-  elif ! node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>24||(a===24&&b>=2)?0:1)'; then
-    problems+=("Node.js $(node --version) détecté : Cornelius demande Node.js 24.2 ou plus récent (node:sqlite, --env-file-if-exists). Voir .nvmrc.")
+  elif ! node_supported; then
+    problems+=("Node.js $(node --version) détecté : Cornelius demande Node.js 24, à partir de 24.2 (node:sqlite, --env-file-if-exists). Voir .nvmrc.")
   fi
   [ -f "$ROOT/.env" ] || problems+=("Fichier .env absent : lancez « npm run setup » à la racine du projet.")
   if [ "${#problems[@]}" -gt 0 ]; then
