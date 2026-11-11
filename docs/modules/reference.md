@@ -196,7 +196,9 @@ L’aperçu d’une source sous son nom (« 20 vélos · Mairie - Opéra ») est
 
 ## Le client HTTP
 
-La requête accepte `url`, `method` (`GET` par défaut, ou `POST`), `headers`, `body` (une chaîne), `timeoutMs` (4 000 par défaut), `maxBytes` (256 Kio par défaut), `signal` et `cacheMs`. La réponse expose `status`, `headers`, `text()` et `json()`, tous deux **synchrones**, `truncated` et `url`. Il n’y a pas de propriété `ok`.
+La requête accepte `url`, `method` (`GET` par défaut, ou `POST`), `headers`, `body` (une chaîne), `timeoutMs` (4 000 par défaut), `maxBytes` (256 Kio par défaut), `signal` et `cacheMs`. La réponse expose `status`, `headers`, `text()`, `json()` et `bytes()`, tous **synchrones**, `truncated` et `url`. Il n’y a pas de propriété `ok`.
+
+`bytes()` rend le corps brut, sans décodage, pour un format binaire que `text()` abîmerait : un flux temps réel GTFS-RT (protobuf), une image, une archive. C’est une copie, qu’un module peut modifier sans toucher au cache ni aux autres lecteurs. Les mêmes règles s’appliquent qu’au texte : `maxBytes`, `truncated`, redirections et `cacheMs`, dont la taille est comptée en octets. Dans `createTestModule`, une réponse simulée peut être un `Uint8Array`, rendu tel quel. Un module qui s’en sert DOIT déclarer le `minCoreVersion` qui l’apporte.
 
 Le client du cœur ([server/addons/http.ts](../../server/addons/http.ts)) ne filtre pas les hôtes : le module DEVRAIT fixer l’adresse du fournisseur et encoder chaque partie variable (`encodeURIComponent`). Il garantit en revanche :
 
@@ -464,6 +466,7 @@ Les mêmes exports qu’avant restent disponibles : `validateAddonDefinition`, `
 
 | Cornelius | Ajouts compatibles v1 |
 | --- | --- |
+| Prochaine version | Client HTTP : `bytes()`, corps brut d’une réponse (format binaire) ; `createTestModule` accepte une réponse en `Uint8Array` |
 | 0.2.0 | `display` ; `arguments` des outils et `context.args` ; `context.timeZone` ; `refreshAt` de l’affichage permanent ; présentation d’un relevé vide ; fraîcheur jusqu’à 24 heures ; client HTTP : redirections, encodage, `truncated`, `url`, User-Agent, `cacheMs` ; formulaire : listes déroulantes et listes répétées ; `clearLabel` ; `createTestModule` |
 | 0.1.0 | Contrat v1, outil à la demande (`query`), secrets, recherche assistée, affichage permanent, `minCoreVersion` |
 

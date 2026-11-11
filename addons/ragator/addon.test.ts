@@ -34,7 +34,13 @@ function setup(t: { after(fn: () => void): void }, config: Record<string, unknow
       calls.push(request);
       const text =
         body ?? JSON.stringify(request.url.endsWith('/api/collections') ? collections : answer);
-      return { status, headers: {}, text: () => text, json: () => JSON.parse(text) as unknown };
+      return {
+        status,
+        headers: {},
+        text: () => text,
+        json: () => JSON.parse(text) as unknown,
+        bytes: () => new TextEncoder().encode(text),
+      };
     },
   };
   const runtime = new AddonRuntime({ addons: [addon], instances, http });

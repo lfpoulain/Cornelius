@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-12 : lecture binaire pour les modules
+
+**Ajouté**
+
+- Modules : `bytes()` sur la réponse du client HTTP rend le corps brut, sans décodage. Un module peut désormais lire un format binaire, que `text()` abîmait sans retour : les flux temps réel GTFS-RT (protobuf) des transports en commun, une image, une archive. Le texte n’est plus décodé qu’à la demande, et le cache partagé compte la taille réelle en octets. Aucun changement pour les modules existants. `createTestModule` accepte une réponse simulée en `Uint8Array`.
+
 ### 2026-11-11 : installation des modules et mises à jour
 
 **Ajouté**
@@ -88,7 +94,6 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 **Ajouté**
 
 - Source expérimentale Google Photos : lien d’album partagé, aperçu, actualisation réglable et retour aux images locales. Les images sont relayées depuis Google sans import sur disque, sans clé API ni connexion au compte. Le connecteur dépend du format non officiel de la page partagée et ne lit que sa page initiale (500 entrées au maximum). Voir [les réglages et limites](docs/fonctionnalites/google-photos.md).
-
 ## 0.3.0 · 2026-11-09
 
 Les satellites gagnent le bouton qui ferme la conversation, le volume à la voix et une fin de parole propre à chacun. Home Assistant règle la couleur et le blanc des lumières. S’y ajoutent les alarmes, minuteurs et rappels, le déclencheur Home Assistant et le serveur Live compatible.

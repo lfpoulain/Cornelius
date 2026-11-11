@@ -178,3 +178,39 @@ test('deux demandes identiques en vol n’en font qu’une ; l’annulation de l
   assert.equal((await second).text(), 'partagé');
   assert.equal(calls, 1);
 });
+
+test('bytes() rend le corps brut intact (format binaire), text() décode toujours', async (t) => {
+  // Octets invalides en UTF-8 (0xff, 0x80), comme dans un message protobuf GTFS-RT.
+  const brut = new Uint8Array([0x0a, 0x03, 0xff, 0x80, 0x00, 0x12, 0x01, 0x41]);
+  network(t, {
+    'https://flux.example/tripUpdates': () =>
+      new Response(brut, { status: 200, headers: { 'content-type': 'application/x-protobuf' } }),
+    'https://flux.example/texte': () =>
+      new Response(new TextEncoder().encode('Montréal'), { status: 200 }),
+  });
+  const client = createHttpClient();
+  const binaire = await client.fetch({ url: 'https://flux.example/tripUpdates' });
+  assert.deepEqual([...binaire.bytes()], [...brut]);
+  // Le décodage en texte, lui, remplace les octets invalides : ils seraient perdus.
+  assert.match(binaire.text(), /�/u);
+  const texte = await client.fetch({ url: 'https://flux.example/texte' });
+  assert.equal(texte.text(), 'Montréal');
+  assert.deepEqual([...texte.bytes()], [...new TextEncoder().encode('Montréal')]);
+});
+
+test('bytes() d’une réponse partagée par le cache : une copie, coupée à maxBytes', async (t) => {
+  const brut = new Uint8Array(1000).map((_, i) => i % 256);
+  const seen = network(t, {
+    'https://flux.example/reseau.pb': () => new Response(brut, { status: 200 }),
+  });
+  const client = createHttpClient();
+  const request = { url: 'https://flux.example/reseau.pb', cacheMs: 30_000, maxBytes: 600 };
+  const premiere = await client.fetch(request);
+  const lu = premiere.bytes();
+  assert.equal(lu.byteLength, 600);
+  assert.equal(premiere.truncated, true);
+  lu.fill(0);
+  const seconde = await client.fetch(request);
+  assert.equal(seen.length, 1, 'servie par le cache');
+  assert.deepEqual([...seconde.bytes()], [...brut.subarray(0, 600)], 'le cache n’est pas modifié');
+});
