@@ -150,6 +150,14 @@ Le script ne vérifie pas que la perception reste lancée. Si elle s’arrête, 
 
 ## Mettre à jour
 
+Le plus simple : **État du système → Mettre à jour vers …** dans l’administration. Sur `main`, Cornelius suit les versions publiées (tag `vX.Y.Z`) ; sur une autre branche, la branche distante. La mise à jour lance `scripts\update.ps1`, qui arrête Cornelius, avance le dépôt, met à jour les dépendances qui ont changé puis relance `start.ps1`. Elle est refusée si des fichiers de Cornelius ont été modifiés à la main, et revient au commit de départ en cas d’échec ; le déroulé est dans `data\run\logs\update.log`. Le script se lance aussi à la main (`-Check` montre seulement la version proposée) :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\update.ps1
+```
+
+Ou, étape par étape :
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\stop.ps1
 git pull

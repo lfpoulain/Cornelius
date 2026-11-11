@@ -1,4 +1,6 @@
 import { defineConfig } from '@playwright/test';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { origin, port } from './tests/e2e/env';
 
 export default defineConfig({
@@ -26,6 +28,9 @@ export default defineConfig({
       // Les parcours ne dépendent pas du dépôt cornelius-modules éventuellement cloné à côté :
       // leur seul module externe est celui d'essai du formulaire.
       CORNELIUS_MODULES_DIR: 'tests/e2e/modules',
+      // Ni modules installés de la machine, ni recherche de mises à jour sur Internet.
+      CORNELIUS_MANAGED_MODULES_DIR: join(tmpdir(), `cornelius-e2e-modules-${process.pid}`),
+      CORNELIUS_UPDATE_CHECK: '0',
     },
   },
   use: {

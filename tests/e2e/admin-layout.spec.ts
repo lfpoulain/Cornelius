@@ -64,6 +64,7 @@ test('les rubriques et l’en-tête restent utilisables sur ordinateur et mobile
     'Voix et modèles',
     'Le foyer et les visages',
     'Modules',
+    'Installer des modules',
     'Micro et haut-parleurs',
     'Caméra et reconnaissance',
     'Orbe et écran de veille',

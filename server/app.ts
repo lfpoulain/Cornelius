@@ -72,7 +72,11 @@ import { registerSatellites } from './satellites-api.js';
 import { SatellitePairing } from './satellites-pairing.js';
 import { AmbientModules } from './addons/ambient.js';
 import { AddonRuntime, defaultTimeZone } from './addons/runtime.js';
-import { loadAddons } from './addons/registry.js';
+import { fileURLToPath } from 'node:url';
+import { coreVersion, loadAddons, reservedAddonIds } from './addons/registry.js';
+import { ModuleStore } from './module-store/store.js';
+import { CoreUpdater } from './core-update.js';
+import { registerModuleStore } from './module-store-api.js';
 import { createHttpClient } from './addons/http.js';
 import { ActionExecutor, actionSecrets } from './actions.js';
 import { registerAddons } from './addons-api.js';
@@ -255,7 +259,56 @@ export async function createApp(
   const addonInstances = new AddonRepository(db);
   const actionRepository = new ActionRepository(db);
   const http = createHttpClient();
-  const { addons, rejected } = await loadAddons({ logs, externalRoot: config.modulesDir ?? null });
+  // Modules installés depuis l'administration, chargés entre les livrés et le dossier local.
+  let builtinIds: ReadonlySet<string> = new Set();
+  const moduleStore = config.managedModulesDir
+    ? new ModuleStore({
+        directory: config.managedModulesDir,
+        coreVersion,
+        autoCheck: !!config.autoUpdateCheck,
+        reservedIds: () => new Set([...reservedAddonIds, ...builtinIds]),
+        logs,
+      })
+    : null;
+  const {
+    addons,
+    rejected,
+    origins: addonOrigins,
+  } = await loadAddons({
+    logs,
+    externalRoot: config.modulesDir ?? null,
+    managed: moduleStore?.plan() ?? [],
+  });
+  builtinIds = new Set(
+    [...addonOrigins].filter(([, origin]) => origin === 'builtin').map(([id]) => id),
+  );
+  moduleStore?.setLoaded({
+    loaded: new Map(
+      addons.map((addon) => [
+        addon.id,
+        { version: addon.version, origin: addonOrigins.get(addon.id)! },
+      ]),
+    ),
+    rejected,
+    local: addons
+      .filter((addon) => addonOrigins.get(addon.id) === 'local')
+      .map((addon) => ({
+        id: addon.id,
+        name: addon.display?.name ?? addon.sourceLabel,
+        version: addon.version,
+      })),
+    localDirectory:
+      config.modulesDir && addons.some((addon) => addonOrigins.get(addon.id) === 'local')
+        ? config.modulesDir
+        : null,
+  });
+  const coreUpdater = new CoreUpdater({
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    version: coreVersion,
+    externallyManaged: !!config.updatesManagedExternally,
+    systemd: Boolean(process.env.INVOCATION_ID),
+    logs,
+  });
   if (rejected.length > 0)
     logs.write('warn', 'addon', 'Modules ignorés au démarrage', {
       rejected: rejected.map((item) => item.name),
@@ -908,6 +961,25 @@ export async function createApp(
       alarmsEnabled = enabled;
       controller.restart('Réglage des alarmes modifié.');
     },
+  });
+  // Recherche quotidienne des mises à jour (Cornelius et dépôts), sans rien appliquer.
+  let updateTimer: NodeJS.Timeout | null = null;
+  if (config.autoUpdateCheck) {
+    const checkUpdates = () => {
+      void coreUpdater.check();
+      void moduleStore?.checkAll();
+      updateTimer = setTimeout(checkUpdates, 24 * 3_600_000);
+      updateTimer.unref();
+    };
+    updateTimer = setTimeout(checkUpdates, 120_000);
+    updateTimer.unref();
+  }
+  registerModuleStore(app, {
+    store: moduleStore,
+    core: coreUpdater,
+    coreVersion,
+    instances: addonInstances,
+    requireAdmin,
   });
   registerAddons(app, {
     runtime: addonRuntime,
@@ -1933,6 +2005,7 @@ export async function createApp(
   heartbeatTimer?.unref();
   controllerTimer?.unref();
   app.addHook('onClose', async () => {
+    if (updateTimer) clearTimeout(updateTimer);
     await googlePhotos.dispose();
     logs.write('info', 'local', 'Arrêt du serveur');
     if (heartbeatTimer) clearInterval(heartbeatTimer);

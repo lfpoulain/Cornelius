@@ -189,6 +189,14 @@ Le premier réglage se fait ensuite pas à pas : voir [Premier démarrage](premi
 
 ## Mettre à jour
 
+Le plus simple : **État du système → Mettre à jour vers …** dans l’administration. Sur `main`, Cornelius suit les versions publiées (tag `vX.Y.Z`) ; sur une autre branche (`beta`), la branche distante. La mise à jour lance `scripts/update.sh`, qui arrête Cornelius, avance le dépôt, réinstalle les dépendances qui ont changé, recompile l’interface et relance les services systemd, ou `scripts/start.sh` sans eux. Elle est refusée si des fichiers de Cornelius ont été modifiés à la main ou si l’historique a divergé, et revient au commit de départ en cas d’échec. Le déroulé est dans `data/run/logs/update.log`. Le même script se lance aussi à la main (`--check` montre seulement la version proposée) :
+
+```sh
+scripts/update.sh
+```
+
+Le script garde une variante GPU d’ONNX Runtime déjà installée. Après une mise à jour qui change les dépendances du mot d’appel ou du GPU, ou pour tout remettre d’aplomb, relancez l’installateur comme ci-dessous.
+
 Avec les services systemd, arrêtez-les, récupérez la nouvelle version, puis relancez l’installateur avec les mêmes options qu’au départ (par exemple `--gpu amd` si vous l’aviez utilisé). Il met à jour les dépendances Node et Python, recompile l’interface et redémarre les services :
 
 ```sh

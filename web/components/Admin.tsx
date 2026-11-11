@@ -22,6 +22,8 @@ import { Agents } from './admin/Agents';
 import { DelegationSettings } from './admin/DelegationSettings';
 import { Diagnostics } from './admin/Diagnostics';
 import { AdminPasswordCard, RestartServerCard } from './admin/ServerControls';
+import { ModuleStore } from './admin/ModuleStore';
+import { CoreUpdateCard } from './admin/CoreUpdate';
 import { VoiceSettings } from './admin/VoiceSettings';
 import { VoiceUsageCard } from './admin/VoiceUsage';
 import { OrbScaleSettings } from './admin/OrbScaleSettings';
@@ -105,6 +107,13 @@ const sections = [
     group: 'Ce qu’il sait faire',
     label: 'Modules',
     description: 'Les sources de ses réponses et les commandes qu’il peut lancer.',
+  },
+  {
+    id: 'catalogue',
+    group: 'Ce qu’il sait faire',
+    label: 'Installer des modules',
+    description:
+      'Les modules à installer depuis le dépôt officiel ou d’autres dépôts, et leurs mises à jour.',
   },
   {
     id: 'agents',
@@ -661,6 +670,8 @@ export function Admin({
                   )}
                   {section === 'memory' && <Memory profiles={state.profiles} run={run} />}
                   {section === 'agents' && <Agents profiles={state.profiles} run={run} />}
+                  {section === 'catalogue' && <ModuleStore run={run} />}
+                  {section === 'diagnostic' && <CoreUpdateCard run={run} />}
                   {section === 'diagnostic' && <RestartServerCard run={run} />}
                   {section === 'diagnostic' && (
                     <Diagnostics

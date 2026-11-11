@@ -6,6 +6,13 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-11 : installation des modules et mises à jour
+
+**Ajouté**
+
+- **Installer des modules** : nouvelle rubrique de l’administration. Le dépôt officiel cornelius-modules et d’autres dépôts git publics (GitHub, GitLab, Gitea, Forgejo, Codeberg) y proposent leurs modules, à installer ou désinstaller d’un clic. Le catalogue est lu sans exécuter de code ; les dépôts sont copiés à un commit précis dans `data/modules` (`CORNELIUS_MANAGED_MODULES_DIR`), sans git. Les mises à jour des dépôts sont cherchées chaque jour et appliquées à la demande ; tout prend effet au redémarrage, rappelé par un bandeau.
+- **Mise à jour de Cornelius** : carte dans **État du système**. Sur `main`, dernière version publiée ; sur une autre branche, la branche distante. `scripts/update.sh` et `scripts/update.ps1` arrêtent Cornelius, avancent le dépôt (avance rapide seulement, refusée sur des fichiers modifiés), mettent à jour les dépendances, recompilent et relancent, puis reviennent en arrière en cas d’échec. Sous Home Assistant, la mise à jour reste celle de l’application.
+
 ### 2026-11-10 : administration réorganisée
 
 **Modifié**

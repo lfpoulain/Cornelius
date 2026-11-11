@@ -7,7 +7,8 @@ Les modules viennent de deux endroits :
 | | Où | Mis à jour |
 | --- | --- | --- |
 | **Modules livrés** : Heure, Météo, Transports, Ragator | `addons/`, dans Cornelius | avec Cornelius |
-| **Modules externes** : Vacances et jours fériés… | le dépôt [cornelius-modules](https://github.com/lfpoulain/cornelius-modules), cloné à côté de Cornelius | à part, par `git pull` (voir [Modules externes](#modules-externes)) |
+| **Modules installés** : Vacances et jours fériés, Vélos… | le dépôt officiel [cornelius-modules](https://github.com/lfpoulain/cornelius-modules) ou un autre dépôt, depuis **Installer des modules** | depuis la même rubrique (voir [Installer des modules](#installer-des-modules)) |
+| **Dossier local** (développement) | un dépôt de modules cloné à côté de Cornelius | à part, par `git pull` (voir [Dossier local](#dossier-local)) |
 
 Pour écrire un module, tout se passe dans [cornelius-modules](https://github.com/lfpoulain/cornelius-modules) : [tutoriel](https://github.com/lfpoulain/cornelius-modules/blob/main/docs/creer-un-module.md), gabarit et commandes de test. Les règles du contrat sont dans la [référence](reference.md), ici, car elles décrivent le code de Cornelius.
 
@@ -45,9 +46,25 @@ En haut de l’onglet, « Sources de » montre les sources de tout le monde, du 
 
 Un module installé mais refusé au démarrage apparaît en bas, sous « Module non chargé », avec la raison.
 
-### Modules externes
+### Installer des modules
 
-Des modules peuvent aussi venir du dépôt [cornelius-modules](https://github.com/lfpoulain/cornelius-modules), cloné **à côté** du dossier de Cornelius (ou dans le dossier de `CORNELIUS_MODULES_DIR`). Ils se mettent à jour sans toucher à Cornelius. Depuis le dossier de Cornelius :
+La rubrique **Installer des modules** (groupe « Ce qu’il sait faire ») liste des dépôts git de modules. Le dépôt officiel [cornelius-modules](https://github.com/lfpoulain/cornelius-modules) y est toujours ; son catalogue est téléchargé à la première ouverture.
+
+- **Installer** ajoute un module ; **Désinstaller** le retire. Ses sources sont gardées : une réinstallation les retrouve telles quelles.
+- **Vérifier ce dépôt** ou **Rechercher des mises à jour** cherche un commit plus récent. Cornelius le fait aussi seul une fois par jour (`CORNELIUS_UPDATE_CHECK=0` pour l’en empêcher). Une mise à jour prête affiche le nombre de modules modifiés ou nouveaux, et la version suivante à côté de chaque module ; **Mettre à jour le dépôt** l’applique. Un dépôt dont aucun module n’est installé avance sans rien demander.
+- **Ajouter un dépôt** prend l’adresse https d’un dépôt public (GitHub, GitLab, Gitea, Forgejo, Codeberg), et une branche si ce n’est pas celle par défaut. Le dépôt doit suivre la forme de cornelius-modules : un dossier par module, avec son `index.ts`. **Retirer le dépôt** désinstalle aussi ses modules ; le dépôt officiel ne se retire pas.
+
+Installer, désinstaller ou mettre à jour prend effet au **redémarrage** : un bandeau le rappelle en haut de la rubrique, avec le bouton **Redémarrer Cornelius**. Un module en attente porte « Actif après redémarrage », ou « 1.0.0 en service, 1.1.0 au redémarrage ».
+
+Ce qu’il faut savoir :
+
+- Le catalogue est lu dans les fichiers du dépôt (titre et version de chaque module), sans exécuter son code. Le code d’un module ne s’exécute qu’une fois installé, **avec les mêmes droits que Cornelius** : il peut lire vos réglages et vos clés. N’ajoutez que des dépôts dont vous connaissez l’auteur.
+- Un module ne s’installe pas s’il porte l’identifiant d’un module livré avec Cornelius ou d’un module déjà installé depuis un autre dépôt, ni s’il demande une version de Cornelius plus récente que celle installée. Une mise à jour de dépôt est refusée pour la même raison : mettez d’abord Cornelius à jour (rubrique **État du système**).
+- Les dépôts sont copiés, à un commit précis, dans `data/modules/` (`CORNELIUS_MANAGED_MODULES_DIR` pour un autre dossier). Le dépôt entier est gardé, car ses modules partagent du code (`_lib/`). git n’est pas nécessaire : Cornelius lit le dépôt en HTTPS. Les dépôts privés ne sont pas pris.
+
+### Dossier local
+
+Pour écrire ou essayer des modules, un dépôt de modules peut aussi être cloné **à côté** du dossier de Cornelius (ou dans le dossier de `CORNELIUS_MODULES_DIR`). Tous ses modules sont chargés tels quels, et se mettent à jour par git, hors de l’administration. Depuis le dossier de Cornelius :
 
 ```bash
 git clone https://github.com/lfpoulain/cornelius-modules.git ../cornelius-modules
@@ -57,7 +74,7 @@ git clone https://github.com/lfpoulain/cornelius-modules.git ../cornelius-module
 git -C ../cornelius-modules pull
 ```
 
-Redémarrez ensuite Cornelius : les modules ne sont lus qu’au démarrage. Un module externe s’exécute avec les mêmes droits que Cornelius : n’installez que des modules dont vous connaissez l’auteur. Il est refusé, avec la raison sous « Module non chargé », s’il porte l’identifiant d’un module livré avec Cornelius ou s’il demande une version de Cornelius plus récente que celle installée.
+Redémarrez ensuite Cornelius : les modules ne sont lus qu’au démarrage. Un module du dossier local est refusé, avec la raison sous « Module non chargé », s’il porte l’identifiant d’un module livré avec Cornelius ou s’il demande une version de Cornelius plus récente que celle installée. Un module installé depuis **Installer des modules** remplace celui du même nom du dossier local.
 
 ## Ajouter une source
 
