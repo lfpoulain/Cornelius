@@ -228,7 +228,7 @@ function RepositoryCard({
           <p className="text-sm text-muted-foreground">
             {repository.commit
               ? 'Aucun module dans ce dépôt (un module est un dossier avec un index.ts).'
-              : 'Catalogue pas encore téléchargé.'}
+              : 'Catalogue pas encore téléchargé : cliquez sur « Vérifier ce dépôt ».'}
           </p>
         ) : (
           <ul className="divide-y rounded-md border" aria-label={`Modules de ${repository.name}`}>

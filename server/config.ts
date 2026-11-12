@@ -35,7 +35,7 @@ export interface AppConfig {
   managedModulesDir?: string;
   /** Mises à jour de Cornelius faites par une autre installation (application Home Assistant). */
   updatesManagedExternally?: boolean;
-  /** Recherche quotidienne des mises à jour (CORNELIUS_UPDATE_CHECK=0 pour la couper). */
+  /** Recherche quotidienne des mises à jour, désactivée par défaut (CORNELIUS_UPDATE_CHECK=1). */
   autoUpdateCheck?: boolean;
   /** Fuseau horaire du foyer donné aux modules (CORNELIUS_TIMEZONE, Europe/Paris par défaut). */
   timeZone?: string;
@@ -137,8 +137,8 @@ export function loadConfig(): AppConfig & { port: number } {
     modulesDir: externalAddonsRoot(),
     managedModulesDir: resolve(process.env.CORNELIUS_MANAGED_MODULES_DIR?.trim() || 'data/modules'),
     updatesManagedExternally: explicitlySupervised(),
-    autoUpdateCheck: !['0', 'false', 'non', 'no'].includes(
-      (process.env.CORNELIUS_UPDATE_CHECK ?? '1').trim().toLowerCase(),
+    autoUpdateCheck: ['1', 'true', 'oui', 'yes'].includes(
+      (process.env.CORNELIUS_UPDATE_CHECK ?? '0').trim().toLowerCase(),
     ),
     timeZone: process.env.CORNELIUS_TIMEZONE?.trim() || undefined,
     machine: detectMachine(),

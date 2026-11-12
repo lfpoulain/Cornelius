@@ -48,10 +48,10 @@ Un module installé mais refusé au démarrage apparaît en bas, sous « Module 
 
 ### Installer des modules
 
-La rubrique **Installer des modules** (groupe « Ce qu’il sait faire ») liste des dépôts git de modules. Le dépôt officiel [cornelius-modules](https://github.com/lfpoulain/cornelius-modules) y est toujours ; son catalogue est téléchargé à la première ouverture.
+La rubrique **Installer des modules** (groupe « Ce qu’il sait faire ») liste des dépôts git de modules. Le dépôt officiel [cornelius-modules](https://github.com/lfpoulain/cornelius-modules) y est toujours ; son catalogue est téléchargé au premier clic sur **Vérifier ce dépôt** (ou dès la première ouverture si `CORNELIUS_UPDATE_CHECK=1`).
 
 - **Installer** ajoute un module ; **Désinstaller** le retire. Ses sources sont gardées : une réinstallation les retrouve telles quelles.
-- **Vérifier ce dépôt** ou **Rechercher des mises à jour** cherche un commit plus récent. Cornelius le fait aussi seul une fois par jour (`CORNELIUS_UPDATE_CHECK=0` pour l’en empêcher). Une mise à jour prête affiche le nombre de modules modifiés ou nouveaux, et la version suivante à côté de chaque module ; **Mettre à jour le dépôt** l’applique. Un dépôt dont aucun module n’est installé avance sans rien demander.
+- **Vérifier ce dépôt** ou **Rechercher des mises à jour** cherche un commit plus récent. Avec `CORNELIUS_UPDATE_CHECK=1`, Cornelius le fait aussi seul une fois par jour ; par défaut, il attend un clic. Une mise à jour prête affiche le nombre de modules modifiés ou nouveaux, et la version suivante à côté de chaque module ; **Mettre à jour le dépôt** l’applique. Un dépôt dont aucun module n’est installé avance sans rien demander.
 - **Ajouter un dépôt** prend l’adresse https d’un dépôt public (GitHub, GitLab, Gitea, Forgejo, Codeberg), et une branche si ce n’est pas celle par défaut. Le dépôt doit suivre la forme de cornelius-modules : un dossier par module, avec son `index.ts`. **Retirer le dépôt** désinstalle aussi ses modules ; le dépôt officiel ne se retire pas.
 
 Installer, désinstaller ou mettre à jour prend effet au **redémarrage** : un bandeau le rappelle en haut de la rubrique, avec le bouton **Redémarrer Cornelius**. Un module en attente porte « Actif après redémarrage », ou « 1.0.0 en service, 1.1.0 au redémarrage ».
