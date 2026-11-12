@@ -1,6 +1,6 @@
 import type { AgentAdminView, AgentConnectionInput, AgentTaskView } from '../shared/agents.js';
 import { agentTaskLabels } from '../shared/agents.js';
-import type { ToolResult } from '../shared/addons.js';
+import { toolFailure, toolResult, type ToolResult } from '../shared/addons.js';
 import type { Scope } from '../shared/types.js';
 import { compile } from '../shared/validation.js';
 import { AgentRepository, type AgentConnection, type AgentTask } from './agents-store.js';
@@ -35,15 +35,6 @@ export const sameScope = (a: Scope, b: Scope) =>
   a.interactionId === b.interactionId &&
   a.profileEpoch === b.profileEpoch &&
   a.contextVersion === b.contextVersion;
-const fail = (message: string): ToolResult => ({
-  schemaVersion: 1,
-  status: 'failed',
-  result: null,
-  snapshotId: null,
-  actionRunId: null,
-  summary: message,
-  error: { code: 'unavailable', message, retryable: false },
-});
 
 /** Hermes owns execution, permissions and task lifetime. */
 export class Agents {
@@ -307,16 +298,16 @@ export class Agents {
     name: string,
     args: unknown,
   ): Promise<ToolResult> {
-    if (!checks.get(name)?.(args)) return fail('Paramètres de demande Hermes invalides.');
+    if (!checks.get(name)?.(args)) return toolFailure('Paramètres de demande Hermes invalides.');
     if (this.lifetime.signal.aborted || input.signal.aborted || !input.scope.interactionId)
-      return fail('Conversation interrompue.');
+      return toolFailure('Conversation interrompue.');
     try {
       let c = this.connection(input.profileId);
       const a = object(args);
       if (name === 'agents__capabilities') {
         await this.discover(c.profileId);
         if (input.signal.aborted || !this.current(c))
-          return fail('Conversation ou connexion modifiée.');
+          return toolFailure('Conversation ou connexion modifiée.');
         const d = this.repository.get(c.profileId)!.discovery;
         return this.result(
           { discovery: d },
@@ -344,10 +335,10 @@ export class Agents {
         c = this.connection(c.profileId);
       }
       if (!c.discovery?.available)
-        return fail('Hermes est indisponible. Vérifiez la connexion dans l’administration.');
-      if (input.signal.aborted) return fail('Conversation interrompue.');
+        return toolFailure('Hermes est indisponible. Vérifiez la connexion dans l’administration.');
+      if (input.signal.aborted) return toolFailure('Conversation interrompue.');
       if (this.submitting.has(c.profileId))
-        return fail('Une demande est déjà en cours d’envoi à cet agent.');
+        return toolFailure('Une demande est déjà en cours d’envoi à cet agent.');
       this.submitting.add(c.profileId);
       try {
         let sessionId: string | undefined;
@@ -357,14 +348,16 @@ export class Agents {
             .tasks(c.profileId)
             .find((t) => t.sessionId === parent.sessionId)!;
           const state = await this.refresh(c, latest, input.signal);
-          if (state.error) return fail(state.error);
+          if (state.error) return toolFailure(state.error);
           if (state.status === 'waiting_for_approval')
-            return fail(
+            return toolFailure(
               'Hermes attend un accord : utilisez les boutons dans Administration → Agents.',
             );
           if (!terminal(state.status)) {
             if (state.status !== 'running' || !c.discovery.steer || !latest.runId)
-              return fail('Hermes travaille encore sur cette demande. Attendez son résultat.');
+              return toolFailure(
+                'Hermes travaille encore sur cette demande. Attendez son résultat.',
+              );
             await this.client.request(
               c,
               '/v1/runs/' + latest.runId + '/steer',
@@ -379,7 +372,7 @@ export class Agents {
           sessionId = parent.sessionId;
         }
         if (input.signal.aborted || !this.current(c))
-          return fail('Conversation ou connexion modifiée.');
+          return toolFailure('Conversation ou connexion modifiée.');
         const key = input.scope.interactionId + ':' + input.callId;
         const existing = this.repository.tasks(c.profileId).find((t) => t.callId === key);
         if (existing) return this.taskResult(this.view(existing));
@@ -401,7 +394,7 @@ export class Agents {
           const runId = remoteId(data.run_id);
           if (!runId) throw new HermesError('Identifiant de tâche Hermes manquant.');
           if (!this.current(c) || !this.repository.find(t.id))
-            return fail('Connexion modifiée ; la demande peut continuer dans Hermes.');
+            return toolFailure('Connexion modifiée ; la demande peut continuer dans Hermes.');
           const updated = this.repository.update(t.id, 'running', runId)!;
           return this.taskResult(await this.refresh(c, updated));
         } catch {
@@ -409,7 +402,7 @@ export class Agents {
             this.repository.update(t.id, 'unknown');
             this.cache.delete(t.id);
           }
-          return fail(
+          return toolFailure(
             'Envoi à Hermes incertain. La demande peut être en cours ; ne la relancez pas sans vérifier dans Hermes.',
           );
         }
@@ -417,21 +410,13 @@ export class Agents {
         this.submitting.delete(c.profileId);
       }
     } catch (error) {
-      return fail(
+      return toolFailure(
         error instanceof HermesError ? error.message : 'Connexion à Hermes indisponible.',
       );
     }
   }
   private result(value: Record<string, unknown>, summary: string): ToolResult {
-    return {
-      schemaVersion: 1,
-      status: 'succeeded',
-      result: value,
-      snapshotId: null,
-      actionRunId: null,
-      summary,
-      error: null,
-    };
+    return toolResult('succeeded', summary, { result: value });
   }
   private taskResult(t: AgentTaskView): ToolResult {
     const summary =

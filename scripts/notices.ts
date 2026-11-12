@@ -15,6 +15,14 @@ interface LockPackage {
   dev?: boolean;
 }
 
+/**
+ * Texte en fins de ligne LF : sous Windows, Git peut extraire le fichier en CRLF, alors que la
+ * liste est produite en LF. Sans cela, une liste à jour paraît périmée.
+ */
+export function unixLines(text: string): string {
+  return text.replaceAll('\r\n', '\n');
+}
+
 export function npmNotices(): string {
   const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8')) as {
     packages: Record<string, LockPackage>;
@@ -47,7 +55,8 @@ function updated(text: string): string {
 }
 
 if (process.argv[1] && import.meta.filename === process.argv[1]) {
-  const current = readFileSync(file, 'utf8');
+  const raw = readFileSync(file, 'utf8');
+  const current = unixLines(raw);
   const next = updated(current);
   if (process.argv.includes('--check')) {
     if (next !== current) {
@@ -55,7 +64,8 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
       process.exit(1);
     }
   } else {
-    writeFileSync(file, next);
+    // Le fichier garde ses fins de ligne d’origine.
+    writeFileSync(file, raw.includes('\r\n') ? next.replaceAll('\n', '\r\n') : next);
     console.info('THIRD_PARTY_NOTICES.md mis à jour.');
   }
 }

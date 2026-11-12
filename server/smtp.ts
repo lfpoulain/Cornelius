@@ -227,6 +227,17 @@ class Session {
     this.socket.off('close', this.onClose);
   }
 
+  /**
+   * Oublie tout ce qui a été lu en clair. Avant STARTTLS, n’importe qui sur le chemin peut
+   * glisser des réponses derrière le 220 : gardées, elles seraient lues comme la réponse
+   * au EHLO chiffré et pourraient, par exemple, changer les mécanismes de connexion annoncés.
+   */
+  discardPlaintext() {
+    this.buffer = Buffer.alloc(0);
+    this.lines = [];
+    this.replies = [];
+  }
+
   private receive(chunk: Buffer) {
     this.buffer = Buffer.concat([this.buffer, chunk]);
     if (this.buffer.length > 64 * 1024) {
@@ -419,6 +430,7 @@ async function withSession<T>(
       const secure = await upgrade(raw, server).catch((error: unknown) => {
         throw session.failure ?? error;
       });
+      session.discardPlaintext();
       session.attach(secure);
       caps = await ehlo(session);
     }

@@ -1,17 +1,13 @@
 import { test, expect } from '@playwright/test';
 import type { StateEvent } from '../../shared/types';
-import { origin, screenshots } from './env';
+import { login, origin, screenshots } from './env';
 
 test('un minuteur créé dans l’administration sonne sur le miroir puis s’arrête', async ({
   page,
 }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Modules', exact: true }).click();
   await page.locator('#module-alarms > summary').click();
   await page.getByRole('button', { name: 'Minuteur', exact: true }).click();

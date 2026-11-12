@@ -56,11 +56,15 @@ MODEL_DIRECTORIES = {
 DEFAULT_MODEL = os.getenv("CORNELIUS_VISION_MODEL", "450m")
 
 
-def variant_files(variant, model="450m"):
+def graph_files(variant, model="450m"):
+    """Les trois graphes (plongements, encodeur d’image, décodeur) d’une variante."""
     embed, encoder, decoder = GRAPH_VARIANTS[model]
-    encoder_variant = encoder + ("_fp16" if variant == "gpu" else "_q4") + ".onnx"
-    decoder_variant = decoder + ("_fp16" if variant == "gpu" else "_q4") + ".onnx"
-    graphs = (embed + ".onnx", encoder_variant, decoder_variant)
+    suffix = ("_fp16" if variant == "gpu" else "_q4") + ".onnx"
+    return embed + ".onnx", encoder + suffix, decoder + suffix
+
+
+def variant_files(variant, model="450m"):
+    graphs = graph_files(variant, model)
     # External data sidecars are required; split sidecars (_data_1, …) are checked at
     # load time by onnxruntime, download_models.py fetches them from the manifest.
     return tuple(name + "_data" for name in graphs) + graphs + CONFIG_FILES
@@ -523,10 +527,7 @@ class SceneCaptioner:
                 options = self._session_options(ort, provider)
                 providers = [provider] if provider == CPU_PROVIDER[0] else [provider, CPU_PROVIDER[0]]
                 provider_options = self._provider_options(provider)
-                embed, encoder, decoder = GRAPH_VARIANTS[self.model]
-                encoder_name = encoder + ("_fp16" if variant == "gpu" else "_q4") + ".onnx"
-                decoder_name = decoder + ("_fp16" if variant == "gpu" else "_q4") + ".onnx"
-                graphs = (embed + ".onnx", encoder_name, decoder_name)
+                graphs = graph_files(variant, self.model)
                 sessions = {
                     name: ort.InferenceSession(
                         str(self.directory / graph), options, providers=providers, provider_options=provider_options

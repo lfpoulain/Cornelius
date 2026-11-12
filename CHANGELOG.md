@@ -6,7 +6,99 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
-Rien pour l’instant.
+### 2026-11-12 : satellite Android
+
+**Ajouté**
+
+- Page [Le satellite Android](docs/fonctionnalites/satellite-android.md) : un téléphone comme satellite vocal, voix seule, mot d’appel calculé sur le téléphone. L’application est tierce, séparée du dépôt, et ne demande aucun changement du serveur ; la page l’annonce dès son en-tête.
+- L’accès hors du réseau local par un tunnel WireGuard : un seul port UDP ouvert, une adresse privée présentée à Cornelius, et les quatre pièges de la double redirection.
+
+**Modifié**
+
+- [Les satellites audio](docs/fonctionnalites/satellites.md) et [la documentation](docs/README.md) renvoient vers la page du satellite Android.
+
+### 2026-11-11 : installation des modules et mises à jour
+
+**Ajouté**
+
+- **Installer des modules** : nouvelle rubrique de l’administration. Le dépôt officiel cornelius-modules et d’autres dépôts git publics (GitHub, GitLab, Gitea, Forgejo, Codeberg) y proposent leurs modules, à installer ou désinstaller d’un clic. Le catalogue est lu sans exécuter de code ; les dépôts sont copiés à un commit précis dans `data/modules` (`CORNELIUS_MANAGED_MODULES_DIR`), sans git. Les mises à jour des dépôts sont cherchées et appliquées à la demande (recherche quotidienne avec `CORNELIUS_UPDATE_CHECK=1`, désactivée par défaut) ; tout prend effet au redémarrage, rappelé par un bandeau.
+- **Mise à jour de Cornelius** : carte dans **État du système**. Sur `main`, dernière version publiée ; sur une autre branche, la branche distante. `scripts/update.sh` et `scripts/update.ps1` arrêtent Cornelius, avancent le dépôt (avance rapide seulement, refusée sur des fichiers modifiés), mettent à jour les dépendances, recompilent et relancent, puis reviennent en arrière en cas d’échec. Sous Home Assistant, la mise à jour reste celle de l’application.
+
+### 2026-11-11 : suites de l’audit du code
+
+**Corrigé**
+
+- **Administration** : Agents et Home Assistant se rétablissent quand la première lecture a échoué ; une relecture ancienne n’écrase plus un enregistrement récent d’agent ; « Tester le micro » ne se lance plus deux fois et libère le micro si l’on quitte la rubrique ; le prix par minute en cours de saisie n’est plus écrasé à la fin d’une conversation ; le compteur des commandes HTTP suit les ajouts ; les gestes des satellites non enregistrés demandent confirmation avant de quitter la rubrique ; « Annuler » est grisé pendant la vérification d’une source ; deux choix rapprochés de l’écran de veille s’enregistrent tous les deux ; le curseur de l’orbe ne revient plus en arrière pendant le glissement.
+- **Accessibilité** : le focus revient au bouton d’origine après une confirmation annulée (réseau local, satellites, serveur, clés, profils, agent) ; la suppression d’un profil se ferme avec Échap ; le testeur de reconnaissance n’annonce plus ses scores en continu ; deux formulaires du même module n’ont plus d’identifiants en double.
+- **Voix** : avec Mistral, un micro débranché est reconnu comme une panne de périphérique et le miroir propose de réactiver la voix.
+- **Perception** : une erreur d’allumage de caméra (modèles de visages absents…) est affichée dans l’administration au lieu d’être avalée ou de couper la liaison ; une erreur d’analyse ou de commande ne fait plus tomber la détection de parole et le mot d’appel ; en caméra du navigateur, une même image n’est plus analysée ni comptée plusieurs fois ; le mot d’appel se recharge après une erreur passagère.
+- **Serveur** : un minuteur de clôture resté armé après une création refusée ; des diagnostics (« Ouvrez le miroir… ») qui restaient publiés après la disparition de leur cause ; les tampons SMTP vidés après STARTTLS ; le repli de la mémoire personnalisée sur Chat Completions limité aux réponses 404, 405 et 501 ; l’heure de fin d’un capteur Home Assistant dans le fuseau du foyer ; un satellite trop lent déconnecté au lieu d’accumuler le son ; `/api/health` et les User-Agent annoncent la version réelle.
+- **Scripts** : `PORT` de `.env` lu comme le fait Node (guillemets, espaces, dernière occurrence) sous Linux et Windows ; Node 25 et plus refusé au démarrage, comme le demande `package.json` ; `dev.sh` s’arrête dès que Vite meurt.
+
+**Modifié**
+
+- **Chargement** : l’administration ne télécharge plus three.js ni la pile audio du miroir ; les modèles de visages et du mot d’appel ne sont plus relus du disque à chaque allumage de caméra ou retour en veille ; le transport Live ne reconstruit plus l’état complet pour lire un seul champ ; le journal et la liste de l’écran de veille font moins d’accès disque.
+- **Retiré** : la dépendance `@livekit/rtc-node`, jamais utilisée ; huit classes CSS, deux fonctions d’API et quelques méthodes serveur mortes.
+- **Doublons** : une seule alerte « Lecture impossible · Réessayer » (`LoadError`) et un seul brouillon décimal (`useDecimalDraft`) dans l’administration ; côté serveur, les résultats d’outil passent par `toolResult` et `toolFailure`.
+- **Tests** : une seule aide de connexion pour les tests navigateur (`tests/e2e/env.ts`) ; `forbidOnly` en CI ; les `push` ne lancent la CI que sur `main` et `beta`.
+
+### 2026-11-10 : administration réorganisée
+
+**Modifié**
+
+- **Administration → barre latérale** : six groupes, dans l’ordre où l’on s’en sert, à la place de trois : **Pour commencer** (Mise en route, Clés et accès), **Conversation** (Quand il écoute, Voix et modèles, Personnaliser Cornelius), **Les personnes** (Le foyer et les visages, Mémoire), **Ce qu’il sait faire** (Modules, Agents), **Le miroir** (Micro et haut-parleurs, Caméra et reconnaissance, Orbe et écran de veille, Satellites audio) et **Diagnostic** (État du système, Journal).
+- **Mise en route** ne porte plus que la liste des étapes. Les cartes qui la suivaient ont leur rubrique : **Clés et accès** (`#access` : Clés et jetons, Mot de passe administrateur, Accès depuis le réseau local) et **Voix et modèles** (`#assistant` : Voix de Cornelius, Délégation, Temps de conversation). Les étapes « Clé OpenAI » et « Mot de passe administrateur » y mènent par un bouton (« Saisir la clé », « Changer le mot de passe »).
+- **Délégation : recherches et actions** quitte les réglages avancés de « Quand il écoute » pour « Voix et modèles », avec le fournisseur et la voix.
+- **Taille de l’orbe** quitte « Personnaliser Cornelius » pour la rubrique « Écran de veille », renommée **Orbe et écran de veille**.
+- Les messages du serveur et du miroir qui renvoyaient à « Mise en route → Clés et jetons » disent « Clés et accès → Clés et jetons ». Les adresses des autres rubriques ne changent pas.
+- **Mise en route → Miroir ouvert** : l’étape distingue le miroir sur cet écran (bouton) du miroir sur un autre écran, dont elle donne l’adresse sur le réseau local.
+- **Clés et jetons → Extraction des souvenirs** (ex-« Mémoire personnalisée ») : le fournisseur se choisit d’abord (OpenAI par défaut, Mistral, ou « Mon serveur ») ; l’adresse, le modèle et le secours ne sont demandés qu’avec « Mon serveur ». Le champ « Nom affiché », qui ne servait nulle part, n’est plus proposé.
+- **Temps de conversation** : le prix par minute de Mistral n’apparaît plus quand la conversation passe par OpenAI.
+- **Orbe et écran de veille** : « Revenir à 100 % » est un vrai bouton ; avec l’album Google Photos, les images locales deviennent un secours replié.
+
+**Corrigé**
+
+- **Sécurité, réseau local** : les contrôles d’accès lisaient l’adresse brute, alors que le routeur décode les `%xx` : `/%61pi/state` était servi comme `/api/state` à un appareil non autorisé. Ils lisent désormais le chemin décodé ; `/voice-audio` rejoint les chemins réservés aux appareils autorisés.
+- **Satellites** : recharger le miroir, ou l’ouvrir dans un autre onglet, ne coupe plus la conversation en cours sur un satellite.
+- **Satellites avec Mistral** : une question dite d’une traite après « Cornelius » n’est plus perdue ; le son reçu avant la fin de la connexion attend au lieu d’être jeté.
+- **Caméra** : une caméra débranchée un instant, ou muette après une mise en veille, est rouverte toute seule (après 1 s, puis toutes les 2 à 15 s) et l’administration affiche « Caméra déconnectée » entre-temps. La caméra du navigateur se rouvre de même.
+- **Installation Linux** : relancer l’installateur sur une machine avec carte graphique ne casse plus ONNX Runtime.
+- **Tests navigateur** : le serveur de test n’écoute plus sur le réseau local et ne s’annonce plus aux satellites.
+- Tests : la liste des notices se compare sans tenir compte des fins de ligne ; le dossier temporaire du test de suppression de profil s’efface après la fermeture de la base ; les specs de vision et d’images ne dépendent plus des modèles installés sur le poste.
+
+### 2026-11-09 : suites de relecture (couleur, bouton, fin de parole, volume)
+
+**Corrigé**
+
+- **Home Assistant → couleur** : une teinte sombre (`[128, 0, 128]`), relue par Home Assistant à pleine intensité (`[255, 0, 255]`), est maintenant confirmée : les deux couleurs sont comparées à pleine intensité.
+- **Satellites → volume à la voix** : la fiche du satellite dans l’administration suit un réglage fait à la voix. Au volume 0, Cornelius rappelle que les sonneries du satellite (réveils, minuteurs, rappels) sont muettes aussi.
+
+**Documentation**
+
+- Confidentialité : le bouton du satellite coupe le micro en veille et ferme la conversation pendant une conversation.
+- Satellites et administration : le délai de fin de parole propre au satellite est pris à l’ouverture, un changement vaut pour la conversation suivante ; volume 0 et sonneries.
+- Home Assistant et architecture : couleur et blanc de `home_assistant__control`, comparaison à pleine intensité.
+- Test de la route `POST /api/admin/home-assistant/control` avec `rgbColor`.
+
+### 2026-11-08 : nouveaux appareils Home Assistant signalés
+
+**Ajouté**
+
+- **Home Assistant** : un appareil apparu dans Home Assistant depuis le dernier enregistrement de la sélection est marqué « Nouveau » dans la liste, avec un compteur ; champ `newEntities` de la vue, ligne « Nouvel appareil Home Assistant à cocher » au journal. Rien ne devient utilisable sans être coché.
+
+### 2026-11-08 : temps de conversation
+
+**Ajouté**
+
+- **Mise en route → Temps de conversation** : minutes et nombre de conversations d’aujourd’hui, du mois et du mois précédent, dans le fuseau du foyer (70 jours gardés), par fournisseur vocal. Le coût n’est estimé que pour le temps passé avec Mistral, facturé à la minute, et avec un prix par minute saisi (aucun par défaut, en $ ou en €) ; OpenAI, facturé aux jetons, n’a pas d’estimation. Seule une conversation devenue prête est comptée, y compris quand la clôture n’est pas acquittée. Table `voice_usage_days`, routes `GET /api/admin/voice-usage` et `PATCH /api/admin/voice-usage/price`.
+
+- Gestes configurables des satellites compatibles. Un geste peut couper le micro, qui se rouvre au bouton.
+
+### Album Google Photos dans l’écran de veille
+
+**Ajouté**
+
+- Source expérimentale Google Photos : lien d’album partagé, aperçu, actualisation réglable et retour aux images locales. Les images sont relayées depuis Google sans import sur disque, sans clé API ni connexion au compte. Le connecteur dépend du format non officiel de la page partagée et ne lit que sa page initiale (500 entrées au maximum). Voir [les réglages et limites](docs/fonctionnalites/google-photos.md).
 
 ## 0.3.0 · 2026-11-09
 

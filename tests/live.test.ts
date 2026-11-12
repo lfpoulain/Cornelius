@@ -944,7 +944,7 @@ test('unavailableReason distingue le blocage administrateur de la clé OpenAI ab
   const missing = new LiveTransport(null, () => false, logs);
   assert.equal(
     missing.unavailableReason(),
-    'Ajoutez la clé du fournisseur vocal choisi dans Mise en route → Clés et jetons.',
+    'Ajoutez la clé du fournisseur vocal choisi dans Clés et accès → Clés et jetons.',
   );
 });
 
@@ -1409,6 +1409,24 @@ for (const result of ['resolve', 'reject'] as const) {
     },
   );
 }
+
+test('après une création refusée, la session suivante garde son délai de clôture', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = fixture(t);
+  f.gateway.create = async () => {
+    throw Object.assign(new Error('Clé refusée'), { status: 401 });
+  };
+  await assert.rejects(f.live.offer(f.scope, 'offer'), /refusée/);
+  assert.equal(f.controller.snapshot().state.session.phase, 'idle');
+  f.controller.command({ type: 'start' });
+  // Création sans réponse : seul le délai du transport peut libérer la clôture.
+  f.gateway.create = () => new Promise(() => {});
+  void f.live.offer(f.controller.scope(), 'next');
+  f.controller.command({ type: 'stop' });
+  assert.equal(f.controller.snapshot().state.session.phase, 'closing');
+  t.mock.timers.tick(5000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'idle');
+});
 
 test('le watchdog du contrôleur peut libérer une clôture avant celui du transport', async (t) => {
   t.mock.timers.enable({ apis: ['setTimeout'] });

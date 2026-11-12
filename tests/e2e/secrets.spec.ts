@@ -1,17 +1,10 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { login } from './env';
 
-async function login(page: Page) {
-  await page.goto('/admin#start');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
-}
-
-test('un jeton de module se saisit dans Mise en route, compte aussitôt et s’efface', async ({
+test('un jeton de module se saisit dans Clés et accès, compte aussitôt et s’efface', async ({
   page,
 }) => {
-  await login(page);
+  await login(page, '/admin#access');
   const card = page.locator('#secrets');
   await expect(card.getByRole('heading', { name: 'Clés et jetons' })).toBeVisible();
   const providers = card.getByRole('region', { name: 'Fournisseurs IA' });
@@ -50,7 +43,7 @@ for (const width of [390, 1440]) {
     page,
   }) => {
     await page.setViewportSize({ width, height: 1000 });
-    await login(page);
+    await login(page, '/admin#access');
     const cards = page.locator('#secrets article');
     await expect(cards.first()).toBeVisible();
     for (const card of await cards.all()) {
@@ -60,14 +53,18 @@ for (const width of [390, 1440]) {
       expect(box!.x + box!.width).toBeLessThanOrEqual(width);
       expect(await card.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
     }
-    const memory = page.getByRole('region', { name: 'Mémoire personnalisée', exact: true });
+    const memory = page.getByRole('region', { name: 'Extraction des souvenirs', exact: true });
     await expect(memory).toBeVisible();
     const box = await memory.boundingBox();
     expect(box!.x + box!.width).toBeLessThanOrEqual(width);
     expect(await memory.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+    // Avec OpenAI ou Mistral, rien d’autre à régler : les réglages du serveur n’apparaissent
+    // qu’avec « Mon serveur ». La base est partagée par la série : le choix est posé d’abord.
+    await memory.getByLabel('Fournisseur mémoire', { exact: true }).selectOption('openai');
+    await expect(memory.getByLabel('URL de base', { exact: true })).toHaveCount(0);
+    await memory.getByLabel('Fournisseur mémoire', { exact: true }).selectOption('custom');
     await memory.getByLabel('URL de base', { exact: true }).fill('http://127.0.0.1:11434/v1');
     await memory.getByLabel('Modèle mémoire', { exact: true }).fill('local-memory-model');
-    await memory.getByLabel('Fournisseur mémoire', { exact: true }).selectOption('custom');
     const secours = memory.getByLabel('Secours mémoire', { exact: true });
     // Un serveur local repart sans secours : les conversations ne sortent pas de la maison.
     await expect(secours).toHaveValue('none');
@@ -80,7 +77,7 @@ for (const width of [390, 1440]) {
     await expect(memory.getByLabel('Fournisseur mémoire', { exact: true })).toHaveValue('custom');
     await expect(secours).toHaveValue('mistral');
     await memory.getByLabel('Fournisseur mémoire', { exact: true }).selectOption('openai');
-    await expect(secours).toBeDisabled();
+    await expect(secours).toHaveCount(0);
     await memory.getByLabel('Fournisseur mémoire', { exact: true }).selectOption('custom');
     await memory.getByRole('button', { name: 'Enregistrer la configuration', exact: true }).click();
     await page.reload();
@@ -108,7 +105,7 @@ for (const width of [390, 1440]) {
 }
 
 test('la clé mémoire active la découverte sans exposer sa valeur', async ({ page }) => {
-  await login(page);
+  await login(page, '/admin#access');
   const key = 'custom-memory-e2e-only-0123456789';
   const field = page.locator('#secrets').getByLabel('Clé mémoire personnalisée', { exact: true });
   await field.fill(key);
@@ -118,7 +115,8 @@ test('la clé mémoire active la découverte sans exposer sa valeur', async ({ p
       .getByRole('button', { name: 'Enregistrer', exact: true })
       .click();
     await expect(field).toHaveCount(0);
-    const memory = page.getByRole('region', { name: 'Mémoire personnalisée', exact: true });
+    const memory = page.getByRole('region', { name: 'Extraction des souvenirs', exact: true });
+    await memory.getByLabel('Fournisseur mémoire', { exact: true }).selectOption('custom');
     await memory.getByLabel('URL de base', { exact: true }).fill('http://127.0.0.1:11434/v1');
     await expect(
       memory.getByRole('button', { name: 'Détecter les modèles', exact: true }),

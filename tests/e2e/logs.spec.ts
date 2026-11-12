@@ -1,11 +1,8 @@
 import { test, expect, type WebSocketRoute } from '@playwright/test';
+import { login } from './env';
 
 test('le journal affiche, filtre et exporte les erreurs locales', async ({ page }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Journal' }).click();
   await expect(page.getByRole('heading', { name: 'Journal détaillé', exact: true })).toBeVisible();
   await page.evaluate(async () => {
@@ -49,11 +46,7 @@ test('le journal affiche, filtre et exporte les erreurs locales', async ({ page 
 });
 
 test('le journal reste affiché au retour dans la rubrique', async ({ page }) => {
-  await page.goto('/admin#logs');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin#logs');
   const log = page.getByRole('log');
   await expect(log.locator('time').first()).toBeVisible();
   await page.getByRole('button', { name: 'État du système' }).click();
@@ -72,11 +65,7 @@ test('hors connexion, le journal reste lisible et s’exporte', async ({ page })
     live = socket;
     socket.connectToServer();
   });
-  await page.goto('/admin#logs');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin#logs');
   const log = page.getByRole('log');
   await expect(log.locator('time').first()).toBeVisible();
   await live!.close();

@@ -23,6 +23,7 @@ import {
   useState,
   type ComponentProps,
   type ReactNode,
+  type RefObject,
 } from 'react';
 import {
   ChevronDown,
@@ -40,7 +41,7 @@ import { Card, CardContent, CardDescription, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { NativeSelect, NativeSelectOption } from '../ui/native-select';
-import { plural } from './format';
+import { decimalText, parseDecimal, plural } from './format';
 import { useUnsavedChanges } from './unsaved';
 import type { AdminResource } from './useAdminResource';
 
@@ -52,6 +53,45 @@ export function LoadingCard({ label }: { label: string }) {
         <p role="status">{label}</p>
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Lecture au serveur ratée : la raison et « Réessayer ». `stale` : des données déjà lues restent
+ * affichées dessous. Seule, pour une rubrique qui garde sa propre mise en page (LoadingCard
+ * pendant la lecture) ; sinon ResourceState s’en charge.
+ */
+export function LoadError({
+  error,
+  loading = false,
+  onRetry,
+  stale = false,
+}: {
+  error: string;
+  loading?: boolean;
+  onRetry: () => unknown;
+  stale?: boolean;
+}) {
+  return (
+    <Alert variant="destructive">
+      <CircleAlert aria-hidden="true" />
+      <AlertDescription className="gap-3">
+        <p>
+          {stale ? 'Actualisation impossible' : 'Lecture impossible'} : {error}
+          {stale ? ' Les informations affichées peuvent être anciennes.' : ''}
+        </p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="text-foreground"
+          disabled={loading}
+          onClick={() => void onRetry()}
+        >
+          <RefreshCw className={loading ? 'animate-spin' : undefined} aria-hidden="true" />
+          {loading ? 'Nouvel essai…' : 'Réessayer'}
+        </Button>
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -79,18 +119,6 @@ export function ResourceState<T>({
   empty?: { title: ReactNode; description?: ReactNode; action?: ReactNode };
   children: (data: T) => ReactNode;
 }) {
-  const retry = (
-    <Button
-      variant="outline"
-      size="sm"
-      className="text-foreground"
-      disabled={loading}
-      onClick={() => void reload()}
-    >
-      <RefreshCw className={loading ? 'animate-spin' : undefined} aria-hidden="true" />
-      {loading ? 'Nouvel essai…' : 'Réessayer'}
-    </Button>
-  );
   if (data === null && !error)
     return (
       <div className="admin-loading" data-admin-loading="" aria-busy="true">
@@ -101,16 +129,7 @@ export function ResourceState<T>({
   return (
     <>
       {error && (
-        <Alert variant="destructive">
-          <CircleAlert aria-hidden="true" />
-          <AlertDescription className="gap-3">
-            <p>
-              {data === null ? 'Lecture impossible' : 'Actualisation impossible'} : {error}
-              {data === null ? '' : ' Les informations affichées peuvent être anciennes.'}
-            </p>
-            {retry}
-          </AlertDescription>
-        </Alert>
+        <LoadError error={error} loading={loading} onRetry={reload} stale={data !== null} />
       )}
       {data !== null &&
         (empty && isEmpty?.(data) ? (
@@ -312,6 +331,26 @@ export function DecimalInput(props: Omit<ComponentProps<typeof Input>, 'type' | 
   return <Input type="text" inputMode="decimal" autoComplete="off" spellCheck={false} {...props} />;
 }
 
+/**
+ * Brouillon d’une valeur décimale enregistrée par SaveBar : le texte saisi, la valeur lue
+ * (null si le champ est vide, NaN si la saisie n’est pas un nombre) et le retour à la valeur
+ * enregistrée. Le texte suit la valeur enregistrée quand elle change, pas à chaque relecture.
+ * `dirty` : « 0,420 » pour 0,42 n’est pas une modification ; une saisie invalide en est une.
+ */
+export function useDecimalDraft(saved: number | null | undefined) {
+  const shown = saved == null ? '' : decimalText(saved);
+  const [text, setText] = useState(shown);
+  useEffect(() => setText(shown), [shown]);
+  const value = text.trim() ? parseDecimal(text) : null;
+  return {
+    text,
+    setText,
+    value,
+    dirty: text !== shown && value !== (saved ?? null),
+    reset: () => setText(shown),
+  };
+}
+
 export function SearchInput({ className, ...props }: Omit<ComponentProps<typeof Input>, 'type'>) {
   return (
     <div className={cn('relative w-full', className)}>
@@ -486,11 +525,17 @@ export function ConfirmAction({
   confirmLabel = 'Confirmer',
   onConfirm,
   onCancel,
+  returnFocusTo,
 }: {
   message: ReactNode;
   confirmLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  /**
+   * Bouton d’origine quand la confirmation le remplace à l’écran : démonté pendant la question,
+   * il est remonté (nouvel élément) à la fermeture, et c’est cette ref qui le retrouve.
+   */
+  returnFocusTo?: RefObject<HTMLElement | null>;
 }) {
   const questionId = useId();
   const container = useRef<HTMLDivElement>(null);
@@ -504,10 +549,13 @@ export function ConfirmAction({
       // ailleurs entre-temps garde sa place. Après une suppression, l’origine a pu disparaître.
       const now = document.activeElement;
       const lost = !now || now === document.body || !now.isConnected;
-      if (origin?.isConnected && (lost || container.current?.contains(now)))
-        origin.focus({ preventScroll: true });
+      if (!lost && !container.current?.contains(now)) return;
+      // Ce nettoyage passe après la mise à jour de la page : un bouton remonté est déjà là.
+      const target = origin?.isConnected ? origin : returnFocusTo?.current;
+      if (target?.isConnected) target.focus({ preventScroll: true });
     };
-  }, []);
+    // Une ref ne change pas d’identité : l’effet ne rejoue qu’au montage et au démontage.
+  }, [returnFocusTo]);
   return (
     <Alert
       ref={container}

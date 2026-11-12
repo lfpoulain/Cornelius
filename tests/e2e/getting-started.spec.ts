@@ -1,14 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { DevicesStatus, MirrorState, StateEvent } from '../../shared/types';
-import { origin, screenshots } from './env';
-
-async function login(page: Page, path = '/admin') {
-  await page.goto(path);
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
-}
+import { login, origin, screenshots } from './env';
 
 const ready: MirrorState = {
   setup: { openaiKey: true, perception: true },
@@ -118,18 +110,18 @@ test('sans clé OpenAI, l’administration s’ouvre sur la mise en route', asyn
   // L’état est écrit en toutes lettres, pas seulement par une couleur.
   await expect(key).toContainText('À faire');
   await expect(key).toContainText('Clés et jetons');
-  await expect(key.getByRole('link', { name: /Guide d’installation/ })).toHaveAttribute(
-    'href',
-    /docs\/installation\/premier-demarrage\.md$/,
-  );
+  await expect(key.getByRole('button', { name: 'Saisir la clé' })).toBeVisible();
+  // La mise en route ne porte que les étapes : les clés et les accès ont leur rubrique.
+  await expect(page.locator('.admin-settings [data-slot="card-title"]')).toHaveCount(1);
   await expect(page.getByText('Tout est prêt', { exact: true })).toHaveCount(0);
-  // Panneau de session compact : la consigne de la clé n’apparaît qu’une fois, et un seul
+  // Panneau de session compact : la consigne de la clé n’apparaît qu’à son étape, et un seul
   // bouton ouvre le miroir, sous le libellé du panneau complet.
   await expect(page.getByRole('region', { name: 'Conversation' })).toHaveAttribute(
     'data-compact',
     'true',
   );
-  await expect(page.getByText('OPENAI_API_KEY', { exact: true })).toHaveCount(1);
+  await expect(page.getByText(/Collez-la dans « Clés et accès »/)).toHaveCount(1);
+  await expect(page.getByText('OPENAI_API_KEY', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /ouvrir le miroir/i })).toHaveCount(1);
   await expect(
     steps
@@ -189,6 +181,24 @@ test('une étape à faire mène à la bonne rubrique', async ({ page }) => {
   await expect(
     page.getByRole('heading', { level: 1, name: 'Caméra et reconnaissance' }),
   ).toBeVisible();
+});
+
+test('la clé et le mot de passe se règlent dans « Clés et accès », depuis leur étape', async ({
+  page,
+}) => {
+  await login(page);
+  const steps = page.getByRole('list', { name: 'Étapes de la mise en route' });
+  await steps
+    .getByRole('listitem')
+    .filter({ hasText: 'Clé OpenAI' })
+    .getByRole('button', { name: 'Saisir la clé' })
+    .click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Clés et accès' })).toBeVisible();
+  await expect(page).toHaveURL(/#access$/);
+  const titles = page.locator('.admin-settings [data-slot="card-title"]');
+  await expect(titles.first()).toHaveText('Clés et jetons');
+  await expect(titles.filter({ hasText: 'Mot de passe administrateur' })).toBeVisible();
+  await expect(titles.filter({ hasText: 'Accès depuis le réseau local' })).toBeVisible();
 });
 
 test('quand tout est prêt, l’arrivée reste « Quand il écoute »', async ({ page }) => {

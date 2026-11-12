@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { GooglePhotosSettings } from './GooglePhotosSettings';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, Download, ImagePlus, Trash2 } from 'lucide-react';
 import {
   DEFAULT_SCREENSAVER,
@@ -114,9 +115,23 @@ function openingWake(opening: Opening): string {
       : `Réglé sur la présence : l’image part dès qu’une personne${who} se présente.`;
 }
 
+/** Réglages comparables d’un coup d’œil, quel que soit l’ordre de leurs champs. */
+function settingsKey(settings: Settings): string {
+  return JSON.stringify([
+    settings.enabled,
+    settings.intervalMs,
+    settings.returnDelayMs,
+    settings.transition,
+    settings.wake,
+    settings.durationMs,
+    settings.fit,
+  ]);
+}
+
 /** Écran de veille : activation et rythme, puis les images proposées au miroir. */
 export function ScreensaverSettings({ state, run }: { state: MirrorState; run: RunAction }) {
-  const saved: Settings = state.screensaver
+  const [source, setSource] = useState<'local' | 'google-photos'>('local');
+  const confirmed: Settings = state.screensaver
     ? {
         enabled: state.screensaver.enabled,
         intervalMs: state.screensaver.intervalMs,
@@ -127,6 +142,14 @@ export function ScreensaverSettings({ state, run }: { state: MirrorState; run: R
         fit: state.screensaver.fit,
       }
     : DEFAULT_SCREENSAVER;
+  // Derniers réglages demandés, affichés tant que le serveur ne les a pas confirmés : un second
+  // choix rapide part de ceux-ci, sinon il renverrait l’ancienne valeur du premier.
+  const [requested, setRequested] = useState<Settings | null>(null);
+  const confirmedKey = settingsKey(confirmed);
+  useEffect(() => {
+    setRequested((value) => (value && settingsKey(value) === confirmedKey ? null : value));
+  }, [confirmedKey]);
+  const saved = requested ?? confirmed;
   const wakeOptions: ChoiceOption<ScreensaverWake>[] = [
     {
       value: 'presence',
@@ -139,9 +162,16 @@ export function ScreensaverSettings({ state, run }: { state: MirrorState; run: R
       description: openingWake(currentOpening(state)),
     },
   ];
-  const save = (label: string, changes: Partial<Settings>) => {
+  const save = async (label: string, changes: Partial<Settings>) => {
     const next = { ...saved, ...changes };
-    return run(label, () => api.screensaverSettings(next), { key: 'screensaver', payload: next });
+    setRequested(next);
+    const ok = await run(label, () => api.screensaverSettings(next), {
+      key: 'screensaver',
+      payload: next,
+    });
+    // Refusé : l’affichage revient à ce que le serveur a gardé.
+    if (!ok) setRequested((current) => (current === next ? null : current));
+    return ok;
   };
   const imageCount = state.screensaver?.imageCount ?? 0;
   return (
@@ -290,7 +320,8 @@ export function ScreensaverSettings({ state, run }: { state: MirrorState; run: R
           </p>
         </CardContent>
       </Card>
-      <ScreensaverImages run={run} />
+      <GooglePhotosSettings run={run} onSourceChange={setSource} />
+      <ScreensaverImages run={run} fallback={source === 'google-photos'} />
     </div>
   );
 }
@@ -322,7 +353,11 @@ const imageFilters: {
   },
 ];
 
-function ScreensaverImages({ run }: { run: RunAction }) {
+/**
+ * Images gardées sur cet ordinateur. Avec l’album Google Photos, elles ne servent plus que de
+ * secours : la carte le dit et se replie, pour ne pas laisser croire qu’elles s’affichent.
+ */
+function ScreensaverImages({ run, fallback }: { run: RunAction; fallback: boolean }) {
   const load = useCallback(() => api.screensaver(), []);
   const resource = useAdminResource(load);
   const { data, reload } = resource;
@@ -382,211 +417,230 @@ function ScreensaverImages({ run }: { run: RunAction }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Images</CardTitle>
+        <CardTitle>{fallback ? 'Images locales de secours' : 'Images'}</CardTitle>
         <CardDescription>
-          Vos photos (JPEG, PNG ou WebP, {SCREENSAVER_IMAGE_MAX_BYTES / 1024 / 1024} Mo au plus), et
-          une sélection de peintures célèbres du domaine public. Elles restent sur cet ordinateur,
-          dans le dossier data/screensaver.
+          {fallback
+            ? 'Avec l’album Google Photos, ces images ne s’affichent que si l’album est indisponible. Vous pouvez n’en garder aucune.'
+            : `Vos photos (JPEG, PNG ou WebP, ${SCREENSAVER_IMAGE_MAX_BYTES / 1024 / 1024} Mo au plus), et une sélection de peintures célèbres du domaine public. Elles restent sur cet ordinateur, dans le dossier data/screensaver.`}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => input.current?.click()}>
-            <ImagePlus aria-hidden="true" />
-            Ajouter des photos
-          </Button>
-          <input
-            ref={input}
-            type="file"
-            className="sr-only"
-            tabIndex={-1}
-            aria-label="Photos à ajouter"
-            accept={SCREENSAVER_IMAGE_TYPES.join(',')}
-            multiple
-            onChange={(event) => {
-              const files = Array.from(event.target.files ?? []);
-              event.target.value = '';
-              if (files.length) upload(files);
-            }}
-          />
-          {collection && collection.installed < collection.total && (
-            <Button
-              variant="outline"
-              disabled={downloading}
-              onClick={() =>
-                void run('Téléchargement des peintures lancé.', () =>
-                  api.installScreensaverCollection(),
-                ).finally(() => void reload())
-              }
-            >
-              <Download aria-hidden="true" />
-              {downloading
-                ? `Téléchargement… ${collection.installed} / ${collection.total}`
-                : collection.installed
-                  ? `Compléter les peintures (${collection.total - collection.installed})`
-                  : `Télécharger ${collection.total} peintures`}
+        <ImagesFold fold={fallback}>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={() => input.current?.click()}>
+              <ImagePlus aria-hidden="true" />
+              Ajouter des photos
             </Button>
+            <input
+              ref={input}
+              type="file"
+              className="sr-only"
+              tabIndex={-1}
+              aria-label="Photos à ajouter"
+              accept={SCREENSAVER_IMAGE_TYPES.join(',')}
+              multiple
+              onChange={(event) => {
+                const files = Array.from(event.target.files ?? []);
+                event.target.value = '';
+                if (files.length) upload(files);
+              }}
+            />
+            {collection && collection.installed < collection.total && (
+              <Button
+                variant="outline"
+                disabled={downloading}
+                onClick={() =>
+                  void run('Téléchargement des peintures lancé.', () =>
+                    api.installScreensaverCollection(),
+                  ).finally(() => void reload())
+                }
+              >
+                <Download aria-hidden="true" />
+                {downloading
+                  ? `Téléchargement… ${collection.installed} / ${collection.total}`
+                  : collection.installed
+                    ? `Compléter les peintures (${collection.total - collection.installed})`
+                    : `Télécharger ${collection.total} peintures`}
+              </Button>
+            )}
+          </div>
+          {collection && collection.installed < collection.total && !downloading && (
+            <p className="text-xs leading-relaxed text-muted-foreground" role="status">
+              {collection.error ??
+                'Les peintures viennent de Wikimedia Commons et sont téléchargées quand vous cliquez.'}
+            </p>
           )}
-        </div>
-        {collection && collection.installed < collection.total && !downloading && (
-          <p className="text-xs leading-relaxed text-muted-foreground" role="status">
-            {collection.error ??
-              'Les peintures viennent de Wikimedia Commons : la seule connexion à Internet de cette rubrique, faite quand vous cliquez.'}
-          </p>
-        )}
-        <ResourceState
-          resource={resource}
-          loadingLabel="Lecture des images…"
-          isEmpty={(view) => view.images.length === 0}
-          empty={{
-            title: 'Aucune image',
-            description: 'Ajoutez vos photos, ou téléchargez les peintures proposées.',
-          }}
-        >
-          {(view) => {
-            const shown = view.images.filter(
-              imageFilters.find((entry) => entry.value === filter)!.keep,
-            );
-            const allShown = shown.length > 0 && shown.every((image) => selected.has(image.id));
-            const paintings = view.images.filter((image) => image.origin === 'collection').length;
-            return (
-              <div className="space-y-3">
-                <div className="flex flex-wrap gap-2" role="group" aria-label="Afficher seulement">
-                  {imageFilters.map((entry) => {
-                    const count = view.images.filter(entry.keep).length;
-                    if (!count && entry.value !== 'all' && entry.value !== filter) return null;
-                    return (
-                      <Button
-                        key={entry.value}
-                        size="sm"
-                        variant={filter === entry.value ? 'secondary' : 'ghost'}
-                        aria-pressed={filter === entry.value}
-                        onClick={() => setFilter(entry.value)}
-                      >
-                        {entry.label} ({count})
-                      </Button>
-                    );
-                  })}
-                </div>
-                {/* Reste en vue pendant le défilement : la sélection et sa confirmation. */}
-                <div className="sticky top-0 z-10 space-y-3 rounded-lg border bg-card p-3 shadow-sm">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="mr-auto text-sm" role="status">
-                      {selected.size
-                        ? plural(selected.size, 'image sélectionnée', 'images sélectionnées')
-                        : 'Cochez les images à retirer.'}
-                    </p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={shown.length === 0}
-                      onClick={() =>
-                        setSelected((current) => {
-                          const next = new Set(current);
-                          for (const image of shown)
-                            if (allShown) next.delete(image.id);
-                            else next.add(image.id);
-                          return next;
-                        })
-                      }
-                    >
-                      {allShown
-                        ? 'Désélectionner ces images'
-                        : `Tout sélectionner (${shown.length})`}
-                    </Button>
-                    {selected.size > 0 && (
-                      <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
-                        Aucune
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="danger-outline"
-                      disabled={selected.size === 0}
-                      aria-label={`Retirer les ${selected.size} images sélectionnées`}
-                      onClick={() => setConfirming(true)}
-                    >
-                      <Trash2 aria-hidden="true" />
-                      Retirer ({selected.size})
-                    </Button>
-                  </div>
-                  {confirming && selected.size > 0 && (
-                    <ConfirmAction
-                      message={
-                        (selected.size > 1
-                          ? `Retirer ces ${selected.size} images de l’écran de veille ? Les fichiers sont effacés de cet ordinateur.`
-                          : 'Retirer cette image de l’écran de veille ? Le fichier est effacé de cet ordinateur.') +
-                        (paintings
-                          ? ' Une peinture retirée peut revenir avec « Compléter les peintures ».'
-                          : '')
-                      }
-                      confirmLabel="Retirer"
-                      onCancel={() => setConfirming(false)}
-                      onConfirm={removeSelected}
-                    />
-                  )}
-                </div>
-                {shown.length === 0 && (
-                  <p className="text-sm text-muted-foreground">Aucune image dans ce filtre.</p>
-                )}
-                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                  {shown.map((image) => {
-                    const checked = selected.has(image.id);
-                    return (
-                      <li key={image.id}>
-                        <label
-                          className={
-                            'relative block cursor-pointer overflow-hidden rounded-lg border bg-muted/30 transition-shadow has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring ' +
-                            (checked ? 'border-destructive ring-2 ring-destructive/60' : '')
-                          }
+          <ResourceState
+            resource={resource}
+            loadingLabel="Lecture des images…"
+            isEmpty={(view) => view.images.length === 0}
+            empty={{
+              title: 'Aucune image',
+              description: 'Ajoutez vos photos, ou téléchargez les peintures proposées.',
+            }}
+          >
+            {(view) => {
+              const shown = view.images.filter(
+                imageFilters.find((entry) => entry.value === filter)!.keep,
+              );
+              const allShown = shown.length > 0 && shown.every((image) => selected.has(image.id));
+              const paintings = view.images.filter((image) => image.origin === 'collection').length;
+              return (
+                <div className="space-y-3">
+                  <div
+                    className="flex flex-wrap gap-2"
+                    role="group"
+                    aria-label="Afficher seulement"
+                  >
+                    {imageFilters.map((entry) => {
+                      const count = view.images.filter(entry.keep).length;
+                      if (!count && entry.value !== 'all' && entry.value !== filter) return null;
+                      return (
+                        <Button
+                          key={entry.value}
+                          size="sm"
+                          variant={filter === entry.value ? 'secondary' : 'ghost'}
+                          aria-pressed={filter === entry.value}
+                          onClick={() => setFilter(entry.value)}
                         >
-                          <input
-                            type="checkbox"
-                            className="sr-only"
-                            checked={checked}
-                            aria-label={`Sélectionner ${image.title}`}
-                            onChange={() => toggle(image.id)}
-                          />
-                          <img
-                            src={image.url}
-                            alt=""
-                            loading="lazy"
+                          {entry.label} ({count})
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  {/* Reste en vue pendant le défilement : la sélection et sa confirmation. */}
+                  <div className="sticky top-0 z-10 space-y-3 rounded-lg border bg-card p-3 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="mr-auto text-sm" role="status">
+                        {selected.size
+                          ? plural(selected.size, 'image sélectionnée', 'images sélectionnées')
+                          : 'Cochez les images à retirer.'}
+                      </p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={shown.length === 0}
+                        onClick={() =>
+                          setSelected((current) => {
+                            const next = new Set(current);
+                            for (const image of shown)
+                              if (allShown) next.delete(image.id);
+                              else next.add(image.id);
+                            return next;
+                          })
+                        }
+                      >
+                        {allShown
+                          ? 'Désélectionner ces images'
+                          : `Tout sélectionner (${shown.length})`}
+                      </Button>
+                      {selected.size > 0 && (
+                        <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+                          Aucune
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="danger-outline"
+                        disabled={selected.size === 0}
+                        aria-label={`Retirer les ${selected.size} images sélectionnées`}
+                        onClick={() => setConfirming(true)}
+                      >
+                        <Trash2 aria-hidden="true" />
+                        Retirer ({selected.size})
+                      </Button>
+                    </div>
+                    {confirming && selected.size > 0 && (
+                      <ConfirmAction
+                        message={
+                          (selected.size > 1
+                            ? `Retirer ces ${selected.size} images de l’écran de veille ? Les fichiers sont effacés de cet ordinateur.`
+                            : 'Retirer cette image de l’écran de veille ? Le fichier est effacé de cet ordinateur.') +
+                          (paintings
+                            ? ' Une peinture retirée peut revenir avec « Compléter les peintures ».'
+                            : '')
+                        }
+                        confirmLabel="Retirer"
+                        onCancel={() => setConfirming(false)}
+                        onConfirm={removeSelected}
+                      />
+                    )}
+                  </div>
+                  {shown.length === 0 && (
+                    <p className="text-sm text-muted-foreground">Aucune image dans ce filtre.</p>
+                  )}
+                  <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                    {shown.map((image) => {
+                      const checked = selected.has(image.id);
+                      return (
+                        <li key={image.id}>
+                          <label
                             className={
-                              'aspect-video w-full bg-black object-contain transition-opacity ' +
-                              (checked ? 'opacity-60' : '')
-                            }
-                          />
-                          <span
-                            aria-hidden="true"
-                            className={
-                              'absolute left-2 top-2 flex size-6 items-center justify-center rounded-md border-2 ' +
-                              (checked
-                                ? 'border-destructive bg-destructive text-white'
-                                : 'border-white/80 bg-black/40')
+                              'relative block cursor-pointer overflow-hidden rounded-lg border bg-muted/30 transition-shadow has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring ' +
+                              (checked ? 'border-destructive ring-2 ring-destructive/60' : '')
                             }
                           >
-                            {checked && <Check className="size-4" />}
-                          </span>
-                          <span className="block min-w-0 p-2">
-                            <span className="block truncate text-sm" title={image.title}>
-                              {image.title}
+                            <input
+                              type="checkbox"
+                              className="sr-only"
+                              checked={checked}
+                              aria-label={`Sélectionner ${image.title}`}
+                              onChange={() => toggle(image.id)}
+                            />
+                            <img
+                              src={image.url}
+                              alt=""
+                              loading="lazy"
+                              className={
+                                'aspect-video w-full bg-black object-contain transition-opacity ' +
+                                (checked ? 'opacity-60' : '')
+                              }
+                            />
+                            <span
+                              aria-hidden="true"
+                              className={
+                                'absolute left-2 top-2 flex size-6 items-center justify-center rounded-md border-2 ' +
+                                (checked
+                                  ? 'border-destructive bg-destructive text-white'
+                                  : 'border-white/80 bg-black/40')
+                              }
+                            >
+                              {checked && <Check className="size-4" />}
                             </span>
-                            {image.credit && (
-                              <span className="block truncate text-xs text-muted-foreground">
-                                {image.credit}
+                            <span className="block min-w-0 p-2">
+                              <span className="block truncate text-sm" title={image.title}>
+                                {image.title}
                               </span>
-                            )}
-                          </span>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            );
-          }}
-        </ResourceState>
+                              {image.credit && (
+                                <span className="block truncate text-xs text-muted-foreground">
+                                  {image.credit}
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            }}
+          </ResourceState>
+        </ImagesFold>
       </CardContent>
     </Card>
+  );
+}
+
+function ImagesFold({ fold, children }: { fold: boolean; children: ReactNode }) {
+  if (!fold) return <>{children}</>;
+  return (
+    <details className="group">
+      <summary className="inline-flex min-h-9 cursor-pointer items-center rounded-md border px-3 text-sm font-medium">
+        <span className="group-open:hidden">Gérer les images de secours</span>
+        <span className="hidden group-open:inline">Masquer les images de secours</span>
+      </summary>
+      <div className="space-y-4 pt-4">{children}</div>
+    </details>
   );
 }

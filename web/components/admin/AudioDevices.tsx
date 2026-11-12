@@ -78,6 +78,16 @@ export function AudioDevices({
   const [level, setLevel] = useState<number | null>(null);
   const [applied, setApplied] = useState<Applied | null>(null);
   const stopTest = useRef<(() => void) | null>(null);
+  // Demande du micro en attente de la réponse du navigateur. Le jeton change dès que le test
+  // n’a plus lieu d’être (rubrique quittée, conversation ouverte, réglage changé) : le flux
+  // obtenu ensuite est refermé aussitôt, au lieu de rester ouvert sans bouton pour l’arrêter.
+  const [requesting, setRequesting] = useState(false);
+  const pending = useRef(false);
+  const testToken = useRef(0);
+  const cancelTest = () => {
+    testToken.current++;
+    stopTest.current?.();
+  };
 
   useEffect(() => {
     const media = navigator.mediaDevices;
@@ -106,10 +116,18 @@ export function AudioDevices({
     };
   }, []);
 
-  useEffect(() => () => stopTest.current?.(), []);
+  useEffect(
+    () => () => {
+      testToken.current++;
+      stopTest.current?.();
+    },
+    [],
+  );
   // Une conversation qui s’ouvre reprend le micro.
   useEffect(() => {
-    if (active) stopTest.current?.();
+    if (!active) return;
+    testToken.current++;
+    stopTest.current?.();
   }, [active]);
 
   async function authorizeMicrophone() {
@@ -140,13 +158,25 @@ export function AudioDevices({
       setError('Ce navigateur ne donne pas accès aux périphériques audio.');
       return;
     }
+    // Un second clic avant la réponse du navigateur ouvrirait un second flux.
+    if (pending.current) return;
     setError(null);
     releasePreparedMicrophone();
+    const token = ++testToken.current;
+    pending.current = true;
+    setRequesting(true);
     let stream: MediaStream;
     try {
       stream = await media.getUserMedia(microphoneConstraints());
     } catch (failure) {
-      setError(errorMessage(failure));
+      if (token === testToken.current) setError(errorMessage(failure));
+      return;
+    } finally {
+      pending.current = false;
+      setRequesting(false);
+    }
+    if (token !== testToken.current) {
+      stream.getTracks().forEach((track) => track.stop());
       return;
     }
     setAuthorized(true);
@@ -196,8 +226,8 @@ export function AudioDevices({
   function toggle(field: (typeof processing)[number], enabled: boolean) {
     const next: AudioPreferences = { ...preferences, [field.key]: enabled };
     setPreferences(next);
-    // Un test en cours garde les anciens réglages : il s’arrête pour être relancé.
-    stopTest.current?.();
+    // Un test en cours ou demandé garde les anciens réglages : il s’arrête pour être relancé.
+    cancelTest();
     setApplied(null);
     void run(enabled ? field.on : field.off, async () => saveAudioPreferences(next), {
       key: 'audio-' + field.key,
@@ -300,7 +330,7 @@ export function AudioDevices({
           </Button>
           <Button
             variant="outline"
-            disabled={active}
+            disabled={active || requesting}
             onClick={() => {
               if (stopTest.current) stopTest.current();
               else void testMicrophone();

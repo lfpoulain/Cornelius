@@ -1,14 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { screenshots } from './env';
+import { login, screenshots } from './env';
 
 test('les délais se règlent en secondes, persistent et restent modifiables après une erreur', async ({
   page,
 }) => {
-  await page.goto('/admin#voice');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin#voice');
   // Les délais vivent dans le repli « Réglages avancés », fermé par défaut : une carte dont les
   // valeurs se règlent dans « Réglage fin », comme partout ailleurs.
   const advanced = page.locator('summary').filter({ hasText: 'Réglages avancés' });

@@ -137,11 +137,12 @@
 .admin-navigation {
   display: flex;
   flex-direction: column;
-  gap: 27px;
+  /* Six groupes : assez serrés pour tenir d’un regard sur un écran d’ordinateur. */
+  gap: 20px;
 }
 .admin-nav-group > .admin-eyebrow {
   padding: 0 12px;
-  margin: 0 0 10px;
+  margin: 0 0 6px;
 }
 .admin-nav-item {
   display: flex;
@@ -149,9 +150,9 @@
   justify-content: space-between;
   gap: 8px;
   width: 100%;
-  min-height: 43px;
-  margin: 3px 0;
-  padding: 11px 12px;
+  min-height: 38px;
+  margin: 2px 0;
+  padding: 8px 12px;
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
@@ -543,14 +544,6 @@
   margin: 2px 0 0;
   overflow-wrap: anywhere;
 }
-.admin-mode-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-  border: 0;
-  margin: 0;
-  padding: 0;
-}
 .admin-mode-option {
   position: relative;
   cursor: pointer;
@@ -630,16 +623,6 @@
 .admin-mode-top .admin-eyebrow {
   color: var(--primary);
 }
-.admin-radio {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 1px solid var(--input);
-}
-.admin-mode-option input:checked + .admin-mode-card .admin-radio {
-  border: 5px solid #38b4a0;
-  background: #102b24;
-}
 .admin-mode-card strong {
   display: block;
   margin: 14px 0 7px;
@@ -654,22 +637,6 @@
   font-size: 13px;
   line-height: 1.65;
   color: var(--muted-foreground);
-}
-.admin-opening-group + .admin-opening-group {
-  margin-top: 22px;
-}
-.admin-opening-legend {
-  grid-column: 1 / -1;
-  margin-bottom: 10px;
-  padding: 0;
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--primary);
-}
-.admin-opening-group .admin-mode-top strong {
-  margin: 0 0 7px;
 }
 .admin-opening-summary {
   display: grid;
@@ -692,44 +659,6 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
   gap: 22px;
-}
-.admin-sound-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-  border: 0;
-  margin: 0;
-  padding: 0;
-}
-.admin-sound-option {
-  display: grid;
-  grid-template-rows: 1fr auto;
-  gap: 8px;
-}
-.admin-sound-option .admin-mode-card strong {
-  margin: 0;
-}
-.admin-sound-option .admin-mode-detail {
-  margin-top: 7px;
-}
-.admin-offline {
-  border-color: #e8bc8840;
-  background: #e8bc880d;
-}
-.admin-checks {
-  margin: 0;
-}
-.admin-checks > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 0;
-  border-top: 1px solid var(--border);
-  font-size: 13px;
-}
-.admin-checks dd {
-  margin: 0;
 }
 .admin-footer {
   display: flex;
@@ -773,13 +702,6 @@
   }
   .admin-voice-columns {
     grid-template-columns: 1fr;
-  }
-  .admin-mode-options {
-    gap: 10px;
-  }
-  .admin-sound-options {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
   }
   .admin-mode-card {
     padding: 15px;
@@ -825,8 +747,6 @@
   .admin-content {
     padding: 20px 16px var(--admin-toast-room);
   }
-  .admin-mode-options,
-  .admin-sound-options,
   .admin-voice-columns {
     grid-template-columns: 1fr;
   }
@@ -878,11 +798,6 @@
     background: Highlight;
     border-color: Highlight;
     color: HighlightText;
-  }
-  .admin-mode-option input:checked + .admin-mode-card .admin-radio {
-    forced-color-adjust: none;
-    background: Canvas;
-    border-color: Highlight;
   }
   .admin-mode-option input:checked + .admin-mode-card {
     border-color: Highlight;

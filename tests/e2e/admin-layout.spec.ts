@@ -1,12 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { origin, screenshots } from './env';
+import { adminPassword, origin, screenshots } from './env';
 
 async function login(page: Page, path = '/admin') {
   await page.goto(path);
   await expect(page).toHaveTitle('Connexion · Cornelius');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
+  await page.getByLabel('Mot de passe administrateur').fill(adminPassword);
   await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
 }
 
@@ -44,13 +42,30 @@ test('les rubriques et l’en-tête restent utilisables sur ordinateur et mobile
   await expect(page.getByRole('heading', { name: 'Mise en route', exact: true })).toBeVisible();
   await expect(page).toHaveTitle('Mise en route · Administration Cornelius');
   await page.screenshot({ path: `${screenshots}/admin-redesign-desktop.png`, fullPage: true });
+  // Les six groupes, dans l’ordre de la barre latérale.
+  await expect(
+    page
+      .getByRole('navigation', { name: 'Sections d’administration' })
+      .locator('.admin-nav-group > .admin-eyebrow'),
+  ).toHaveText([
+    'Pour commencer',
+    'Conversation',
+    'Les personnes',
+    'Ce qu’il sait faire',
+    'Le miroir',
+    'Diagnostic',
+  ]);
   const sections = [
     'Mise en route',
+    'Clés et accès',
     'Quand il écoute',
-    'Caméra et reconnaissance',
-    'Micro et haut-parleurs',
+    'Voix et modèles',
     'Le foyer et les visages',
     'Modules',
+    'Installer des modules',
+    'Micro et haut-parleurs',
+    'Caméra et reconnaissance',
+    'Orbe et écran de veille',
     'État du système',
     'Journal',
   ];

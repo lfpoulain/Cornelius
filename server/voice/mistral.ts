@@ -262,7 +262,8 @@ export function createMistralVoiceAdapter(
       return {
         audio(pcm) {
           if (closed) return;
-          if (queue.length >= 64) {
+          // Assez pour le son d’avant le mot d’appel, rejoué d’un coup à l’ouverture.
+          if (queue.length >= 256) {
             notify({ type: 'error', code: 'audio_backpressure' });
             return;
           }

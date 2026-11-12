@@ -47,6 +47,9 @@ class BrowserCamera(Camera):
     def __init__(self):
         super().__init__(enabled=False)
         self.enabled = False
+        # Numéro de la dernière image reçue : read() rend la même image jusqu’à la suivante,
+        # et le worker ne doit l’analyser (et ne compter un vote d’identité) qu’une fois.
+        self.frame_number = 0
 
     def enable(self, preferred=None, mode=None):
         with self.lock:
@@ -108,6 +111,7 @@ class BrowserCamera(Camera):
             if not self.enabled:
                 return False
             self.latest = self.oriented(frame)
+            self.frame_number += 1
             self.latest_at = time.monotonic()
             self.latest_wall = int(time.time() * 1000)
             self.selected_id = "browser"

@@ -96,8 +96,7 @@ fi
 # --- Node.js 24 (fichier .nvmrc) -----------------------------------------------------
 step "Node.js"
 node_ok() {
-  command -v node >/dev/null 2>&1 &&
-    node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a===24&&b>=2?0:1)'
+  command -v node >/dev/null 2>&1 && node_supported
 }
 if ! node_ok && command -v fnm >/dev/null 2>&1; then
   fnm install "$(cat .nvmrc)" && eval "$(fnm env)" && fnm use "$(cat .nvmrc)"
@@ -149,6 +148,14 @@ fi
 # --- Accélération de la vision locale (ONNX Runtime) -----------------------------------
 step "Vision locale : moteur ONNX"
 has_nvidia() { command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1; }
+# Les paquets onnxruntime, onnxruntime-gpu et onnxruntime-migraphx écrivent dans le même dossier.
+# Sur une installation relancée, requirements.txt remet la version processeur par-dessus la
+# version GPU ; la désinstaller efface alors les fichiers communs, et pip croit la version GPU
+# déjà en place. Si le moteur ne se charge plus, on le remet de force, sans ses dépendances.
+repair_onnx() {
+  .venv/bin/python -c 'import onnxruntime' >/dev/null 2>&1 && return 0
+  .venv/bin/python -m pip install --disable-pip-version-check --force-reinstall --no-deps "$@"
+}
 if [ "$arch" = arm64 ] && [ "$gpu" != auto ] && [ "$gpu" != cpu ]; then
   die "--gpu $gpu n’est pas proposé en ARM64 : la vision locale y tourne sur le processeur."
 fi
@@ -159,6 +166,7 @@ case "$gpu" in
   nvidia)
     .venv/bin/python -m pip uninstall -y onnxruntime onnxruntime-migraphx >/dev/null 2>&1 || true
     .venv/bin/python -m pip install --disable-pip-version-check -r perception/requirements-gpu.txt
+    repair_onnx "$(sed -n 's/^\(onnxruntime-gpu\)\[[^]]*\]\(==.*\)$/\1\2/p' perception/requirements-gpu.txt | head -n 1)"
     ;;
   amd)
     [ -d /opt/rocm ] || die "ROCm est absent (/opt/rocm) : installez-le d’abord (docs/installation/gpu.md)."
@@ -167,6 +175,7 @@ gardez --gpu cpu pour la vision et utilisez ROCm pour la génération d’images
     .venv/bin/python -m pip uninstall -y onnxruntime onnxruntime-gpu >/dev/null 2>&1 || true
     .venv/bin/python -m pip install --disable-pip-version-check onnxruntime-migraphx \
       -f "https://repo.radeon.com/rocm/manylinux/rocm-rel-$ROCM_RELEASE/"
+    repair_onnx onnxruntime-migraphx -f "https://repo.radeon.com/rocm/manylinux/rocm-rel-$ROCM_RELEASE/"
     ;;
   cpu)
     if [ "$small" = 1 ]; then echo "Vision locale désactivée sur cette machine."
@@ -269,7 +278,7 @@ npm run --silent password -- --if-default || warn "mot de passe inchangé : npm 
 step "Terminé"
 port="$(server_port)"
 echo "Administration : http://127.0.0.1:$port/admin"
-https_port="$(sed -n 's/^CORNELIUS_HTTPS_PORT=\([0-9][0-9]*\).*/\1/p' .env | tail -n 1)"
+https_port="$(env_number CORNELIUS_HTTPS_PORT)"
 lan_ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
 if [ -n "$lan_ip" ] && ! grep -Eqi '^CORNELIUS_LAN=(0|false|non|no)\s*$' .env; then
   echo "Depuis un autre appareil : https://$lan_ip:${https_port:-$((port + 443))}/admin (certificat à accepter)."

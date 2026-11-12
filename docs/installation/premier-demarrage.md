@@ -12,7 +12,7 @@ Cette page vous guide de la fin de l’installation jusqu’à la première conv
 
 Ouvrez `http://127.0.0.1:3000/admin`. Saisissez le « Mot de passe administrateur », puis cliquez sur **Ouvrir cet espace**.
 
-Le mot de passe est la valeur de `CORNELIUS_ADMIN_PASSWORD` dans le fichier `.env`, `cornelius` au départ. Changez-le dès maintenant dans **Mise en route**, carte « Mot de passe administrateur » (8 caractères au moins) : il remplace celui de `.env`, sans redémarrage. Dans un terminal, `npm run password` fait la même chose.
+Le mot de passe est la valeur de `CORNELIUS_ADMIN_PASSWORD` dans le fichier `.env`, `cornelius` au départ. Changez-le dès maintenant dans **Clés et accès**, carte « Mot de passe administrateur » (8 caractères au moins) : il remplace celui de `.env`, sans redémarrage. Dans un terminal, `npm run password` fait la même chose.
 
 ```sh
 systemctl --user restart cornelius        # Linux, avec les services systemd
@@ -38,14 +38,14 @@ La liste se met à jour d’elle-même. Voici les étapes, dans l’ordre :
 
 | Étape | Où agir |
 |---|---|
-| Clé OpenAI | **Mise en route → Clés et jetons**, ou le fichier `.env` |
+| Clé OpenAI | **Clés et accès → Clés et jetons** (bouton **Saisir la clé**), ou le fichier `.env` |
 | Service caméra (perception) | Les scripts de démarrage (bouton **Ouvrir le diagnostic**) |
 | Caméra choisie | Rubrique « Caméra et reconnaissance » (bouton **Choisir la caméra**) |
 | Miroir ouvert | Bouton **Activer et ouvrir le miroir** |
 | Voix activée sur le miroir | Bouton **Activer et ouvrir le miroir**, ou **Activer la voix** sur le miroir |
 | Visage enregistré | Rubrique « Le foyer et les visages » (bouton **Enregistrer un visage**) |
 | Mot d’appel « Cornelius » | Seulement si la conversation s’ouvre au mot « Cornelius » (bouton **Guide du mot d’appel**) |
-| Mot de passe administrateur | **Mise en route → Mot de passe administrateur**, ou le fichier `.env` (étape 1 ci-dessus) |
+| Mot de passe administrateur | **Clés et accès → Mot de passe administrateur** (bouton **Changer le mot de passe**), ou le fichier `.env` (étape 1 ci-dessus) |
 | Accès aux services IA | Bouton **Autoriser les services IA**, si l’accès a été bloqué |
 
 En haut de chaque page, le panneau de la conversation résume l’état de Cornelius sur une ligne (par exemple « Configuration à terminer » ou « En veille attentive ») et propose **Démarrer la session** ou **Arrêter la session**. Le lien « Voir la mise en route » ramène à cette liste.
@@ -54,9 +54,9 @@ Quand tout est prêt, la carte affiche « Tout est prêt » et l’administratio
 
 ## 3. Clé OpenAI
 
-Sans clé, Cornelius ne peut pas parler. Créez une clé dans votre compte OpenAI (page [API keys](https://platform.openai.com/api-keys)), sur un compte payant. Collez-la dans la carte **Clés et jetons**, plus bas dans la même rubrique, puis **Enregistrer** : elle compte tout de suite, sans redémarrage. (Elle peut aussi s’écrire dans `.env` après `OPENAI_API_KEY=`, avec un redémarrage.)
+Sans clé, Cornelius ne peut pas parler. Créez une clé dans votre compte OpenAI (page [API keys](https://platform.openai.com/api-keys)), sur un compte payant. Le bouton **Saisir la clé** de l’étape ouvre la rubrique « Clés et accès » : collez-la dans la carte **Clés et jetons**, puis **Enregistrer** : elle compte tout de suite, sans redémarrage. (Elle peut aussi s’écrire dans `.env` après `OPENAI_API_KEY=`, avec un redémarrage.)
 
-La clé reste sur cet ordinateur : l’administration n’en montre ensuite que les quatre derniers caractères. Chaque conversation est facturée par OpenAI. Cornelius ne suit pas les dépenses : fixez une limite dans votre compte OpenAI. Le bouton **Bloquer les services IA**, dans le panneau de la conversation de « Quand il écoute », coupe et interdit toute connexion à OpenAI jusqu’à **Autoriser les services IA**.
+La clé reste sur cet ordinateur : l’administration n’en montre ensuite que les quatre derniers caractères. Chaque conversation est facturée par OpenAI, aux jetons. Cornelius compte la durée des conversations (carte **Temps de conversation**, rubrique « Voix et modèles ») mais n’estime pas la facture OpenAI : fixez une limite dans votre compte OpenAI. Le bouton **Bloquer les services IA**, dans le panneau de la conversation de « Quand il écoute », coupe et interdit toute connexion à OpenAI jusqu’à **Autoriser les services IA**.
 
 ## 4. Service caméra (perception)
 

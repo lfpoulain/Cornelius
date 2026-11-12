@@ -3,7 +3,10 @@ import { api, errorMessage, type Role } from './api';
 const Admin = lazy(() =>
   import('./components/Admin').then((module) => ({ default: module.Admin })),
 );
-import { Mirror } from './components/Mirror';
+// Chargé à part lui aussi : l’administration ne télécharge ni three.js ni la pile audio.
+const Mirror = lazy(() =>
+  import('./components/Mirror').then((module) => ({ default: module.Mirror })),
+);
 
 import { useMirror } from './useMirror';
 
@@ -52,15 +55,7 @@ export function App() {
   }, [role]);
 
   if (authenticated === null && role === 'admin') return <AdminLoading />;
-  if (authenticated === null)
-    return (
-      <main className="loading-screen">
-        <span className="brand">
-          cornelius<span> / </span>
-        </span>
-        <p>{role === 'admin' ? 'Ouverture de l’administration…' : 'Connexion au miroir…'}</p>
-      </main>
-    );
+  if (authenticated === null) return <MirrorLoading />;
   if (!authenticated)
     return (
       <Login
@@ -125,7 +120,10 @@ function ConnectedApp({
           <Admin connection={connection} onLogout={logout} loggingOut={busy} />
         </Suspense>
       ) : (
-        <Mirror connection={connection} />
+        // Même écran que pendant la connexion : pas de changement visible entre les deux attentes.
+        <Suspense fallback={<MirrorLoading />}>
+          <Mirror connection={connection} />
+        </Suspense>
       )}
       {error && (
         <div className="toast error" role="alert">
@@ -136,6 +134,18 @@ function ConnectedApp({
         </div>
       )}
     </>
+  );
+}
+
+/** Attente du miroir : réponse de l’authentification, puis chargement de son code. */
+function MirrorLoading() {
+  return (
+    <main className="loading-screen">
+      <span className="brand">
+        cornelius<span> / </span>
+      </span>
+      <p>Connexion au miroir…</p>
+    </main>
   );
 }
 

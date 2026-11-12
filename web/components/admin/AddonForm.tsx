@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Check, Plus, Search, Trash2 } from 'lucide-react';
 import type { Profile } from '../../../shared/types';
 import { refFromLabel } from '../../../shared/addons';
@@ -227,6 +227,15 @@ export function InstanceForm({
   // Erreurs par champ renvoyées par le serveur ; un champ modifié perd la sienne.
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [checking, setChecking] = useState(false);
+  // Formulaire refermé pendant la vérification (« Configurer », changement de personne) :
+  // rien ne doit plus être enregistré.
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   // Un champ modifié perd aussi les erreurs de ses lignes (« jours/0/bac »).
   const clearError = (...names: string[]) =>
     setErrors((current) => {
@@ -305,6 +314,7 @@ export function InstanceForm({
     } finally {
       setChecking(false);
     }
+    if (!alive.current) return;
     if (found.length > 0) {
       const next: Record<string, string> = {};
       for (const error of found) next[error.path] ??= error.message;
@@ -347,7 +357,7 @@ export function InstanceForm({
     const search = definition.search.find(
       (field) => field.target === name || field.labelTarget === name,
     );
-    const id = search ? `search-${definition.id}-${search.kind}` : `${name}-${suffix}`;
+    const id = search ? `search-${definition.id}-${search.kind}-${suffix}` : `${name}-${suffix}`;
     requestAnimationFrame(() => document.getElementById(id)?.focus());
   }
 
@@ -364,6 +374,9 @@ export function InstanceForm({
             <SearchPicker
               autoFocus={index === 0}
               key={`${field.kind}:${field.dependsOn ? form[field.dependsOn] : ''}`}
+              // Suffixe de la source, comme les autres champs : deux formulaires du même module
+              // ouverts ensemble ne partagent pas d’identifiant.
+              id={`search-${definition.id}-${field.kind}-${suffix}`}
               definition={definition}
               field={field}
               values={form}
@@ -521,7 +534,8 @@ export function InstanceForm({
           <Check />
           {instance ? 'Enregistrer' : 'Ajouter'}
         </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+        {/* Grisé pendant la vérification : elle enchaîne sur l’enregistrement. */}
+        <Button type="button" variant="ghost" size="sm" disabled={checking} onClick={onCancel}>
           Annuler
         </Button>
       </div>
@@ -531,6 +545,7 @@ export function InstanceForm({
 
 function SearchPicker({
   autoFocus = false,
+  id,
   definition,
   field,
   values,
@@ -539,6 +554,7 @@ function SearchPicker({
   onSelect,
 }: {
   autoFocus?: boolean;
+  id: string;
   definition: AddonDefinitionView;
   field: AddonSearchFieldView;
   values: Record<string, string>;
@@ -546,7 +562,7 @@ function SearchPicker({
   allowClear: boolean;
   onSelect: (result: AddonSearchResultView) => void;
 }) {
-  const errorId = `search-${definition.id}-${field.kind}-error`;
+  const errorId = `${id}-error`;
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<AddonSearchResultView[]>([]);
   const [busy, setBusy] = useState(false);
@@ -586,10 +602,10 @@ function SearchPicker({
 
   return (
     <div className="space-y-2 rounded-md border border-dashed p-3">
-      <Label htmlFor={`search-${definition.id}-${field.kind}`}>{field.label}</Label>
+      <Label htmlFor={id}>{field.label}</Label>
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          id={`search-${definition.id}-${field.kind}`}
+          id={id}
           className="max-w-xs"
           type="search"
           autoComplete="off"
@@ -715,6 +731,10 @@ function ConfigField({
       ? `De ${field.minimum.toLocaleString('fr-FR')} à ${field.maximum.toLocaleString('fr-FR')}.`
       : undefined;
   const help = field.description ?? range;
+  // Plus de 400 fuseaux à ranger : seulement quand la valeur change, pas à chaque frappe
+  // dans un autre champ du formulaire.
+  const timeZone = isTimeZone(name);
+  const zoneGroups = useMemo(() => (timeZone ? timeZoneGroups(value) : []), [timeZone, value]);
   if (type === 'boolean') {
     // Interrupteur : un réglage oui ou non se lit et se change d’un geste.
     const described = [error ? `${id}-error` : '', help ? `${id}-help` : '']
@@ -762,7 +782,7 @@ function ConfigField({
       help={help}
       error={error}
     >
-      {isTimeZone(name) ? (
+      {timeZone ? (
         <NativeSelect
           id={id}
           wrapperClassName="w-full"
@@ -771,7 +791,7 @@ function ConfigField({
           value={value}
           onChange={(event) => onChange(event.target.value)}
         >
-          {timeZoneGroups(value).map((group) => (
+          {zoneGroups.map((group) => (
             <optgroup key={group.label} label={group.label}>
               {group.zones.map((zone) => (
                 <NativeSelectOption key={zone.value} value={zone.value}>

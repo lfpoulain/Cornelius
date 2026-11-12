@@ -100,8 +100,8 @@ export function readinessChecklist(input: ReadinessInput): ReadinessItem[] {
           status: 'todo',
           title: state.voiceProvider === 'mistral' ? 'Clé Mistral' : 'Clé OpenAI',
           detail:
-            'Sans elle, Cornelius ne peut pas parler. Collez-la plus bas, dans « Clés et jetons » : elle compte tout de suite.',
-          action: { kind: 'doc', path: 'docs/installation/premier-demarrage.md' },
+            'Sans elle, Cornelius ne peut pas parler. Collez-la dans « Clés et accès », carte « Clés et jetons » : elle compte tout de suite.',
+          action: { kind: 'section', section: 'access' },
         },
     perceptionItem(perception, camera),
     cameraItem(devices, perception, camera),
@@ -116,7 +116,7 @@ export function readinessChecklist(input: ReadinessInput): ReadinessItem[] {
           id: 'mirror',
           status: 'todo',
           title: 'Miroir ouvert',
-          detail: 'Ouvrez la page du miroir dans un navigateur, sur l’écran du miroir.',
+          detail: 'Ouvrez la page du miroir dans un navigateur, sur l’écran qui sert de miroir.',
           action: { kind: 'mirror' },
         },
     !state.browserConnected
@@ -150,7 +150,8 @@ export function readinessChecklist(input: ReadinessInput): ReadinessItem[] {
           status: 'todo',
           title: 'Mot de passe administrateur',
           detail:
-            'Le mot de passe de départ est encore utilisé. Changez-le plus bas, dans la carte « Mot de passe administrateur ».',
+            'Le mot de passe de départ est encore utilisé. Changez-le dans « Clés et accès », carte « Mot de passe administrateur ».',
+          action: { kind: 'section', section: 'access' },
         }
       : {
           id: 'admin-password',
@@ -433,7 +434,7 @@ export function adminBlockers(
   if (!(state.setup?.voiceKey ?? state.setup?.openaiKey ?? devices?.apiConfigured ?? false))
     add(
       'openai-key',
-      'Clé du fournisseur vocal absente : ajoutez-la dans Mise en route, carte « Clés et jetons ».',
+      'Clé du fournisseur vocal absente : ajoutez-la dans Clés et accès, carte « Clés et jetons ».',
     );
   if (state.openaiBlocked)
     add('openai-blocked', 'Autorisez les services IA pour permettre la conversation.');

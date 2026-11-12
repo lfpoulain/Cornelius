@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
-import type { ToolResult } from '../shared/addons.js';
+import { toolFailure, toolResult, type ToolResult } from '../shared/addons.js';
 import { MAIL_RECIPIENTS_MAX, type MailLastSend, type MailView } from '../shared/mail.js';
 import { profileNameKey } from '../shared/profile-names.js';
+import { stripAccents } from '../shared/text.js';
 import type { DiagnosticLog } from './logs.js';
 import type { MailRepository } from './mail-store.js';
 import {
@@ -58,30 +59,12 @@ const clip = (text: string, max: number) => {
 };
 
 const slug = (text: string) =>
-  text
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
+  stripAccents(text)
     .toLowerCase()
     .replace(/[^a-z0-9]+/gu, '-')
     .replace(/^-+|-+$/gu, '')
     .slice(0, 40)
     .replace(/-+$/u, '');
-
-function tool(status: ToolResult['status'], summary: string, extra: Partial<ToolResult> = {}) {
-  return {
-    schemaVersion: 1,
-    status,
-    result: null,
-    snapshotId: null,
-    actionRunId: null,
-    summary,
-    error: null,
-    ...extra,
-  } satisfies ToolResult;
-}
-
-const failed = (summary: string, code: string) =>
-  tool('failed', summary, { error: { code, message: summary, retryable: false } });
 
 function parseArgs(raw: unknown): MailArgs | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
@@ -210,9 +193,9 @@ export class Mailer {
   }
 
   async run(input: MailRunInput, raw: unknown): Promise<ToolResult> {
-    if (!this.ready()) return failed('L’envoi par e-mail n’est pas configuré.', 'forbidden');
+    if (!this.ready()) return toolFailure('L’envoi par e-mail n’est pas configuré.', 'forbidden');
     const args = parseArgs(raw);
-    if (!args) return failed('Demande d’envoi invalide.', 'invalid_params');
+    if (!args) return toolFailure('Demande d’envoi invalide.', 'invalid_params');
     // Le rejeu d'un même appel restitue son résultat : jamais deux e-mails pour une demande.
     const key = input.callId ? `${input.interactionId}:${input.callId}` : null;
     const replay = key ? this.recent.get(key) : undefined;
@@ -236,13 +219,13 @@ export class Mailer {
           null);
     if (!recipient)
       return profileNameKey(args.recipient) === self
-        ? failed(
+        ? toolFailure(
             input.profileId === null
               ? 'Je ne sais pas qui parle : demande à qui envoyer, par son prénom.'
               : `Aucune adresse e-mail pour ${input.profileName ?? 'cette personne'} : à ajouter dans l’administration, Modules → E-mail.`,
             'not_found',
           )
-        : failed(
+        : toolFailure(
             `« ${clip(args.recipient, 40)} » n’est pas dans la liste des destinataires.`,
             'not_found',
           );
@@ -254,19 +237,22 @@ export class Mailer {
         position: args.position,
         search: args.search,
       }) ?? { summary: 'Aucune image à envoyer.' };
-      if (!('image' in found)) return failed(found.summary, 'not_found');
+      if (!('image' in found)) return toolFailure(found.summary, 'not_found');
       try {
         attachment = { prompt: found.image.prompt, content: readFileSync(found.image.path) };
       } catch {
-        return failed('L’image n’est plus disponible.', 'not_found');
+        return toolFailure('L’image n’est plus disponible.', 'not_found');
       }
     } else if (!args.message)
-      return failed('Rien à envoyer : une image ou un message est nécessaire.', 'invalid_params');
+      return toolFailure(
+        'Rien à envoyer : une image ou un message est nécessaire.',
+        'invalid_params',
+      );
 
     const now = this.now();
     this.sent = this.sent.filter((at) => at > now - hourMs);
     if (this.sent.length >= hourlyLimit)
-      return failed(
+      return toolFailure(
         'Trop d’e-mails envoyés cette dernière heure : réessaie un peu plus tard.',
         'rate_limited',
       );
@@ -319,12 +305,15 @@ export class Mailer {
         summary: reason,
       };
       return uncertain
-        ? tool(
+        ? toolResult(
             'unknown',
             `Envoi incertain à ${recipient.name} : le serveur n’a pas confirmé. Ne pas renvoyer ; vérifier la boîte de réception.`,
             { error: { code: smtp!.code, message: reason, retryable: false } },
           )
-        : failed(`E-mail non envoyé à ${recipient.name}. ${reason}`, smtp?.code ?? 'unavailable');
+        : toolFailure(
+            `E-mail non envoyé à ${recipient.name}. ${reason}`,
+            smtp?.code ?? 'unavailable',
+          );
     }
     this.logs?.write('info', 'mail', 'E-mail envoyé', {
       recipient: recipient.name,
@@ -334,7 +323,7 @@ export class Mailer {
     });
     const summary = `E-mail envoyé à ${recipient.name}${attachment ? ', avec l’image' : ''}.`;
     this.last = { at: now, status: 'sent', recipient: recipient.name, summary };
-    return tool('succeeded', summary, {
+    return toolResult('succeeded', summary, {
       result: { recipient: recipient.name, image: !!attachment },
     });
   }

@@ -18,6 +18,7 @@ import type {
   AddonInstanceView,
   AddonCatalog,
   AddonSecretView,
+  HttpActionView,
   RunAction,
 } from './types';
 import { Actions } from './Actions';
@@ -34,7 +35,14 @@ import { addonIcon } from './addon-icons';
 import { SecretField } from './Secrets';
 import { useAdminResource } from './useAdminResource';
 import { useConfirmations, waitingConfirmations } from './useConfirmations';
-import { ConfirmAction, LoadingCard, ModulePanel, PersonPicker, SearchInput } from './shared';
+import {
+  ConfirmAction,
+  LoadError,
+  LoadingCard,
+  ModulePanel,
+  PersonPicker,
+  SearchInput,
+} from './shared';
 import {
   commandsStatus,
   describeError,
@@ -223,16 +231,7 @@ export function Addons({
   } = useAdminResource<AddonCatalog>(loadCatalog);
 
   if (loadError && !catalog)
-    return (
-      <Alert variant="destructive">
-        <AlertDescription className="gap-3">
-          <p>{loadError}</p>
-          <Button variant="outline" size="sm" onClick={() => void reload()}>
-            Réessayer
-          </Button>
-        </AlertDescription>
-      </Alert>
-    );
+    return <LoadError error={loadError} loading={loading} onRetry={reload} />;
   if (!catalog) return <LoadingCard label="Lecture des modules installés…" />;
 
   const builtInVisible = (entry: (typeof builtIns)[number]) =>
@@ -426,7 +425,11 @@ function CommandsPanel({
   openOnArrival: boolean;
 }) {
   const load = useCallback(() => api.actions(), []);
-  const { data: commands } = useAdminResource(load);
+  const { data: loaded } = useAdminResource(load);
+  // Panneau ouvert, la liste d’Actions fait foi : une commande ajoutée ou supprimée met à jour
+  // le sous-titre et le badge, que la lecture d’ouverture laisserait à « 0 commande ».
+  const [listed, setListed] = useState<HttpActionView[] | null>(null);
+  const commands = listed ?? loaded;
   const waiting = waitingConfirmations(useConfirmations().list).length;
   const count = commands?.length ?? 0;
   const status = commands ? commandsStatus(commands, waiting) : null;
@@ -458,7 +461,7 @@ function CommandsPanel({
           Cornelius déclenche à la voix les adresses que vous enregistrez : ouvrir le portail,
           lancer une scène… Les commandes sensibles attendent votre accord.
         </p>
-        {open && <Actions profiles={profiles} run={run} />}
+        {open && <Actions profiles={profiles} run={run} onActions={setListed} />}
       </ModulePanel>
     </div>
   );

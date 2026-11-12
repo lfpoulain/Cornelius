@@ -2,12 +2,14 @@ import argparse
 import asyncio
 import json
 import os
+import sys
 import time
 from pathlib import Path
 from urllib.parse import urlparse
 
 import numpy as np
 from websockets.asyncio.client import connect
+from websockets.exceptions import ConnectionClosed
 from vision import DEFAULT_ENGAGEMENT, Vision
 from vad import Vad
 from wake import WakeDetector
@@ -22,10 +24,18 @@ VISION_DEVICES = {"auto", "gpu", "cpu"}
 def load_environment():
     path = ROOT / ".env"
     if path.exists():
+        values = {}
         for line in path.read_text(encoding="utf-8").splitlines():
             if line.strip() and not line.lstrip().startswith("#") and "=" in line:
                 key, value = line.split("=", 1)
-                os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+                # Clé en double : la dernière ligne l’emporte, comme pour Node (--env-file).
+                values[key.strip()] = value.strip().strip('"').strip("'")
+        for key, value in values.items():
+            os.environ.setdefault(key, value)
+
+class VisionUnavailable(RuntimeError):
+    """Le message de cette erreur est lisible tel quel dans l’administration."""
+
 
 class Worker:
     def __init__(self, camera):
@@ -67,17 +77,51 @@ class Worker:
         self.loop = None
         self.camera_lock = None
         self.camera_tasks = set()
+        # Dernière image du navigateur analysée : (repère de l’image, personnes, engagement, visages).
+        self.analyzed = None
+        self.repeated_frame = False
+        # Pannes déjà journalisées (lieu, type d’erreur) : une ligne par cause.
+        self.reported = set()
 
     def enable_camera(self, preferred=None, mode=None):
         status = self.camera.enable(preferred, mode)
         self.camera_enabled = True
         if self.vision is None:
-            self.vision = Vision(ROOT / "models", self.recognition_threshold)
+            # Gardé d’un allumage à l’autre (voir disable_camera) : YuNet et SFace ne sont lus
+            # du disque qu’une fois. Tous les réglages s’appliquent à l’instance existante.
+            try:
+                vision = Vision(ROOT / "models", self.recognition_threshold)
+            except Exception as error:
+                raise VisionUnavailable(
+                    "Reconnaissance des visages indisponible : modèles YuNet ou SFace absents ou "
+                    "illisibles. Relancez l’installation des modèles."
+                ) from error
+            self.vision = vision
             self.configure_vision()
         return status
 
+    def report(self, where, error):
+        """Journalise une panne sans inonder le journal : une ligne par cause, jamais d’image."""
+        reported = getattr(self, "reported", None)
+        if reported is None:
+            reported = self.reported = set()
+        cause = error.__cause__ or error
+        key = (where, type(cause).__name__)
+        if key in reported or len(reported) >= 64:
+            return
+        reported.add(key)
+        print(where + " en échec : " + type(cause).__name__ + " : " + str(cause)[:240],
+              file=sys.stderr, flush=True)
+
+    def reset_tracks(self):
+        """Oublie les visages suivis, et l’analyse gardée pour une image répétée."""
+        self.analyzed = None
+        if getattr(self, "vision", None):
+            self.vision.reset_tracks()
+
     def configure_vision(self):
         """Applique au module de vision chargé les profils et réglages reçus du serveur."""
+        self.analyzed = None
         self.vision.set_profiles([
             (profile_id, np.asarray(templates, dtype=np.float32))
             for profile_id, templates in self.profile_templates
@@ -108,14 +152,35 @@ class Worker:
         self.camera_enabled = False
         self.enrollment = None
         self.last_progress = None
-        self.vision = None
+        # L’instance de vision reste chargée : en ouverture au mot d’appel, la caméra s’allume à
+        # chaque conversation. Seules les pistes sont oubliées, comme avec une instance neuve.
+        self.reset_tracks()
         return self.camera.disable()
 
     def frame(self):
-        ok, frame, captured, boot = self.camera.read()
+        self.repeated_frame = False
+        camera = self.camera
+        key = None
+        if isinstance(camera, BrowserCamera):
+            # Le navigateur envoie moins de dix images par seconde et read() rend la dernière
+            # tant qu’elle a moins de 2 s : le numéro dit si elle a déjà été analysée.
+            with camera.lock:
+                ok, frame, captured, boot = camera.read()
+                key = (boot, camera.frame_number)
+        else:
+            ok, frame, captured, boot = camera.read()
         if not ok or self.vision is None:
+            self.analyzed = None
             return captured, [], False, [], "unavailable", boot
-        people, engaged, embeddings = self.vision.analyze(frame)
+        analyzed = getattr(self, "analyzed", None)
+        if key is not None and analyzed is not None and analyzed[0] == key:
+            # Même image : la réanalyser ajouterait un vote d’identité par tour de boucle, et la
+            # règle des images concordantes serait atteinte avec deux images réelles.
+            self.repeated_frame = True
+            _, people, engaged, embeddings = analyzed
+        else:
+            people, engaged, embeddings = self.vision.analyze(frame)
+            self.analyzed = (key, people, engaged, embeddings) if key is not None else None
         return captured, people, engaged, embeddings, "ok", boot
 
     def _queue_put(self, queue, event):
@@ -176,7 +241,20 @@ class Worker:
                 await asyncio.sleep(0.1)
                 continue
             started = time.monotonic()
-            captured, people, engaged, embeddings, health, boot = await asyncio.to_thread(self.frame)
+            try:
+                captured, people, engaged, embeddings, health, boot = await asyncio.to_thread(self.frame)
+            except Exception as error:
+                # Une analyse en échec ne doit pas fermer la connexion : elle porte aussi la
+                # détection de parole et le mot d’appel. La présence devient indisponible.
+                self.report("Analyse de l’image", error)
+                self.reset_tracks()
+                captured, people, engaged, embeddings, health = int(time.time() * 1000), [], False, [], "unavailable"
+                boot = getattr(getattr(self, "camera", None), "boot", "")
+            # Caméra perdue ou revenue d’elle-même : l’administration le voit.
+            take = getattr(getattr(self, "camera", None), "take_status_change", None)
+            changed = take() if take else None
+            if changed:
+                await socket.send(json.dumps(changed))
             self.sequence += 1
             await socket.send(json.dumps({"type": "observation", "observation": {
                 "schemaVersion": 1, "producerBootId": boot, "sequence": self.sequence,
@@ -190,7 +268,9 @@ class Worker:
                     "threshold": self.recognition_threshold, "faces": self.live_faces(embeddings),
                 }))
             enrollment = self.enrollment
-            if enrollment and enrollment.request["expiresAt"] > captured:
+            # Une image répétée n’apporte aucune vue nouvelle à l’enregistrement d’un visage.
+            if (enrollment and enrollment.request["expiresAt"] > captured
+                    and not getattr(self, "repeated_frame", False)):
                 templates = enrollment.add(embeddings, time.monotonic())
                 if templates:
                     await socket.send(json.dumps({"type": "enrolled", "id": enrollment.request["id"], "templates": templates}))
@@ -245,15 +325,13 @@ class Worker:
                     continue
                 if len(message) == 2562 and message[0] == 0x57:
                     entry = self.wake_streams.get(message[1])
-                    if entry is None or self.wake.model is None:
+                    if entry is None or entry[1] is None or self.wake.model is None:
                         continue
                     stream_id, stream = entry
                     try:
                         score = await asyncio.to_thread(stream.process, message[2:])
                     except Exception as error:
-                        self.wake.model = None
-                        self.wake_streams = {}
-                        self.wake.detail = "Inférence du mot d’appel indisponible (" + type(error).__name__ + ")."
+                        self.wake_failed("Inférence du mot d’appel indisponible (" + type(error).__name__ + ").")
                         await socket.send(json.dumps(self.wake.status()))
                         continue
                     if score is not None:
@@ -269,96 +347,155 @@ class Worker:
                     await socket.send(json.dumps({"type": "vad", "interactionId": self.interaction, "speaking": speaking}))
                     self.last_speech, self.last_vad_sent = speaking, now
                 continue
-            event = json.loads(message)
-            if event["type"] == "camera_source" and event.get("source") in ("server", "browser"):
-                requested = event["source"] == "browser"
-                if requested != isinstance(self.camera, BrowserCamera):
-                    for task in list(self.camera_tasks):
-                        await task
-                    if self.scene:
-                        self.scene.cancel("Source de la caméra modifiée.")
-                    await asyncio.to_thread(self.disable_camera)
-                    self.camera = BrowserCamera() if requested else Camera(self.server_camera_index, enabled=False)
-                await socket.send(json.dumps({"type": "camera_source_status", "source": event["source"]}))
-            elif event["type"] == "browser_camera_reset":
-                if isinstance(getattr(self, "camera", None), BrowserCamera):
-                    await asyncio.to_thread(self.camera.reset)
-                    if self.vision:
-                        self.vision.reset_tracks()
-                    await socket.send(json.dumps(self.camera.status()))
-            elif event["type"] in ("camera_enabled", "camera_list", "camera_select", "camera_mode", "camera_preview"):
-                if isinstance(getattr(self, "camera", None), BrowserCamera):
-                    await self.camera_command(socket, event)
-                else:
-                    self.camera_job(lambda event=event: self.camera_command(socket, event))
-            elif event["type"] == "engagement":
-                self.engagement = event["settings"]
-                if self.vision:
-                    self.vision.configure_engagement(self.engagement)
-            elif event["type"] == "tracking":
-                self.tracking_grace_ms = event["graceMs"]
-                self.identity_hold_ms = event.get("identityHoldMs", 8000)
-                if self.vision:
-                    self.vision.configure_tracking(self.tracking_grace_ms)
-                    self.vision.configure_identity_hold(self.identity_hold_ms)
-            elif event["type"] == "recognition":
-                self.recognition_threshold = event["threshold"]
-                if self.vision:
-                    self.vision.configure(self.recognition_threshold)
-            elif event["type"] == "profiles":
-                self.profile_templates = [
-                    (p["profileId"], p["templates"]) for p in event["profiles"]
-                ]
-                self.recognition_threshold = event.get("recognitionThreshold", 0.42)
-                self.tracking_grace_ms = event.get("trackingGraceMs", 8000)
-                self.identity_hold_ms = event.get("identityHoldMs", 8000)
-                self.engagement = event.get("engagement", dict(DEFAULT_ENGAGEMENT))
-                self.detection_width = event.get("detectionWidth")
-                if self.vision:
-                    self.configure_vision()
-                request = event.get("enrollment")
-                if request is None or self.enrollment is None or self.enrollment.request["id"] != request["id"]:
-                    self.enrollment = self.start_enrollment(request) if request and self.camera_enabled else None
-                    self.last_progress = None
-            elif event["type"] == "enroll":
-                if self.camera_enabled:
-                    self.enrollment, self.last_progress = self.start_enrollment(event["enrollment"]), None
-            elif event["type"] == "recognition_debug":
-                self.debug_until = time.monotonic() + 5
-            elif event["type"] == "vision_cancel":
+            # Une commande refusée (réglage invalide, champ absent) ne ferme pas la connexion :
+            # elle porte aussi la détection de parole et le mot d’appel, et le serveur renverrait
+            # la même commande à chaque reconnexion.
+            kind = "?"
+            try:
+                event = json.loads(message)
+                kind = str(event["type"])[:40]
+                await self.command(socket, event)
+            except ConnectionClosed:
+                raise
+            except Exception as error:
+                self.report("Commande " + kind, error)
+
+    def wake_failed(self, detail):
+        """Mot d’appel en panne : les flux restent inscrits, sans modèle, pour reprendre ensuite."""
+        self.wake.fail(detail)
+        self.wake_streams = {slot: (stream_id, None) for slot, (stream_id, _) in self.wake_streams.items()}
+
+    async def release_wake_streams(self, streams):
+        for _, stream in streams:
+            # reset() refait une inférence d’amorçage : hors de la boucle des commandes.
+            await asyncio.to_thread(self.wake.release, stream)
+
+    async def command(self, socket, event):
+        if event["type"] == "camera_source" and event.get("source") in ("server", "browser"):
+            requested = event["source"] == "browser"
+            if requested != isinstance(self.camera, BrowserCamera):
+                for task in list(self.camera_tasks):
+                    await task
                 if self.scene:
-                    self.scene.cancel("Analyse annulée par le serveur.")
-            elif event["type"] == "vision":
-                self.scene_worker().request(event["requestId"], event["trigger"], event.get("question"))
-            elif event["type"] == "vision_warm":
-                self.scene_worker().warm()
-            elif event["type"] == "vision_model":
-                requested = event.get("model")
-                self.set_vision_model(
-                    requested,
-                    device=event.get("device"),
-                    reload=event.get("reload") is True,
-                )
-            elif event["type"] == "audio":
-                self.interaction = event["interactionId"]
-                self.vad.reset()
-            elif (event["type"] == "wake_start" and isinstance(event.get("streamId"), str)
-                  and isinstance(event.get("slot"), int) and 0 <= event["slot"] < 256):
-                if self.wake.model is not None:
-                    try:
-                        stream = await asyncio.to_thread(self.wake.stream)
-                    except Exception as error:
-                        self.wake.model = None
-                        self.wake_streams = {}
-                        self.wake.detail = "Modèle Cornelius illisible (" + type(error).__name__ + ")."
-                        await socket.send(json.dumps(self.wake.status()))
-                    else:
-                        self.wake_streams[event["slot"]] = (event["streamId"], stream)
-            elif event["type"] == "wake_end":
-                self.wake_streams = {slot: entry for slot, entry in self.wake_streams.items()
-                                     if entry[0] != event.get("streamId")}
+                    self.scene.cancel("Source de la caméra modifiée.")
+                await asyncio.to_thread(self.disable_camera)
+                self.camera = BrowserCamera() if requested else Camera(self.server_camera_index, enabled=False)
+            await socket.send(json.dumps({"type": "camera_source_status", "source": event["source"]}))
+        elif event["type"] == "browser_camera_reset":
+            if isinstance(getattr(self, "camera", None), BrowserCamera):
+                await asyncio.to_thread(self.camera.reset)
+                self.reset_tracks()
+                await socket.send(json.dumps(self.camera.status()))
+        elif event["type"] in ("camera_enabled", "camera_list", "camera_select", "camera_mode", "camera_preview"):
+            if isinstance(getattr(self, "camera", None), BrowserCamera):
+                await self.camera_command(socket, event)
+            else:
+                self.camera_job(lambda event=event: self.camera_command(socket, event))
+        elif event["type"] == "engagement":
+            self.engagement = event["settings"]
+            if self.vision:
+                self.vision.configure_engagement(self.engagement)
+        elif event["type"] == "tracking":
+            self.tracking_grace_ms = event["graceMs"]
+            self.identity_hold_ms = event.get("identityHoldMs", 8000)
+            if self.vision:
+                self.vision.configure_tracking(self.tracking_grace_ms)
+                self.vision.configure_identity_hold(self.identity_hold_ms)
+        elif event["type"] == "recognition":
+            self.recognition_threshold = event["threshold"]
+            if self.vision:
+                self.vision.configure(self.recognition_threshold)
+        elif event["type"] == "profiles":
+            self.profile_templates = [
+                (p["profileId"], p["templates"]) for p in event["profiles"]
+            ]
+            self.recognition_threshold = event.get("recognitionThreshold", 0.42)
+            self.tracking_grace_ms = event.get("trackingGraceMs", 8000)
+            self.identity_hold_ms = event.get("identityHoldMs", 8000)
+            self.engagement = event.get("engagement", dict(DEFAULT_ENGAGEMENT))
+            self.detection_width = event.get("detectionWidth")
+            if self.vision:
+                self.configure_vision()
+            request = event.get("enrollment")
+            if request is None or self.enrollment is None or self.enrollment.request["id"] != request["id"]:
+                self.enrollment = self.start_enrollment(request) if request and self.camera_enabled else None
+                self.last_progress = None
+        elif event["type"] == "enroll":
+            if self.camera_enabled:
+                self.enrollment, self.last_progress = self.start_enrollment(event["enrollment"]), None
+        elif event["type"] == "recognition_debug":
+            self.debug_until = time.monotonic() + 5
+        elif event["type"] == "vision_cancel":
+            if self.scene:
+                self.scene.cancel("Analyse annulée par le serveur.")
+        elif event["type"] == "vision":
+            self.scene_worker().request(event["requestId"], event["trigger"], event.get("question"))
+        elif event["type"] == "vision_warm":
+            self.scene_worker().warm()
+        elif event["type"] == "vision_model":
+            requested = event.get("model")
+            self.set_vision_model(
+                requested,
+                device=event.get("device"),
+                reload=event.get("reload") is True,
+            )
+        elif event["type"] == "audio":
+            self.interaction = event["interactionId"]
+            self.vad.reset()
+        elif (event["type"] == "wake_start" and isinstance(event.get("streamId"), str)
+              and isinstance(event.get("slot"), int) and 0 <= event["slot"] < 256):
+            slot = event["slot"]
+            previous = self.wake_streams.pop(slot, None)
+            if previous:
+                await self.release_wake_streams([previous])
+            # Inscrit même sans modèle : le flux reprendra dès qu’un chargement réussira.
+            self.wake_streams[slot] = (event["streamId"], None)
+            if self.wake.model is None:
+                # Après une panne d’inférence ou un modèle posé après coup : on retente ici, au
+                # lieu de rester sans mot d’appel jusqu’au redémarrage du processus.
+                detail = self.wake.detail
+                ready = await asyncio.to_thread(self.wake.prepare)
+                if ready or self.wake.detail != detail:
+                    await socket.send(json.dumps(self.wake.status()))
+                if not ready:
+                    return
+            try:
+                for key, (stream_id, stream) in list(self.wake_streams.items()):
+                    if stream is None:
+                        self.wake_streams[key] = (stream_id, await asyncio.to_thread(self.wake.stream))
+            except Exception as error:
+                self.wake_failed("Modèle Cornelius illisible (" + type(error).__name__ + ").")
+                await socket.send(json.dumps(self.wake.status()))
+        elif event["type"] == "wake_end":
+            ended = [entry for entry in self.wake_streams.values() if entry[0] == event.get("streamId")]
+            self.wake_streams = {slot: entry for slot, entry in self.wake_streams.items()
+                                 if entry[0] != event.get("streamId")}
+            await self.release_wake_streams(ended)
 
     async def camera_command(self, socket, event):
+        """Commande caméra ; une panne est journalisée et dite à l’administration.
+
+        Sans cela, l’erreur d’un allumage (modèle YuNet absent, par exemple) disparaissait avec
+        sa tâche de fond en caméra serveur, et fermait la connexion en boucle en caméra navigateur.
+        """
+        try:
+            await self.apply_camera_command(socket, event)
+        except ConnectionClosed:
+            raise
+        except Exception as error:
+            self.report("Commande " + str(event.get("type"))[:40], error)
+            try:
+                status = self.camera.status()
+            except Exception:
+                status = {"type": "camera_status", "selectedId": None, "devices": []}
+            status["error"] = (str(error) if isinstance(error, VisionUnavailable)
+                               else "Commande de caméra en échec (" + type(error).__name__ + "). "
+                                    "Consultez le journal de la perception.")
+            if "requestId" in event:
+                status["requestId"] = event["requestId"]
+            await socket.send(json.dumps(status))
+
+    async def apply_camera_command(self, socket, event):
         if event["type"] == "camera_enabled":
             enabled = event.get("enabled") is True
             if enabled:
@@ -375,15 +512,13 @@ class Worker:
             if not self.camera_enabled:
                 return
             status = await asyncio.to_thread(self.camera.select, event["id"])
-            if self.vision:
-                self.vision.reset_tracks()
+            self.reset_tracks()
             self.enrollment, self.last_progress = None, None
             status["requestId"] = event["requestId"]
             await socket.send(json.dumps(status))
         elif event["type"] == "camera_mode":
             status = await asyncio.to_thread(self.camera.set_mode, event.get("mode"))
-            if self.vision:
-                self.vision.reset_tracks()
+            self.reset_tracks()
             if "requestId" in event:
                 status["requestId"] = event["requestId"]
             if self.camera_enabled:
@@ -403,7 +538,9 @@ class Worker:
                                    additional_headers={"Authorization": "Bearer " + token},
                                    max_size=256_000, max_queue=4, open_timeout=5) as socket:
                     self.enrollment, self.last_progress, self.interaction = None, None, None
-                    self.wake_streams = {}
+                    # Le serveur réinscrit ses flux de veille : leurs modèles retournent en réserve.
+                    streams, self.wake_streams = list(self.wake_streams.values()), {}
+                    await self.release_wake_streams(streams)
                     self.vad.reset()
                     self.loop = asyncio.get_running_loop()
                     self.vision_queue = asyncio.Queue(maxsize=16)

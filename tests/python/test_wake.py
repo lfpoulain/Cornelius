@@ -39,6 +39,43 @@ class WakeStreamTest(unittest.TestCase):
             self.assertEqual(mirror.process(bytes(2560)), 0.9)
             self.assertEqual(satellite.process(bytes(2560)), 0.9)
 
+    def test_a_finished_stream_lends_its_reset_model_to_the_next_one(self):
+        class Model(FakeModel):
+            resets = 0
+
+            def reset(self):
+                self.resets += 1
+
+        loads = []
+        detector = WakeDetector.__new__(WakeDetector)
+        detector.threshold = 0.5
+        detector.load = lambda: loads.append(Model()) or loads[-1]
+        detector.path = detector.mel = detector.embedding = Path(__file__)
+        self.assertTrue(detector.prepare())
+        # Le modèle chargé au démarrage sert au premier flux : il n’est pas qu’un témoin.
+        mirror = detector.stream()
+        self.assertIs(mirror.model, detector.model)
+        satellite = detector.stream()
+        self.assertIsNot(mirror.model, satellite.model)
+        self.assertEqual(len(loads), 2)
+        # Retour en veille : le modèle rendu ressert, tampons audio remis à zéro, sans relecture.
+        detector.release(mirror)
+        again = detector.stream()
+        self.assertIs(again.model, mirror.model)
+        self.assertIsNot(again, mirror)
+        self.assertEqual(again.model.resets, 1)
+        self.assertEqual(len(loads), 2)
+        # Un modèle en service n’est jamais prêté à un second flux.
+        self.assertIsNot(detector.stream().model, again.model)
+        self.assertEqual(len(loads), 3)
+        # Après une panne, la réserve est jetée ; prepare() recharge.
+        detector.fail("Inférence du mot d’appel indisponible (RuntimeError).")
+        self.assertFalse(detector.status()["ready"])
+        detector.release(again)
+        self.assertTrue(detector.prepare())
+        self.assertTrue(detector.status()["ready"])
+        self.assertIsNone(detector.status()["detail"])
+
 
 if __name__ == "__main__":
     unittest.main()

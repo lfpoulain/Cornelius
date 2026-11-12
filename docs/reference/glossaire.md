@@ -14,7 +14,7 @@ Cette page définit les mots employés dans l’administration, la documentation
 
 **Conversation, ou session.** Période pendant laquelle Cornelius écoute et répond, entre son ouverture et sa fermeture. La voix ne part chez OpenAI que pendant une conversation.
 
-**Délégation.** Second modèle d’OpenAI, à qui le modèle vocal confie les recherches, les cartes et les commandes. Son mode se règle dans **Quand il écoute → Réglages avancés → Délégation : recherches et actions**.
+**Délégation.** Second modèle d’OpenAI, à qui le modèle vocal confie les recherches, les cartes et les commandes. Son mode se règle dans **Voix et modèles → Délégation : recherches et actions**.
 
 **Foyer.** L’ensemble des personnes enregistrées dans **Le foyer et les visages**. Une source « du foyer » sert à tout le monde, même à une personne inconnue.
 

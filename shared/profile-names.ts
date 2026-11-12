@@ -1,15 +1,12 @@
+import { stripAccents } from './text.js';
+
 /**
  * Deux membres du foyer ne portent pas le même nom : Cornelius les appelle par ce nom et
  * l’administration les choisit dans des listes. La comparaison ignore la casse, les accents et
  * les espaces répétés (« Élodie » et « elodie » sont le même nom).
  */
 export function profileNameKey(name: string): string {
-  return name
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLocaleLowerCase('fr')
-    .replace(/\s+/gu, ' ')
-    .trim();
+  return stripAccents(name).toLocaleLowerCase('fr').replace(/\s+/gu, ' ').trim();
 }
 
 /** Profil déjà nommé ainsi, en dehors de `exceptId` (le profil que l’on renomme). */

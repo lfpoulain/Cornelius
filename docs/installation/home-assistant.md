@@ -101,6 +101,8 @@ Pendant une sauvegarde, l’application s’arrête le temps de copier son dossi
 
 L’image contient une version précise de Cornelius et du dépôt [cornelius-modules](https://github.com/lfpoulain/cornelius-modules), fixée par la version de l’application : chaque nouvelle version indique dans son historique le commit de Cornelius qu’elle contient, et le **Journal** de l’application l’affiche au démarrage. Le dépôt vérifie chaque jour si Cornelius a publié une version ; la bêta avance quand une étape de la branche `beta` est prête à essayer. Une nouvelle version apparaît dans **Paramètres → Mises à jour** ; **Mettre à jour** reconstruit l’image, et la base est migrée au démarrage, comme d’habitude. Le certificat HTTPS et sa clé sont gardés : le miroir et les satellites déjà associés n’ont rien à refaire. Pour l’installer sans y penser, activez **Mise à jour automatique** sur la page de l’application.
 
+Cornelius ne se met pas à jour depuis son administration sous Home Assistant : la carte « Cornelius » de **État du système** le rappelle. Les modules, eux, s’installent et se mettent à jour depuis **Installer des modules**, sans attendre une nouvelle version de l’application : ils sont gardés dans `/data/modules` et remplacent la copie de cornelius-modules contenue dans l’image.
+
 ## Limites
 
 - L’administration ne s’ouvre pas dans le panneau latéral de Home Assistant (Ingress) : le miroir a besoin de son propre HTTPS pour le micro, et Cornelius interdit l’affichage dans un cadre.

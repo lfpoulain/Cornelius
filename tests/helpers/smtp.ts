@@ -15,6 +15,8 @@ export interface FakeSmtpOptions {
   rejectRecipient?: boolean;
   /** Coupe la connexion après le message, sans confirmer : envoi incertain. */
   dropAfterData?: boolean;
+  /** Texte en clair glissé juste derrière le 220 de STARTTLS, comme le ferait un intrus. */
+  injectAfterStarttls?: string;
   /** N'envoie jamais d'accueil. */
   silent?: boolean;
 }
@@ -94,7 +96,7 @@ export async function fakeSmtp(options: FakeSmtpOptions) {
         lines.push('8BITMIME');
         send(...lines.map((text, i) => `250${i === lines.length - 1 ? ' ' : '-'}${text}`));
       } else if (verb === 'STARTTLS') {
-        send('220 On passe en TLS');
+        socket.write('220 On passe en TLS\r\n' + (options.injectAfterStarttls ?? ''));
         socket.removeAllListeners('data');
         const upgraded = new TLSSocket(socket, { isServer: true, secureContext: context });
         sockets.add(upgraded);

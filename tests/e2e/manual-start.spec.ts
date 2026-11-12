@@ -1,5 +1,6 @@
 import { test, expect, type WebSocketRoute } from '@playwright/test';
 import type { DevicesStatus, MirrorState, StateEvent } from '../../shared/types';
+import { login } from './env';
 
 type StatePatch = Omit<Partial<MirrorState>, 'session' | 'presence'> & {
   session?: Partial<MirrorState['session']>;
@@ -104,11 +105,7 @@ test('le démarrage manuel respecte chaque mode et les blocages communs', async 
     await route.fulfill({ json: snapshot });
   });
 
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Quand il écoute' }).click();
   const start = page.getByRole('button', { name: 'Démarrer la session', exact: true });
   await expect(start).toBeEnabled();

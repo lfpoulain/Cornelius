@@ -1,4 +1,4 @@
-import type { ToolResult } from '../shared/addons.js';
+import { toolFailure, toolResult, type ToolResult } from '../shared/addons.js';
 import {
   ALARM_DAYS,
   ALARM_KIND_LABELS,
@@ -49,23 +49,11 @@ const kinds = ['alarm', 'timer', 'reminder'] as const;
 const duplicateMs = 120_000;
 const listMax = 10;
 
-function tool(status: ToolResult['status'], summary: string, result: ToolResult['result'] = null) {
-  return {
-    schemaVersion: 1,
-    status,
-    result,
-    snapshotId: null,
-    actionRunId: null,
-    summary,
-    error: null,
-  } satisfies ToolResult;
-}
+const tool = (status: ToolResult['status'], summary: string, result: ToolResult['result'] = null) =>
+  toolResult(status, summary, { result });
 
 const failed = (summary: string, code: string): AlarmsOutcome => ({
-  tool: {
-    ...tool('failed', summary),
-    error: { code, message: summary, retryable: false },
-  },
+  tool: toolFailure(summary, code),
   card: null,
 });
 

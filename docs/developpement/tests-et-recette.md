@@ -38,7 +38,7 @@ Installez Chromium une fois pour Playwright (sous Linux, `--with-deps` ajoute le
 npx playwright install chromium
 ```
 
-`npm run test:e2e` démarre lui-même un serveur de test (`playwright.config.ts`) avec une base en mémoire et un mot de passe dédié, sur le port 3101. Ce serveur sert l’interface compilée : lancez `npm run build` d’abord. Si le port est déjà pris, choisissez-en un autre :
+`npm run test:e2e` démarre lui-même un serveur de test (`playwright.config.ts`) avec une base en mémoire et un mot de passe dédié, sur le port 3101, fermé au réseau local. Les specs se connectent avec `login(page, '/admin#…')` de `tests/e2e/env.ts`. Ce serveur sert l’interface compilée : lancez `npm run build` d’abord. Si le port est déjà pris, choisissez-en un autre :
 
 ```sh
 CORNELIUS_E2E_PORT=3199 npm run test:e2e

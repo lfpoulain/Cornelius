@@ -1,5 +1,9 @@
 name: Verify
-on: [push, pull_request]
+# push limité aux branches longues : une PR interne ne lance plus chaque vérification deux fois.
+on:
+  push:
+    branches: [main, beta]
+  pull_request:
 permissions:
   contents: read
 jobs:

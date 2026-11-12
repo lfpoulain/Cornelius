@@ -1,3 +1,5 @@
+import type { VoiceUsageView } from '../shared/voice-usage';
+import type { GooglePhotosSettings, GooglePhotosView } from '../shared/google-photos';
 import type { CustomProviderSettings, CustomProviderView } from '../shared/custom-provider';
 import type { Opening } from '../shared/opening';
 import type {
@@ -46,6 +48,7 @@ import type { MemoryView, MemoryEdit } from '../shared/memory';
 import type { PersonalityView } from '../shared/personality';
 import type { PendingSatelliteView, SatelliteView } from '../shared/satellites';
 import type { ScreensaverImage, ScreensaverSettings, ScreensaverView } from '../shared/screensaver';
+import type { CoreUpdateView, ModuleStoreView } from '../shared/module-store';
 
 export type Role = 'admin' | 'kiosk';
 
@@ -120,6 +123,12 @@ const post = <T>(path: string, body: unknown, options: RequestOptions = {}) =>
 const slow = { timeoutMs: SLOW_REQUEST_TIMEOUT_MS };
 
 export const api = {
+  voiceUsage: () => request<VoiceUsageView>('/api/admin/voice-usage'),
+  setVoicePrice: (perMinute: number | null, currency: '$' | '€') =>
+    request<VoiceUsageView>('/api/admin/voice-usage/price', {
+      method: 'PATCH',
+      body: JSON.stringify({ perMinute, currency }),
+    }),
   agent: (profileId: string) =>
     request<AgentAdminView>('/api/admin/agents/' + encodeURIComponent(profileId)),
   saveAgent: (profileId: string, input: AgentConnectionInput) =>
@@ -296,7 +305,16 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ scale }),
     }),
-  screensaverImages: () => request<{ images: ScreensaverImage[] }>('/api/screensaver'),
+  googlePhotos: () => request<GooglePhotosView>('/api/admin/screensaver/google-photos'),
+  saveGooglePhotos: (settings: GooglePhotosSettings) =>
+    request<GooglePhotosView>('/api/admin/screensaver/google-photos', {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    }),
+  refreshGooglePhotos: () =>
+    post<GooglePhotosView>('/api/admin/screensaver/google-photos/refresh', {}),
+  screensaverImages: () =>
+    request<{ images: ScreensaverImage[]; fallback?: ScreensaverImage[] }>('/api/screensaver'),
   screensaver: () => request<ScreensaverView>('/api/admin/screensaver'),
   screensaverSettings: (settings: ScreensaverSettings) =>
     request<StateEvent>('/api/admin/screensaver', {
@@ -310,10 +328,6 @@ export const api = {
       // Le fichier brut : son type et son nom remplacent l’en-tête JSON par défaut.
       headers: { 'Content-Type': file.type, 'X-File-Name': encodeURIComponent(file.name) },
       timeoutMs: SLOW_REQUEST_TIMEOUT_MS,
-    }),
-  removeScreensaverImage: (id: string) =>
-    request<ScreensaverView>('/api/admin/screensaver/images/' + encodeURIComponent(id), {
-      method: 'DELETE',
     }),
   removeScreensaverImages: (ids: string[]) =>
     post<ScreensaverView>('/api/admin/screensaver/images/remove', { ids }),
@@ -380,7 +394,6 @@ export const api = {
     }),
   installImageGeneration: () =>
     post<ImageGenerationStatus>('/api/admin/image-generation/install', {}),
-  profiles: () => request<Profile[]>('/api/admin/profiles'),
   addProfile: (name: string, memoryEnabled = true) =>
     post<Profile>('/api/admin/profiles', { name, memoryEnabled }),
   renameProfile: (id: string, name: string) =>
@@ -498,6 +511,40 @@ export const api = {
     request<{ ok: boolean }>(`/api/admin/profiles/${encodeURIComponent(id)}/face`, {
       method: 'DELETE',
     }),
+  moduleStore: () => request<ModuleStoreView>('/api/admin/module-store'),
+  /** Le dépôt est lu et téléchargé avant d’être gardé : quelques secondes. */
+  addModuleRepository: (url: string, branch: string | null) =>
+    post<ModuleStoreView>('/api/admin/module-store/repositories', { url, branch }, slow),
+  removeModuleRepository: (id: string) =>
+    request<ModuleStoreView>('/api/admin/module-store/repositories/' + encodeURIComponent(id), {
+      method: 'DELETE',
+    }),
+  checkModuleRepository: (id: string) =>
+    post<ModuleStoreView>(
+      '/api/admin/module-store/repositories/' + encodeURIComponent(id) + '/check',
+      {},
+      slow,
+    ),
+  checkModuleRepositories: () =>
+    post<ModuleStoreView>('/api/admin/module-store/check', {}, { timeoutMs: 120_000 }),
+  updateModuleRepository: (id: string) =>
+    post<ModuleStoreView>(
+      '/api/admin/module-store/repositories/' + encodeURIComponent(id) + '/update',
+      {},
+    ),
+  installModule: (repository: string, module: string) =>
+    post<ModuleStoreView>('/api/admin/module-store/install', { repository, module }),
+  uninstallModule: (id: string, deleteSources = false) =>
+    post<ModuleStoreView>(
+      '/api/admin/module-store/modules/' + encodeURIComponent(id) + '/uninstall',
+      { deleteSources },
+    ),
+  coreUpdate: () => request<CoreUpdateView>('/api/admin/core-update'),
+  /** `git fetch` vers le dépôt de Cornelius : jusqu’à une minute et demie. */
+  checkCoreUpdate: () =>
+    post<CoreUpdateView>('/api/admin/core-update/check', {}, { timeoutMs: 100_000 }),
+  applyCoreUpdate: (commit: string) =>
+    post<CoreUpdateView>('/api/admin/core-update/apply', { commit }, { timeoutMs: 100_000 }),
   addons: () => request<AddonCatalog>('/api/admin/addons'),
   createAddonInstance: (input: AddonInstanceInput) =>
     post<AddonInstanceView>('/api/admin/addons/instances', input),

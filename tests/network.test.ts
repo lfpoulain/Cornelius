@@ -169,6 +169,30 @@ test('réseau local : un appareil de la maison ouvre Cornelius, une adresse publ
   assert.equal(rebinding.statusCode, 403);
 });
 
+test('réseau local : un chemin encodé ne contourne ni l’appairage ni la réserve de la machine', async (t) => {
+  const app = await fixture(t);
+  const host = '192.168.1.20:3443';
+  const remote = { remoteAddress: '192.168.1.30', headers: { host } };
+  // Sans session ni appareil autorisé, l’état du miroir est refusé.
+  assert.equal((await app.inject({ url: '/api/state', ...remote })).statusCode, 401);
+  // Le routeur décode les %xx : « /%61pi/state » est la même route, et reste refusée.
+  for (const url of ['/%61pi/state', '/%41pi/state', '/api/%73tate', '/%65vents?role=kiosk']) {
+    const response = await app.inject({ url, ...remote });
+    assert.notEqual(response.statusCode, 200, url);
+    assert.doesNotMatch(response.body, /"profiles"/u, url);
+  }
+  assert.equal((await app.inject({ url: '/%61pi/state', ...remote })).statusCode, 401);
+  for (const url of ['/%70erception', '/image-%67eneration'])
+    assert.equal((await app.inject({ url, ...remote })).statusCode, 403, url);
+  // Un encodage invalide est refusé avant tout contrôle.
+  assert.equal((await app.inject({ url: '/%zz', ...remote })).statusCode, 400);
+  // Sur la machine, rien ne change.
+  assert.equal(
+    (await app.inject({ url: '/api/state', headers: { host: 'localhost' } })).statusCode,
+    200,
+  );
+});
+
 test('réseau local fermé : seule la machine elle-même est servie', async (t) => {
   const app = await fixture(t, { lan: false });
   const lan = await app.inject({

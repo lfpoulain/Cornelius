@@ -1,6 +1,7 @@
 import {
   AddonCollectError,
   addonScope,
+  toolResult,
   type AddonArgumentValue,
   type AddonDefinition,
   type AddonDisplay,
@@ -605,34 +606,25 @@ export class AddonRuntime {
 
   toolResult(outcome: AddonReadOutcome): ToolResult {
     if (outcome.ok) {
-      return {
-        schemaVersion: 1,
-        status: outcome.empty ? 'empty' : outcome.stale ? 'stale' : 'succeeded',
-        result: {
-          addonId: outcome.instance.addonId,
-          instanceRef: outcome.instance.ref,
-          title: outcome.presentation.title,
-          value: outcome.presentation.primaryValue,
-          summary: outcome.presentation.summary,
-          data: outcome.snapshot.data,
+      return toolResult(
+        outcome.empty ? 'empty' : outcome.stale ? 'stale' : 'succeeded',
+        outcome.presentation.summary,
+        {
+          result: {
+            addonId: outcome.instance.addonId,
+            instanceRef: outcome.instance.ref,
+            title: outcome.presentation.title,
+            value: outcome.presentation.primaryValue,
+            summary: outcome.presentation.summary,
+            data: outcome.snapshot.data,
+            snapshotId: outcome.snapshot.snapshotId,
+            stale: outcome.stale,
+          },
           snapshotId: outcome.snapshot.snapshotId,
-          stale: outcome.stale,
         },
-        snapshotId: outcome.snapshot.snapshotId,
-        actionRunId: null,
-        summary: outcome.presentation.summary,
-        error: null,
-      };
+      );
     }
-    return {
-      schemaVersion: 1,
-      status: outcome.status,
-      result: null,
-      snapshotId: null,
-      actionRunId: null,
-      summary: outcome.summary,
-      error: outcome.error,
-    };
+    return toolResult(outcome.status, outcome.summary, { error: outcome.error });
   }
 
   private async ensureSnapshot(

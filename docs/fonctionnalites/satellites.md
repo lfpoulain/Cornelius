@@ -10,7 +10,7 @@ Un satellite est un petit boîtier avec un micro, un haut-parleur et un anneau l
 - **Une seule conversation à la fois** dans la maison : sur le miroir ou sur un satellite. Un satellite qui entend « Cornelius » pendant ce temps clignote en ambre.
 - Quand le miroir et un satellite entendent le même « Cornelius », l’appareil qui l’a le mieux entendu répond.
 - Pendant la conversation d’un satellite, le miroir reste au repos et affiche « Conversation en cours : » suivi du nom de la pièce.
-- La conversation se termine après un silence (réglage **Fin de parole** de **Quand il écoute**, 20 secondes par défaut).
+- La conversation se termine après un silence (réglage **Fin de parole** de **Quand il écoute**, 20 secondes par défaut, ou le délai propre au satellite réglé sur sa fiche). Le délai est pris à l’ouverture de la conversation : un changement fait pendant une conversation vaut pour la suivante.
 
 Matériel pris en charge : la carte **Waveshare ESP32-S3-AUDIO-Board**, avec le firmware **cornelius-satellite** (dépôt séparé, à compiler et flasher une fois avec ESP-IDF ; voir son README).
 
@@ -67,7 +67,7 @@ Chaque satellite a sa fiche dans **Administration → Satellites audio**, avec s
 
 ## Le volume à la voix
 
-Pendant une conversation sur un satellite, « parle plus fort », « moins fort » ou « mets le volume à 5 » règle son haut-parleur (outil `satellite__volume`, de 0 à 10, deux crans pour plus fort ou moins fort). Le réglage est enregistré comme depuis l’administration et envoyé aussitôt au satellite. Il n’existe pas sur le miroir.
+Pendant une conversation sur un satellite, « parle plus fort », « moins fort » ou « mets le volume à 5 » règle son haut-parleur (outil `satellite__volume`, de 0 à 10, deux crans pour plus fort ou moins fort). Le réglage est enregistré comme depuis l’administration, envoyé aussitôt au satellite et repris par sa fiche dans l’administration. Il n’existe pas sur le miroir. Le satellite joue ses sonneries (réveils, minuteurs, rappels) au même volume : à 0, elles sont muettes aussi, et Cornelius le rappelle quand on lui demande le volume 0.
 
 ## Le bouton BOOT
 
@@ -100,6 +100,7 @@ Le journal de Cornelius (rubrique **Journal**) note la connexion de chaque satel
 ## Voir aussi
 
 - [Le protocole des satellites](../developpement/satellites-protocole.md)
+- [Le satellite Android](satellite-android.md)
 - [Le mot d’appel](mot-d-appel.md)
 - [Ouverture et présence](ouverture-et-presence.md)
 - [Accès depuis le réseau local](../utilisation/reseau-local.md)

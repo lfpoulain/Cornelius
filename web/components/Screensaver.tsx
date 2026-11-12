@@ -86,7 +86,7 @@ export function Screensaver({
   const fallbackRef = useRef<HTMLDivElement>(null);
   const engine = useRef<{
     wake: (active: boolean) => void;
-    setImages: (images: ScreensaverImage[]) => void;
+    setImages: (images: ScreensaverImage[], fallback?: ScreensaverImage[]) => void;
     setInterval: (ms: number) => void;
     setTransition: (transition: ScreensaverTransition) => void;
     setDuration: (ms: number) => void;
@@ -113,6 +113,8 @@ export function Screensaver({
     let images: ScreensaverImage[] = [];
     let bag: ScreensaverImage[] = [];
     let stage: ScreensaverScene = 'off';
+    let localFallback: ScreensaverImage[] = [];
+    let galleryGeneration = 0;
     let wanted = false;
     let interval = intervalMs;
     let style = transition;
@@ -222,21 +224,26 @@ export function Screensaver({
       if (!frame) frame = requestAnimationFrame(tick);
     };
 
-    const pick = (): ScreensaverImage | null => {
-      if (images.length === 0) return null;
-      if (bag.length === 0) bag = shuffle(images).filter((image) => image.id !== current?.id);
-      return bag.shift() ?? images[0] ?? null;
-    };
     const load = async (slot: ScreensaverSlot): Promise<ScreensaverImage | null> => {
-      // Une image illisible est sautée ; au plus un tour complet de la liste.
-      for (let attempt = 0; attempt < Math.max(1, images.length); attempt++) {
-        const image = pick();
-        if (!image) return null;
+      const generation = galleryGeneration;
+      if (!bag.length) bag = shuffle(images);
+      const remaining = bag.filter((image) => image.id !== current?.id);
+      const queued = new Set(remaining.map((image) => image.id));
+      const candidates = [
+        ...remaining,
+        ...shuffle(images).filter((image) => image.id !== current?.id && !queued.has(image.id)),
+      ];
+      if (slot === 'current' && !candidates.length) candidates.push(...images);
+      const preferred = localFallback.length ? candidates.slice(0, 8) : candidates;
+      const alternatives = shuffle(localFallback).filter((image) => image.id !== current?.id);
+      for (const image of [...preferred, ...alternatives]) {
+        if (disposed || generation !== galleryGeneration) return null;
+        bag = bag.filter((entry) => entry.id !== image.id);
         try {
           if (renderer) {
             const bitmap = await loadBitmap(image);
             // L’image reste ouverte jusqu’à son envoi à la carte graphique ; le moteur la ferme.
-            if (disposed) {
+            if (disposed || generation !== galleryGeneration) {
               bitmap.close();
               return null;
             }
@@ -248,6 +255,7 @@ export function Screensaver({
               probe.onerror = () => reject(new Error(image.url));
               probe.src = image.url;
             });
+            if (disposed || generation !== galleryGeneration) return null;
             setFallback((shown) =>
               slot === 'current'
                 ? { current: image.url, next: null }
@@ -256,7 +264,7 @@ export function Screensaver({
           }
           return image;
         } catch {
-          images = images.filter((candidate) => candidate.id !== image.id);
+          // Une panne passagère ne retire pas la photo de la prochaine rotation.
         }
       }
       return null;
@@ -264,7 +272,8 @@ export function Screensaver({
     const schedule = () => {
       if (slideshow) clearTimeout(slideshow);
       slideshow = null;
-      if (stage !== 'on' || images.length < 2) return;
+      if (stage !== 'on' || !images.length) return;
+      if (images.length === 1 && images[0]?.id === current?.id) return;
       slideshow = setTimeout(() => void advance(), interval);
     };
     const advance = async () => {
@@ -301,7 +310,17 @@ export function Screensaver({
         if (loading) return;
         loading = true;
         const image = await load('current').finally(() => (loading = false));
-        if (!image || disposed || !wanted) return;
+        if (!image || disposed || !wanted) {
+          if (!image && !disposed && wanted && images.length && !slideshow)
+            slideshow = setTimeout(
+              () => {
+                slideshow = null;
+                if (wanted && stage === 'off') void enter();
+              },
+              Math.min(interval, 60000),
+            );
+          return;
+        }
         current = image;
         next = null;
         setCaption(image);
@@ -370,9 +389,15 @@ export function Screensaver({
         if (active && (stage === 'off' || stage === 'leaving')) void enter();
         else if (!active && (stage === 'entering' || stage === 'on')) leave();
       },
-      setImages(list) {
+      setImages(list, fallback = []) {
+        galleryGeneration++;
         images = list;
-        bag = bag.filter((image) => list.some((candidate) => candidate.id === image.id));
+        localFallback = fallback;
+        const byId = new Map(list.map((image) => [image.id, image]));
+        bag = bag.flatMap((image) => {
+          const updated = byId.get(image.id);
+          return updated ? [updated] : [];
+        });
         // L’image affichée a été retirée : passer à la suivante sans attendre.
         if (stage === 'on' && current && !list.some((image) => image.id === current!.id))
           void advance();
@@ -414,7 +439,7 @@ export function Screensaver({
     let cancelled = false;
     void api
       .screensaverImages()
-      .then(({ images }) => !cancelled && engine.current?.setImages(images))
+      .then(({ images, fallback }) => !cancelled && engine.current?.setImages(images, fallback))
       .catch(() => {});
     return () => {
       cancelled = true;

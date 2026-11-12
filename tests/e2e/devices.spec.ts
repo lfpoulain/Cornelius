@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { origin, screenshots } from './env';
+import { login, origin, screenshots } from './env';
 
 test.use({
   permissions: ['microphone'],
@@ -18,11 +18,7 @@ test('les périphériques audio sont autorisés puis libérés, et les choix per
       return stream;
     };
   });
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Micro et haut-parleurs' }).click();
   await expect(
     page.getByText('Ce réglage s’applique au miroir ouvert dans ce navigateur.', { exact: true }),
@@ -61,11 +57,7 @@ test('les périphériques audio sont autorisés puis libérés, et les choix per
 test('l’exigence de la reconnaissance s’enregistre dès le choix et survit au rechargement', async ({
   page,
 }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Caméra et reconnaissance' }).click();
   const group = page.getByRole('group', { name: 'Exigence de la reconnaissance' });
   const flexible = group.getByRole('radio', { name: 'Souple', exact: true });
@@ -94,11 +86,7 @@ test('l’exigence de la reconnaissance s’enregistre dès le choix et survit a
 test('la détection du regard s’enregistre dès le choix et survit au rechargement', async ({
   page,
 }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Caméra et reconnaissance' }).click();
   const group = page.getByRole('group', { name: 'Exigence du regard' });
   try {

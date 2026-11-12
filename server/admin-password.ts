@@ -14,7 +14,11 @@ function digest(password: string, salt: Buffer): Buffer {
   return scryptSync(password, salt, 32, { N: 16384, r: 8, p: 1 });
 }
 
-function equalText(input: string, expected: string): boolean {
+/**
+ * Compare deux secrets (mot de passe, jeton) sans que le temps de réponse renseigne sur la
+ * valeur attendue : les empreintes ont toujours la même longueur.
+ */
+export function equalSecret(input: string, expected: string): boolean {
   return timingSafeEqual(
     createHash('sha256').update(input).digest(),
     createHash('sha256').update(expected).digest(),
@@ -42,7 +46,7 @@ export class AdminPassword {
   }
   verify(input: string): boolean {
     const stored = this.stored();
-    if (!stored) return equalText(input, this.envPassword);
+    if (!stored) return equalSecret(input, this.envPassword);
     const [scheme, salt, hash] = stored.split('$');
     if (scheme !== 'scrypt' || !salt || !hash) return false;
     const expected = Buffer.from(hash, 'base64');

@@ -28,6 +28,15 @@ export interface AppConfig {
   primApiKey?: string;
   /** Dépôt des modules externes (CORNELIUS_MODULES_DIR) ; absent, aucun n'est chargé. */
   modulesDir?: string;
+  /**
+   * Modules installés depuis l'administration (CORNELIUS_MANAGED_MODULES_DIR, data/modules par
+   * défaut) : dépôts téléchargés et liste des modules choisis. Absent, le catalogue est fermé.
+   */
+  managedModulesDir?: string;
+  /** Mises à jour de Cornelius faites par une autre installation (application Home Assistant). */
+  updatesManagedExternally?: boolean;
+  /** Recherche quotidienne des mises à jour, désactivée par défaut (CORNELIUS_UPDATE_CHECK=1). */
+  autoUpdateCheck?: boolean;
   /** Fuseau horaire du foyer donné aux modules (CORNELIUS_TIMEZONE, Europe/Paris par défaut). */
   timeZone?: string;
   /** Accès depuis les autres appareils du réseau local (HTTPS), en plus de la machine. */
@@ -126,6 +135,11 @@ export function loadConfig(): AppConfig & { port: number } {
     meteoConceptToken: process.env.CORNELIUS_METEO_CONCEPT_TOKEN || undefined,
     primApiKey: process.env.CORNELIUS_PRIM_API_KEY || undefined,
     modulesDir: externalAddonsRoot(),
+    managedModulesDir: resolve(process.env.CORNELIUS_MANAGED_MODULES_DIR?.trim() || 'data/modules'),
+    updatesManagedExternally: explicitlySupervised(),
+    autoUpdateCheck: ['1', 'true', 'oui', 'yes'].includes(
+      (process.env.CORNELIUS_UPDATE_CHECK ?? '0').trim().toLowerCase(),
+    ),
     timeZone: process.env.CORNELIUS_TIMEZONE?.trim() || undefined,
     machine: detectMachine(),
     supervised: Boolean(process.env.INVOCATION_ID) || explicitlySupervised(),

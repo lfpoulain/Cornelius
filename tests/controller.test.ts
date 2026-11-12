@@ -1707,6 +1707,43 @@ test('fermeture après la réponse en mode voix : le silence ferme toujours sans
   assert.equal(f.state().session.reason, 'Fin de conversation après silence.');
 });
 
+test('mesure de clôture : acquittée ou libérée par le chien de garde, prête ou non', (t) => {
+  const closures = (f: ReturnType<typeof fixture>) =>
+    f.measures.filter((entry) => entry.name === 'cloture').map((entry) => entry.details);
+  // Clôture acquittée d’une conversation prête.
+  const acked = fixture(t);
+  acked.engage();
+  acked.ready();
+  acked.advance(30_000);
+  acked.controller.close('Fin de test.');
+  acked.acknowledgeClose();
+  assert.deepEqual(
+    closures(acked).map(({ ready, seconds }) => ({ ready, seconds })),
+    [{ ready: true, seconds: 30 }],
+  );
+  // Accusé perdu : le chien de garde libère la session et la compte quand même, une fois.
+  const lost = fixture(t);
+  lost.engage();
+  const scope = lost.ready();
+  lost.controller.close('Fin de test.');
+  lost.advance(5000);
+  assert.equal(lost.state().session.phase, 'idle');
+  lost.controller.sessionClosed(scope.interactionId!);
+  assert.deepEqual(
+    closures(lost).map(({ ready }) => ready),
+    [true],
+  );
+  // Création refusée : jamais prête, signalée comme telle.
+  const refused = fixture(t);
+  refused.engage();
+  refused.controller.close('Création refusée.');
+  refused.acknowledgeClose();
+  assert.deepEqual(
+    closures(refused).map(({ ready }) => ready),
+    [false],
+  );
+});
+
 function voiceFixture(t: TestContext, recognition = true) {
   const f = fixture(t);
   f.controller.setSessionMode(4);
@@ -1864,4 +1901,20 @@ test('fin de parole : un seul délai, toujours actif quand la caméra est étein
   assert.equal(f.state().session.phase, 'ready');
   f.advance(1);
   assert.equal(f.state().session.phase, 'closing');
+});
+
+test('un diagnostic d’admission disparaît avec sa cause', (t) => {
+  const f = fixture(t);
+  // Miroir fermé : la personne qui regarde n’ouvre rien, et le diagnostic dit pourquoi.
+  f.observe();
+  f.advance(400, { browser: false });
+  assert.equal(f.transport.opened.length, 0);
+  assert.match(f.state().diagnostic ?? '', /Ouvrez le miroir/);
+  // Elle repart, puis le miroir est ouvert : plus rien à signaler, même sans conversation.
+  f.observe({ presence: false, engaged: false, people: [] });
+  f.advance(10_000, { browser: false });
+  assert.match(f.state().diagnostic ?? '', /Ouvrez le miroir/);
+  f.advance(1000);
+  assert.equal(f.transport.opened.length, 0);
+  assert.equal(f.state().diagnostic, null);
 });

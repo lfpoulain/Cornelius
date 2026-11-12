@@ -26,7 +26,7 @@ La disposition exacte dépend de l’orientation de l’écran (voir [Portrait e
 
 ### L’orbe
 
-L’orbe montre l’état de Cornelius d’un coup d’œil. Sa taille se règle dans l’administration, rubrique « Personnaliser Cornelius » (« Taille de l’orbe »).
+L’orbe montre l’état de Cornelius d’un coup d’œil. Sa taille se règle dans l’administration, rubrique « Orbe et écran de veille » (« Taille de l’orbe »).
 
 | Ce que fait l’orbe | Ce que cela veut dire |
 |---|---|
@@ -109,7 +109,9 @@ Les prénoms des personnes reconnues sont donc visibles par tous ceux qui voient
 
 ### L’écran de veille
 
-Plutôt que de rester noir, le miroir peut afficher des peintures et vos photos quand personne n’est devant lui, comme un cadre d’art. Il est désactivé par défaut ; il s’active et se remplit dans l’administration, rubrique « Écran de veille ».
+La source peut aussi être un [album Google Photos partagé](../fonctionnalites/google-photos.md), choisi dans l’administration. Les photos sont chargées depuis Google et le contenu de l’album est relu périodiquement. Cette connexion expérimentale demande Internet et ne prend pas en charge la pagination des grands albums.
+
+Plutôt que de rester noir, le miroir peut afficher des peintures et vos photos quand personne n’est devant lui, comme un cadre d’art. Il est désactivé par défaut ; il s’active et se remplit dans l’administration, rubrique « Orbe et écran de veille ».
 
 - **Quand.** Les images arrivent après un délai sans personne devant le miroir (30 s par défaut), sans conversation ni carte affichée. Elles changent à intervalle régulier (toutes les 5 minutes par défaut), par un long fondu, dans un ordre mélangé.
 - **Ce qui fait revenir l’orbe.** Au choix : « Au moindre mouvement » (par défaut), dès qu’une personne passe, ou « Selon le réveil de Cornelius ». Dans ce second cas, l’écran de veille suit ce qui ouvre la conversation (rubrique « Quand il écoute ») : une personne qui se présente, une personne qui regarde le miroir, ou le mot « Cornelius ». Quelqu’un qui passe sans regarder, ou sans appeler, laisse l’image en place. Si l’ouverture est réservée aux membres du foyer, seule une personne reconnue réveille l’orbe. Une conversation qui s’ouvre le fait toujours revenir.

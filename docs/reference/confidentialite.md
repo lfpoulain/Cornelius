@@ -26,13 +26,13 @@ La caméra est lue par la perception, mais le micro est lu par le navigateur qui
 - **Sans mot d’appel ni micro gardé prêt.** Le micro préparé est relâché après 15 secondes si aucune conversation ne s’ouvre.
 - **Pendant une conversation.** Le son part chez le fournisseur vocal, le temps de la conversation seulement. Avec OpenAI, le navigateur l’envoie directement ; avec Mistral, il passe par le serveur Cornelius, qui le transmet. Il passe aussi par la détection locale de la parole.
 
-**Les satellites audio.** Un satellite envoie le son de son micro à l’ordinateur, par le réseau local et chiffré (WebSocket sécurisé, port `3443`), seulement quand Cornelius écoute « Cornelius » ou pendant sa propre conversation. L’ordinateur y cherche le mot, puis transmet la conversation au fournisseur vocal comme pour le miroir. Une conversation de satellite rattaché à une personne nourrit la mémoire de cette personne ; sinon, elle ne laisse aucun souvenir. Le bouton du satellite coupe son micro. Voir [Les satellites audio](../fonctionnalites/satellites.md).
+**Les satellites audio.** Un satellite envoie le son de son micro à l’ordinateur, par le réseau local et chiffré (WebSocket sécurisé, port `3443`), seulement quand Cornelius écoute « Cornelius » ou pendant sa propre conversation. L’ordinateur y cherche le mot, puis transmet la conversation au fournisseur vocal comme pour le miroir. Une conversation de satellite rattaché à une personne nourrit la mémoire de cette personne ; sinon, elle ne laisse aucun souvenir. En veille, un appui bref sur le bouton du satellite coupe son micro (il n’envoie plus aucun son, même après un redémarrage) ; pendant une conversation, il la ferme. Voir [Les satellites audio](../fonctionnalites/satellites.md).
 
 Pour couper tout envoi vers OpenAI et Mistral, utilisez **Bloquer les services IA** (voir plus bas).
 
 ## Ce qui part chez le fournisseur vocal, et quand
 
-Le fournisseur vocal est OpenAI par défaut, ou Mistral s’il est choisi dans **Mise en route → Voix de Cornelius**. Un seul des deux reçoit une conversation donnée. Voir [Le fournisseur vocal](../fonctionnalites/fournisseur-vocal.md).
+Le fournisseur vocal est OpenAI par défaut, ou Mistral s’il est choisi dans **Voix et modèles → Voix de Cornelius**. Un seul des deux reçoit une conversation donnée. Voir [Le fournisseur vocal](../fonctionnalites/fournisseur-vocal.md).
 
 **Pendant une conversation**, le fournisseur reçoit :
 
@@ -57,7 +57,8 @@ Les conversations sont ouvertes avec l’option `store: false` d’OpenAI, qui d
 - **Les agents** (Hermes) reçoivent la demande confiée par la personne reconnue, à l’adresse de votre agent.
 - **Les e-mails** (**Modules → E-mail**) partent par le serveur de messagerie réglé (Gmail, iCloud, votre fournisseur…), vers les seuls destinataires de la liste, avec l’image demandée en pièce jointe ou le court message dicté. Une photo de la caméra n’est jamais envoyée. Voir [L’envoi par e-mail](../fonctionnalites/envoi-par-e-mail.md).
 - **Les modèles** sont téléchargés depuis leurs sites (GitHub, Hugging Face) lors de leur installation.
-- **Les peintures de l’écran de veille** sont téléchargées depuis Wikimedia Commons, seulement quand vous cliquez sur « Télécharger les peintures ». Vos photos ne quittent jamais l’ordinateur.
+- **Les mises à jour et le catalogue de modules.** Pour savoir s’il existe une version plus récente, Cornelius interroge son propre dépôt (`git fetch` vers `origin`, GitHub pour une installation officielle) et chaque dépôt de modules listé dans **Installer des modules** (le dépôt officiel est sur GitHub). Par défaut, il ne le fait que lorsque vous cliquez sur un bouton de l’administration (**Rechercher une mise à jour**, **Vérifier ce dépôt**…). Avec `CORNELIUS_UPDATE_CHECK=1`, il le fait aussi seul une fois par jour et à la première ouverture du catalogue (voir [Configuration](configuration.md)). Seules partent des requêtes de lecture de ces dépôts : aucun réglage, aucune donnée du foyer. Le service qui héberge le dépôt voit, comme pour toute visite, l’adresse IP de la maison et l’heure. Installer un module ou une mise à jour télécharge ensuite son code depuis ce même dépôt.
+- **Les peintures de l’écran de veille** sont téléchargées depuis Wikimedia Commons, seulement quand vous cliquez sur « Télécharger les peintures ». Les photos importées dans Cornelius ne quittent jamais l’ordinateur. Avec la source facultative [Google Photos](../fonctionnalites/google-photos.md), le serveur contacte Google pour lire l’album partagé et relayer les photos au miroir, sans import sur disque. Toute personne possédant le lien peut consulter cet album. Le lien reste dans la base et ses sauvegardes ; il n’est transmis ni au miroir ni aux fournisseurs IA. La liste distante reste en mémoire jusqu’à l’actualisation ou l’arrêt du serveur.
 
 ## Les données enregistrées
 
@@ -69,11 +70,13 @@ Tout est sur l’ordinateur du miroir, dans le dossier `data/` (voir [Configurat
 | Jeton Home Assistant et jeton de connexion de chaque agent | la base, **sans chiffrement** |
 | Réveils, minuteurs et rappels, avec leur texte | la base ; supprimer un profil supprime ses échéances. Le texte d’un rappel personnel n’est affiché et dit qu’à son propriétaire reconnu. |
 | Réglages d’envoi d’e-mail et adresses des destinataires | la base ; jamais diffusées au miroir ni données à la conversation. Supprimer un profil supprime son adresse. |
+| Temps de conversation : par jour du foyer et par fournisseur, durée et nombre de conversations, sans contenu ni personne ; prix par minute saisi | la base ; 70 jours gardés |
 | Copies de sécurité de la base | à côté de la base, `cornelius.sqlite.backup-v…sqlite` |
 | Journal technique | `data/logs/cornelius.log` |
 | Trois dernières images créées | `data/generated-images/`, vidé à chaque démarrage |
 | Images de l’écran de veille (vos photos et les peintures) | `data/screensaver/` ; leur titre dans la base |
-| Mot de passe de l’administration | le fichier `.env` au départ ; s’il est changé dans **Mise en route**, une empreinte (scrypt) dans la base, jamais le mot de passe lui-même |
+| Source Google Photos de l’écran de veille | lien partagé et réglages dans la base et ses sauvegardes ; liste et images relayées uniquement en mémoire |
+| Mot de passe de l’administration | le fichier `.env` au départ ; s’il est changé dans **Clés et accès**, une empreinte (scrypt) dans la base, jamais le mot de passe lui-même |
 | Secrets des commandes (`CORNELIUS_SECRET_*`) | le fichier `.env`, jamais dans la base |
 | Clés OpenAI et Mistral, jetons Météo et Transports, mot de passe SMTP | la base locale s’ils sont saisis dans l’administration (ils y passent avant ceux de `.env`), sinon le fichier `.env`. L’administration n’en montre que les quatre derniers caractères, et le journal les masque. |
 
@@ -121,13 +124,13 @@ Il ne contient donc ni la parole, ni les images, ni le texte des conversations. 
 
 ## L’administration
 
-L’administration demande le mot de passe administrateur (celui de `.env`, ou celui choisi dans **Mise en route**). La connexion reste ouverte une heure après la dernière action, puis il faut se reconnecter. Un redémarrage du serveur ferme toutes les connexions.
+L’administration demande le mot de passe administrateur (celui de `.env`, ou celui choisi dans **Clés et accès**). La connexion reste ouverte une heure après la dernière action, puis il faut se reconnecter. Un redémarrage du serveur ferme toutes les connexions.
 
 Le miroir, lui, ne demande aucun mot de passe. Le miroir et l’administration répondent à l’ordinateur lui-même et, en HTTPS, aux appareils du réseau local (désactivable avec `CORNELIUS_LAN=0`), jamais à Internet. Un autre appareil n’ouvre le miroir qu’après avoir été autorisé une fois avec le mot de passe administrateur.
 
 ## Les dépenses
 
-Cornelius ne compte pas ce que coûtent les conversations et ne les bloque pas pour ce motif. Fixez vos limites de dépense dans votre compte OpenAI ou Mistral. Avec Mistral, facturé à la minute, une conversation se ferme après 20 secondes sans activité et dure 15 minutes au plus. Les modes **Rapide** et **Ultra rapide** de **Quand il écoute → Réglages avancés → Délégation : recherches et actions** coûtent plus cher que **Normal**.
+Cornelius ne bloque jamais une conversation pour son coût. La carte **Voix et modèles → Temps de conversation** compte la durée des conversations par jour et par fournisseur ; elle n’estime un coût que pour le temps passé avec Mistral, facturé à la minute, et seulement si vous saisissez son prix. OpenAI facture aux jetons (voix, délégation, recherche web, images) : aucun coût n’est estimé pour lui, consultez sa console. Fixez vos limites de dépense dans votre compte OpenAI ou Mistral. Avec Mistral, facturé à la minute, une conversation se ferme après 20 secondes sans activité et dure 15 minutes au plus. Les modes **Rapide** et **Ultra rapide** de **Voix et modèles → Délégation : recherches et actions** coûtent plus cher que **Normal**.
 
 Le bouton **Bloquer les services IA**, dans le panneau **Conversation** de la rubrique **Quand il écoute** (le seul où ce panneau est complet), ferme la conversation en cours et interdit toute nouvelle connexion à OpenAI et à Mistral, extraction de souvenirs et images OpenAI comprises. Le blocage reste après un redémarrage. **Autoriser les services IA** le lève. La caméra, la reconnaissance et la vision locale continuent de fonctionner.
 

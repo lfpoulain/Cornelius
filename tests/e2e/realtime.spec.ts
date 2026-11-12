@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { StateEvent } from '../../shared/types';
-import { origin } from './env';
+import { login, origin } from './env';
 
 test('le repos reste silencieux et les changements sont poussés sans polling', async ({
   page,
@@ -29,11 +29,7 @@ test('le repos reste silencieux et les changements sont poussés sans polling', 
       }),
     );
   }
-  await admin.goto('/admin');
-  await admin
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await admin.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(admin, '/admin');
   await page.goto('/');
   await expect(admin.getByText('Serveur connecté', { exact: true })).toBeVisible();
   await expect(page.locator('.orb')).toHaveAttribute('data-presence', 'sleeping');
@@ -79,11 +75,7 @@ test('un état manqué déclenche une seule resynchronisation puis le flux repre
       route.send(message);
     });
   });
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Le foyer' }).click();
   dropNext = true;
   // Use HTTP directly so the UI can only discover this change through the event stream.

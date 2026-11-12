@@ -1,25 +1,18 @@
 import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
-import type {
-  DevicesStatus,
-  ImageGenerationModel,
-  ModelDownload,
-  StateEvent,
+import {
+  IMAGE_GENERATION_MODELS,
+  type DevicesStatus,
+  type ImageGenerationModel,
+  type ModelDownload,
+  type StateEvent,
 } from '../../shared/types';
-import { origin, screenshots } from './env';
+import { login, origin, screenshots } from './env';
 
 // PNG 1 × 1 : le miroir n’a besoin que d’un fichier image valide.
 const pixel = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
   'base64',
 );
-
-async function login(page: Page) {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
-}
 
 const download = (state: ModelDownload['state'], extra: Partial<ModelDownload> = {}) => ({
   state,
@@ -121,7 +114,11 @@ test('image : choisir ne télécharge rien, installer se confirme, progresse, é
   const fake: Parameters<typeof fakeImageGeneration>[1] = {
     model: 'flux2-klein-4b',
     enabled: false,
-    installations: {},
+    // Tous les modèles absents, quoi que contienne ce poste : un modèle déjà installé dans
+    // models/ ne doit pas changer le parcours.
+    installations: Object.fromEntries(
+      IMAGE_GENERATION_MODELS.map((model) => [model, download('missing')]),
+    ),
   };
   const publish = await fakeImageGeneration(page, fake);
   await page.route('**/api/admin/image-generation', async (route) => {

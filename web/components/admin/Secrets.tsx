@@ -1,4 +1,4 @@
-import { useCallback, useId, useState, type FormEvent } from 'react';
+import { useCallback, useId, useRef, useState, type FormEvent } from 'react';
 import { Boxes, ExternalLink, KeyRound, Sparkles, type LucideIcon } from 'lucide-react';
 import type {
   CustomProviderSettings,
@@ -51,6 +51,8 @@ export function SecretField({
   const [editing, setEditing] = useState(!secret.configured);
   const [value, setValue] = useState('');
   const [confirming, setConfirming] = useState(false);
+  // « Effacer » disparaît pendant la confirmation : la ref lui rend le focus après « Annuler ».
+  const eraseButton = useRef<HTMLButtonElement>(null);
   const id = `secret-${secret.env}`;
   const save = async (event: FormEvent) => {
     event.preventDefault();
@@ -74,7 +76,7 @@ export function SecretField({
             </Button>
           )}
           {secret.source === 'admin' && !confirming && (
-            <Button variant="ghost" size="sm" onClick={() => setConfirming(true)}>
+            <Button ref={eraseButton} variant="ghost" size="sm" onClick={() => setConfirming(true)}>
               Effacer
             </Button>
           )}
@@ -84,6 +86,7 @@ export function SecretField({
         <ConfirmAction
           message={`Effacer la valeur enregistrée ici pour « ${secret.label} » ? Celle du fichier .env, s’il y en a une, reprendra sa place.`}
           confirmLabel="Effacer"
+          returnFocusTo={eraseButton}
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
             setConfirming(false);
@@ -253,6 +256,7 @@ function CustomProviderFields({
   const chooseProvider = (memoryProvider: MemoryProvider) =>
     setForm({ ...form, memoryProvider, memoryFallback: defaultMemoryFallback(memoryProvider) });
   const models = view.models;
+  const custom = form.memoryProvider === 'custom';
   return (
     <section
       className="min-w-0 space-y-4 rounded-xl border bg-muted/20 p-4"
@@ -260,98 +264,116 @@ function CustomProviderFields({
     >
       <div>
         <h3 id="custom-provider-settings" className="text-sm font-semibold">
-          Mémoire personnalisée
+          Extraction des souvenirs
         </h3>
         <p className="text-xs text-muted-foreground">
-          Extraction de la mémoire via une API compatible OpenAI. La clé se renseigne ci-dessus.
+          Après une conversation, un modèle la relit pour en tirer les souvenirs de la personne. Par
+          défaut, c’est OpenAI. Vous pouvez la confier à Mistral, ou à un serveur de la maison
+          (Ollama, LM Studio…) pour que rien ne sorte de chez vous.
         </p>
       </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <label className="block min-w-0 space-y-1 text-sm">
-          <span>Nom affiché</span>
-          <Input value={form.name} onChange={(event) => field('name', event.target.value)} />
-        </label>
-        <label className="block min-w-0 space-y-1 text-sm">
-          <span>URL de base</span>
-          <Input
-            type="url"
-            placeholder="http://serveur:port/v1"
-            value={form.baseUrl}
-            onChange={(event) => field('baseUrl', event.target.value)}
-          />
-        </label>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!keyConfigured || !form.baseUrl}
-          onClick={() =>
-            void run('Modèles compatibles détectés.', async () => {
-              const saved = await api.saveCustomProvider(form);
-              setView(saved);
-              const discovered = await api.discoverCustomProviderModels();
-              setView(discovered);
-              setForm(discovered);
-            })
-          }
+      <div className="block min-w-0 max-w-md space-y-1 text-sm">
+        <label htmlFor="custom-memoryProvider">Fournisseur mémoire</label>
+        <NativeSelect
+          id="custom-memoryProvider"
+          value={form.memoryProvider}
+          onChange={(event) => chooseProvider(event.target.value as MemoryProvider)}
         >
-          Détecter les modèles
-        </Button>
-        <span className="self-center text-xs text-muted-foreground">
-          {models.length ? `${models.length} modèle(s) détecté(s)` : 'Aucun modèle détecté'}
-        </span>
+          <NativeSelectOption value="openai">OpenAI (par défaut)</NativeSelectOption>
+          <NativeSelectOption value="mistral">Mistral</NativeSelectOption>
+          <NativeSelectOption value="custom">
+            Mon serveur (API compatible OpenAI)
+          </NativeSelectOption>
+        </NativeSelect>
+        <p className="text-xs text-muted-foreground">
+          {custom
+            ? 'Indiquez ci-dessous l’adresse de votre serveur et le modèle à utiliser.'
+            : form.memoryProvider === 'mistral'
+              ? 'Avec la clé Mistral ci-dessus. Rien d’autre à régler.'
+              : 'Avec la clé OpenAI ci-dessus. Rien d’autre à régler.'}
+        </p>
       </div>
-      <datalist id="custom-provider-models">
-        {models.map((model) => (
-          <option key={model} value={model} />
-        ))}
-      </datalist>
-      <label className="block min-w-0 space-y-1 text-sm">
-        <span>Modèle mémoire</span>
-        <Input
-          list="custom-provider-models"
-          value={form.memoryModel}
-          onChange={(event) => field('memoryModel', event.target.value)}
-        />
-      </label>
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="block min-w-0 space-y-1 text-sm">
-          <label htmlFor="custom-memoryProvider">Fournisseur mémoire</label>
-          <NativeSelect
-            id="custom-memoryProvider"
-            value={form.memoryProvider}
-            onChange={(event) => chooseProvider(event.target.value as MemoryProvider)}
-          >
-            <NativeSelectOption value="openai">OpenAI</NativeSelectOption>
-            <NativeSelectOption value="mistral">Mistral</NativeSelectOption>
-            <NativeSelectOption value="custom">Personnalisé</NativeSelectOption>
-          </NativeSelect>
-        </div>
-        <div className="block min-w-0 space-y-1 text-sm">
-          <label htmlFor="custom-memoryFallback">Secours mémoire</label>
-          <NativeSelect
-            id="custom-memoryFallback"
-            value={form.memoryFallback}
-            disabled={form.memoryProvider !== 'custom'}
-            onChange={(event) => field('memoryFallback', event.target.value)}
-          >
-            <NativeSelectOption value="none">Aucun</NativeSelectOption>
-            <NativeSelectOption value="openai">OpenAI</NativeSelectOption>
-            <NativeSelectOption value="mistral">Mistral</NativeSelectOption>
-          </NativeSelect>
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        {form.memoryFallback === 'none'
-          ? 'Sans secours, une extraction qui échoue n’est envoyée à aucun autre service : elle reste marquée en échec.'
-          : 'Si le fournisseur personnalisé est indisponible, les données de cette extraction sont envoyées au fournisseur de secours choisi, si sa clé est renseignée.'}
-      </p>
+      {custom && (
+        <>
+          <div className="min-w-0 space-y-1 text-sm">
+            <label htmlFor="custom-baseUrl">URL de base</label>
+            <Input
+              id="custom-baseUrl"
+              type="url"
+              placeholder="http://serveur:port/v1"
+              aria-describedby="custom-baseUrl-help"
+              value={form.baseUrl}
+              onChange={(event) => field('baseUrl', event.target.value)}
+            />
+            <p id="custom-baseUrl-help" className="text-xs text-muted-foreground">
+              L’adresse de votre serveur, avec /v1. Sa clé se saisit plus haut, dans « Clé mémoire
+              personnalisée ».
+            </p>
+          </div>
+          <datalist id="custom-provider-models">
+            {models.map((model) => (
+              <option key={model} value={model} />
+            ))}
+          </datalist>
+          <div className="space-y-1 text-sm">
+            <label htmlFor="custom-memoryModel">Modèle mémoire</label>
+            <div className="flex flex-wrap gap-2">
+              <Input
+                id="custom-memoryModel"
+                className="min-w-0 flex-[1_1_14rem]"
+                list="custom-provider-models"
+                value={form.memoryModel}
+                onChange={(event) => field('memoryModel', event.target.value)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!keyConfigured || !form.baseUrl}
+                onClick={() =>
+                  void run('Modèles compatibles détectés.', async () => {
+                    const saved = await api.saveCustomProvider(form);
+                    setView(saved);
+                    const discovered = await api.discoverCustomProviderModels();
+                    setView(discovered);
+                    setForm(discovered);
+                  })
+                }
+              >
+                Détecter les modèles
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {models.length
+                ? `${models.length} modèle(s) détecté(s) : choisissez-en un dans la liste.`
+                : !keyConfigured || !form.baseUrl
+                  ? 'Saisissez son nom, ou renseignez la clé et l’adresse pour le détecter.'
+                  : 'Saisissez son nom, ou détectez ceux que propose le serveur.'}
+            </p>
+          </div>
+          <div className="block min-w-0 max-w-md space-y-1 text-sm">
+            <label htmlFor="custom-memoryFallback">Secours mémoire</label>
+            <NativeSelect
+              id="custom-memoryFallback"
+              value={form.memoryFallback}
+              onChange={(event) => field('memoryFallback', event.target.value)}
+            >
+              <NativeSelectOption value="none">Aucun</NativeSelectOption>
+              <NativeSelectOption value="openai">OpenAI</NativeSelectOption>
+              <NativeSelectOption value="mistral">Mistral</NativeSelectOption>
+            </NativeSelect>
+            <p className="text-xs text-muted-foreground">
+              {form.memoryFallback === 'none'
+                ? 'Sans secours, une extraction qui échoue n’est envoyée à aucun autre service : elle reste marquée en échec.'
+                : 'Si votre serveur est indisponible, les données de cette extraction sont envoyées au fournisseur de secours choisi, si sa clé est renseignée.'}
+            </p>
+          </div>
+        </>
+      )}
       <Button
         type="button"
         className="h-auto whitespace-normal"
         onClick={() =>
-          void run('Fournisseur personnalisé enregistré.', async () => {
+          void run('Fournisseur mémoire enregistré.', async () => {
             const saved = await api.saveCustomProvider(form);
             setView(saved);
             setForm(saved);

@@ -65,7 +65,19 @@ export function Logs() {
           { signal: abort.signal },
         );
         if (!abort.signal.aborted) {
-          lastSnapshot = { ...result, at: Date.now() };
+          // Rien de nouveau (même longueur, même dernière entrée) : l’ancien tableau est gardé,
+          // sinon chaque lecture refiltre et redessine jusqu’à mille lignes.
+          const previous = lastSnapshot?.entries;
+          const unchanged =
+            previous !== undefined &&
+            previous.length === result.entries.length &&
+            previous.at(-1)?.id === result.entries.at(-1)?.id &&
+            previous[0]?.id === result.entries[0]?.id;
+          lastSnapshot = {
+            ...result,
+            entries: unchanged ? previous : result.entries,
+            at: Date.now(),
+          };
           setSnapshot(lastSnapshot);
           setError('');
         }

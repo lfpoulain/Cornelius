@@ -34,6 +34,13 @@ def same_capture(a, b):
     return all(a[key] == b[key] for key in ("width", "height", "fps"))
 
 
+# Reprise : après une seconde de lectures ratées (10 images), puis toutes les 2, 4, 8… 15 s.
+RECOVER_AFTER_FAILURES = 10
+RECOVER_FIRST_DELAY = 2
+RECOVER_MAX_DELAY = 15
+CAMERA_LOST = "Caméra déconnectée : nouvelle tentative en cours. Vérifiez son câble."
+
+
 class Camera:
     def __init__(self, index=0, enabled=True):
         self.backend = cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_V4L2
@@ -50,6 +57,12 @@ class Camera:
         self.mode = dict(DEFAULT_MODE)
         # Ce que la caméra a réellement accepté (elle peut arrondir ou refuser).
         self.actual = None
+        # Reprise après une coupure (câble débranché, mise en veille) : lectures ratées de
+        # suite, prochaine tentative de réouverture, et statut à renvoyer au serveur.
+        self.failures = 0
+        self.attempts = 0
+        self.retry_at = 0
+        self.status_changed = False
         if enabled:
             self.enable()
 
@@ -79,6 +92,7 @@ class Camera:
             self.latest_wall = 0
             self.selected_id = None
             self.error = None
+            self.failures = self.attempts = self.retry_at = 0
             self.boot = str(uuid.uuid4())
             return self.status()
 
@@ -172,12 +186,59 @@ class Camera:
     def read(self):
         with self.lock:
             ok, frame = self.capture.read() if self.capture else (False, None)
-            frame = self.oriented(frame) if ok else frame
+            if ok:
+                self.failures = self.attempts = self.retry_at = 0
+            elif self.selected_id is not None:
+                ok, frame = self._recover()
+            frame = self.oriented(frame) if ok and frame is not None else frame
             captured = int(time.time() * 1000)
             self.latest = frame if ok else None
             self.latest_at = time.monotonic() if ok else 0
             self.latest_wall = captured if ok else 0
             return ok, frame, captured, self.boot
+
+    def _recover(self):
+        """Caméra choisie mais muette : la rouvrir, de plus en plus rarement ; le verrou est tenu.
+
+        Sans cela, une webcam débranchée une seconde ou une mise en veille laissait la présence
+        indisponible jusqu’au redémarrage de la perception, sans rien dire à l’administration.
+        """
+        self.failures += 1
+        now = time.monotonic()
+        if self.failures < RECOVER_AFTER_FAILURES or now < self.retry_at:
+            return False, None
+        self.retry_at = now + min(RECOVER_MAX_DELAY, RECOVER_FIRST_DELAY * 2 ** self.attempts)
+        self.attempts += 1
+        if self.capture:
+            self.capture.release()
+            self.capture = None
+        try:
+            # L’appareil rebranché peut avoir changé de numéro.
+            self.refresh()
+        except Exception:
+            pass
+        target = self.devices.get(self.selected_id)
+        capture, frame = self._open(target) if target else (None, None)
+        if capture is None:
+            if self.error != CAMERA_LOST:
+                self.error = CAMERA_LOST
+                self.status_changed = True
+            return False, None
+        self.capture = capture
+        self.failures = self.attempts = self.retry_at = 0
+        self.error = None
+        self.boot = str(uuid.uuid4())
+        self.status_changed = True
+        # _open rend une image déjà orientée : read() ne la retourne pas une seconde fois.
+        return True, cv2.rotate(frame, cv2.ROTATE_180) if self.mode["rotate180"] else frame
+
+    def take_status_change(self):
+        """Statut à renvoyer au serveur si la caméra vient de se perdre ou de revenir, sinon None."""
+        with self.lock:
+            if not self.status_changed:
+                return None
+            self.status_changed = False
+            return self.status()
 
     def _fresh(self):
         """The latest frame, only while it is at most 2 s old; caller holds the lock."""

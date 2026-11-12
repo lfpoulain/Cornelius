@@ -1,4 +1,4 @@
-import type { ToolResult } from '../shared/addons.js';
+import { toolResult, type ToolResult } from '../shared/addons.js';
 import type { SatelliteHub } from './satellites.js';
 import type { SatelliteStore } from './satellites-store.js';
 
@@ -23,13 +23,8 @@ export const satelliteVolumeTool = {
 };
 
 function result(status: ToolResult['status'], summary: string, level: number | null): ToolResult {
-  return {
-    schemaVersion: 1,
-    status,
+  return toolResult(status, summary, {
     result: level === null ? null : { level },
-    snapshotId: null,
-    actionRunId: null,
-    summary,
     error:
       status === 'succeeded'
         ? null
@@ -38,7 +33,7 @@ function result(status: ToolResult['status'], summary: string, level: number | n
             message: summary,
             retryable: false,
           },
-  };
+  });
 }
 
 /**
@@ -82,9 +77,13 @@ export function setSatelliteVolume(
   hub.refresh(updated);
   return result(
     'succeeded',
-    next === current
+    (next === current
       ? `Le volume est déjà à ${next} sur 10${next === 10 ? ', le maximum' : next === 0 ? ', le minimum' : ''}.`
-      : `Volume réglé à ${next} sur 10.`,
+      : `Volume réglé à ${next} sur 10.`) +
+      // Le satellite joue ses sonneries au même volume : à 0, elles sont muettes aussi.
+      (next === 0
+        ? ' Attention : les réveils et minuteurs de ce satellite seront muets aussi.'
+        : ''),
     next,
   );
 }

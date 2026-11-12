@@ -10,14 +10,21 @@ import {
 import { profileNameKey } from '../../../shared/profile-names';
 import type { Profile } from '../../../shared/types';
 import { api, errorMessage } from '../../api';
-import { Alert, AlertDescription } from '../ui/alert';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { NativeSelect, NativeSelectOption } from '../ui/native-select';
 import { Switch } from '../ui/switch';
-import { ConfirmAction, Field, LoadingCard, ModulePanel, PresetButton, SaveBar } from './shared';
+import {
+  ConfirmAction,
+  Field,
+  LoadError,
+  LoadingCard,
+  ModulePanel,
+  PresetButton,
+  SaveBar,
+} from './shared';
 import type { RunAction } from './types';
 import { useAdminResource } from './useAdminResource';
 
@@ -192,7 +199,7 @@ export function MailSettings({
   action?: ReactNode;
 }) {
   const load = useCallback(() => api.mail(), []);
-  const { data, error: loadError, reload } = useAdminResource<MailView>(load);
+  const { data, error: loadError, loading, reload } = useAdminResource<MailView>(load);
   const [view, setView] = useState<MailView | null>(null);
   const current = view ?? data;
   const [draft, setDraft] = useState<ServerDraft | null>(null);
@@ -227,14 +234,7 @@ export function MailSettings({
   if (!current)
     return panel(
       loadError ? (
-        <Alert variant="destructive">
-          <AlertDescription className="gap-3">
-            <p>{loadError}</p>
-            <Button variant="outline" size="sm" onClick={() => void reload()}>
-              Réessayer
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <LoadError error={loadError} loading={loading} onRetry={reload} />
       ) : (
         <LoadingCard label="Lecture des réglages d’e-mail…" />
       ),

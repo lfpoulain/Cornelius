@@ -6,8 +6,10 @@ Cornelius peut allumer et éteindre les lumières et les prises de la maison, et
 
 Home Assistant est un logiciel de domotique installé à part. Cornelius s’y connecte directement : aucun module complémentaire, blueprint ni intégration n’est à installer dans Home Assistant. Cornelius peut aussi tourner lui-même sur la box, comme add-on (voir [Installer dans Home Assistant](../installation/home-assistant.md)) : la connexion décrite ici reste la même.
 
-- **Lumières et prises** (`light.*` et `switch.*`) : allumer, éteindre, lire l’état, et régler la luminosité des lumières qui le permettent (de 1 à 100 %), leur couleur (« mets le bureau en violet ») et leur blanc (« blanc chaud », de 1500 à 9000 K, ramené à la plage de l’ampoule). La couleur n’est confirmée que si Home Assistant la relit (à une marge près, l’ampoule l’arrondissant à sa teinte).
+- **Lumières et prises** (`light.*` et `switch.*`) : allumer, éteindre, lire l’état, et régler la luminosité des lumières qui le permettent (de 1 à 100 %), leur couleur (« mets le bureau en violet ») et leur blanc (« blanc chaud », de 1500 à 9000 K, ramené à la plage de l’ampoule). La couleur n’est confirmée que si Home Assistant la relit (à pleine intensité : une teinte sombre comme [128, 0, 128] est comparée à [255, 0, 255], et à une marge près, l’ampoule l’arrondissant à sa teinte).
 - **Capteurs**, en lecture seule : capteurs et détecteurs, minuteries, dates et heures, nombres, interrupteurs virtuels, listes de choix, compteurs, thermostats, volets et serrures. Un capteur n’est jamais commandé : Cornelius peut dire si une serrure est fermée, pas l’ouvrir.
+
+Un appareil ajouté ensuite dans Home Assistant apparaît tout seul dans la liste, marqué **Nouveau**, avec un compteur au-dessus de la liste, jusqu’au prochain enregistrement de la sélection. Seul ce choix des appareils vaut examen : changer les autorisations ou reconnecter la même adresse ne fait pas disparaître le repère, et les nouveaux appareils restent affichés avec « Afficher uniquement la sélection ». Un appareil déjà coché n’est jamais nouveau. Il n’est jamais utilisable avant d’être coché. Le journal note une fois chaque nouvel appareil, « Nouvel appareil Home Assistant à cocher », y compris ceux ajoutés pendant une coupure ou un arrêt de Cornelius.
 
 Dans Home Assistant, un « switch » peut piloter autre chose qu’une prise. Ne cochez que les appareils que Cornelius doit vraiment commander.
 
@@ -119,7 +121,7 @@ Ce que ce compte limite : sans droits d’administrateur, le jeton ne donne pas 
 
 Une automatisation Home Assistant peut ouvrir une conversation sur le miroir, au geste d’une baguette, à l’appui d’un bouton ou à tout autre événement. L’effet est celui du bouton **Démarrer** de l’administration.
 
-1. **Le jeton est facultatif.** Sans jeton, toute machine du réseau local peut appeler la route (sauf un navigateur : voir plus bas). Pour la protéger, choisissez un jeton long et aléatoire (32 caractères ou plus) dans **Mise en route → Clés et jetons → Jeton de déclenchement**, ou écrivez `CORNELIUS_TRIGGER_TOKEN=…` dans `.env` puis redémarrez. Les appels doivent alors l’envoyer.
+1. **Le jeton est facultatif.** Sans jeton, toute machine du réseau local peut appeler la route (sauf un navigateur : voir plus bas). Pour la protéger, choisissez un jeton long et aléatoire (32 caractères ou plus) dans **Clés et accès → Clés et jetons → Jeton de déclenchement**, ou écrivez `CORNELIUS_TRIGGER_TOKEN=…` dans `.env` puis redémarrez. Les appels doivent alors l’envoyer.
 2. Dans Home Assistant, ajoutez une commande REST à `configuration.yaml` :
 
    ```yaml

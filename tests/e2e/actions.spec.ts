@@ -1,12 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { origin } from './env';
+import { login, origin } from './env';
 
 test('l’écran Actions enregistre une commande HTTP et teste sa destination', async ({ page }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Modules', exact: true }).click();
   await page.locator('#module-commands > summary').click();
   await expect(page.getByRole('button', { name: 'Nouvelle commande' })).toBeVisible();
@@ -24,11 +20,7 @@ test('l’écran Actions enregistre une commande HTTP et teste sa destination', 
 });
 
 test('l’identifiant se tape librement, suit le nom puis signale un doublon', async ({ page }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await expect(page.getByRole('button', { name: 'Modules', exact: true })).toBeVisible();
   const existing = await page.request.post('/api/admin/actions', {
     headers: { origin },
@@ -79,11 +71,7 @@ test('l’identifiant se tape librement, suit le nom puis signale un doublon', a
 test('une commande à valider apparaît seule, se compte sur le module et se refuse', async ({
   page,
 }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   const response = await page.request.post('/api/admin/actions', {
     headers: { origin },
     data: {
@@ -144,11 +132,7 @@ test('une commande à valider apparaît seule, se compte sur le module et se ref
 test('options avancées : un nom d’en-tête invalide bloque l’envoi, un secret absent est expliqué', async ({
   page,
 }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Modules', exact: true }).click();
   await page.locator('#module-commands > summary').click();
   await page.getByRole('button', { name: 'Nouvelle commande' }).click();

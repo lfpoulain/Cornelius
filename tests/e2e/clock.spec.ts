@@ -1,15 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { origin, screenshots } from './env';
+import { login, origin, screenshots } from './env';
 
 test('l’heure se configure et se supprime comme une source, sans horloge imposée au miroir', async ({
   page,
   context,
 }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Modules', exact: true }).click();
   await page.locator('#module-clock > summary').click();
   await page.getByLabel('Rechercher un module ou une source').fill('heure');

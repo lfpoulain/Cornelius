@@ -47,15 +47,6 @@ export interface PendingSatelliteView {
 export const SATELLITE_NAME_MAX = 40;
 export const SATELLITE_LED_COLOR_PATTERN = '^#[0-9a-f]{6}$';
 
-export const DEFAULT_SATELLITE_SETTINGS: Readonly<SatelliteSettings> = {
-  volume: 70,
-  ledColor: '#00ffb4',
-  ledBrightness: 6,
-  nightLight: false,
-  attentive: false,
-  silenceCloseMs: null,
-};
-
 /** Couleurs proposées dans l’administration (l’ambre, le rouge et l’orange restent aux alertes). */
 export const SATELLITE_LED_PRESETS: readonly { color: string; label: string }[] = [
   { color: '#00ffb4', label: 'Turquoise' },

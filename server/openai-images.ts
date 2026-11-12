@@ -46,7 +46,7 @@ export function openAIImageError(error: unknown): string {
   if (error instanceof OpenAI.APIError) {
     if (error.code === 'moderation_blocked' || /moderation|safety/iu.test(error.message))
       return 'OpenAI a refusé cette description (filtre de sécurité).';
-    if (error.status === 401) return 'Clé OpenAI refusée : vérifiez-la dans Mise en route.';
+    if (error.status === 401) return 'Clé OpenAI refusée : vérifiez-la dans Clés et accès.';
     if (error.status === 403)
       return 'OpenAI refuse ce modèle d’image pour ce compte : l’organisation doit peut-être être vérifiée sur platform.openai.com.';
     if (error.status === 429)

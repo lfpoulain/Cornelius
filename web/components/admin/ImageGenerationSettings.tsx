@@ -216,8 +216,8 @@ function OpenAISteps({
             <TriangleAlert className="mt-0.5 size-4 shrink-0 text-amber-300" aria-hidden="true" />
             <span>
               {unavailable}{' '}
-              <a className="font-medium text-primary underline underline-offset-4" href="#start">
-                Renseigner la clé dans la mise en route
+              <a className="font-medium text-primary underline underline-offset-4" href="#access">
+                Renseigner la clé dans Clés et accès
               </a>
             </span>
           </p>

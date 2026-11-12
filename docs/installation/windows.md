@@ -26,7 +26,7 @@ notepad .env
 
 - `npm ci` installe les dépendances exactes du projet.
 - `npm run setup` crée le fichier `.env` : le port (`PORT=3000`), la base de données, le mot de passe de l’administration (`cornelius` au départ), un jeton privé pour la perception et une ligne `OPENAI_API_KEY=` vide. Sur un `.env` existant, il ne change rien et complète seulement les lignes manquantes.
-- Dans le Bloc-notes, choisissez un autre mot de passe dans `CORNELIUS_ADMIN_PASSWORD` (4 caractères au moins), puis enregistrez. La clé OpenAI peut se coller ici après `OPENAI_API_KEY=`, ou plus tard dans l’administration (**Mise en route → Clés et jetons**), sans redémarrage.
+- Dans le Bloc-notes, choisissez un autre mot de passe dans `CORNELIUS_ADMIN_PASSWORD` (4 caractères au moins), puis enregistrez. La clé OpenAI peut se coller ici après `OPENAI_API_KEY=`, ou plus tard dans l’administration (**Clés et accès → Clés et jetons**), sans redémarrage.
 
 Les autres réglages possibles de `.env` (jetons des modules, caméra, vision, images) sont décrits dans [Configuration](../reference/configuration.md) et commentés dans `.env.example`.
 
@@ -149,6 +149,14 @@ Les problèmes s’affichent en jaune, précédés de « AVERTISSEMENT : » (« 
 Le script ne vérifie pas que la perception reste lancée. Si elle s’arrête, la rubrique « Mise en route » de l’administration l’indique à l’étape « Service caméra (perception) », et la raison est dans `data\run\logs\perception.err.log`.
 
 ## Mettre à jour
+
+Le plus simple : **État du système → Mettre à jour vers …** dans l’administration. Sur `main`, Cornelius suit les versions publiées (tag `vX.Y.Z`) ; sur une autre branche, la branche distante. La mise à jour lance `scripts\update.ps1`, qui arrête Cornelius, avance le dépôt, met à jour les dépendances qui ont changé puis relance `start.ps1`. Elle est refusée si des fichiers de Cornelius ont été modifiés à la main, et revient au commit de départ en cas d’échec ; le déroulé est dans `data\run\logs\update.log`. Le script se lance aussi à la main (`-Check` montre seulement la version proposée) :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\update.ps1
+```
+
+Ou, étape par étape :
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\stop.ps1

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { screenshots } from './env';
+import { login, screenshots } from './env';
 
 test('choisir une caméra et afficher un aperçu seulement pendant sa consultation', async ({
   page,
@@ -64,11 +64,7 @@ test('choisir une caméra et afficher un aperçu seulement pendant sa consultati
       ),
     });
   });
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Caméra et reconnaissance' }).click();
   await expect(page.getByLabel('Caméra', { exact: true })).toHaveValue('one');
   expect(frames).toBe(0);

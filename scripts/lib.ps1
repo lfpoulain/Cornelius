@@ -36,7 +36,7 @@ function Get-CorneliusState {
 function Set-CorneliusState {
   param([hashtable]$State)
   $object = [ordered]@{}
-  foreach ($key in @('backend', 'frontend', 'perception', 'imageGeneration')) {
+  foreach ($key in @('backend', 'frontend', 'perception')) {
     if ($State.ContainsKey($key) -and $State[$key]) { $object[$key] = [int]$State[$key] }
   }
   $object | ConvertTo-Json | Set-Content -LiteralPath $StateFile -Encoding UTF8
@@ -86,26 +86,30 @@ function Get-CorneliusImageWorkerPids {
   return $workerPids
 }
 
-# Port du serveur : PORT dans .env, sinon 3000 (comme server/config.ts).
-function Get-CorneliusPort {
+# Nombre d'une clé de .env, lu comme Node (--env-file) et comme lib.sh : espaces autour du signe
+# égal, guillemets facultatifs, « export » et commentaire de fin de ligne admis ; la dernière
+# ligne l'emporte (le serveur écoute sur celle-là).
+function Get-CorneliusEnvNumber {
+  param([string]$Name, [int]$Default)
+  $value = $Default
   $envFile = Join-Path $Root '.env'
   if (Test-Path -LiteralPath $envFile) {
+    $pattern = '^\s*(?:export\s+)?' + [regex]::Escape($Name) + '\s*=\s*["'']?(\d+)["'']?\s*(?:#.*)?$'
     foreach ($line in Get-Content -LiteralPath $envFile) {
-      if ($line -match '^\s*PORT\s*=\s*"?(\d+)"?\s*$') { return [int]$Matches[1] }
+      if ($line -match $pattern) { $value = [int]$Matches[1] }
     }
   }
-  return 3000
+  return $value
+}
+
+# Port du serveur : PORT dans .env, sinon 3000 (comme server/config.ts).
+function Get-CorneliusPort {
+  return Get-CorneliusEnvNumber -Name 'PORT' -Default 3000
 }
 
 # Port de l'interface de développement (Vite) : CORNELIUS_DEV_PORT dans .env, sinon 5173.
 function Get-CorneliusDevPort {
-  $envFile = Join-Path $Root '.env'
-  if (Test-Path -LiteralPath $envFile) {
-    foreach ($line in Get-Content -LiteralPath $envFile) {
-      if ($line -match '^\s*CORNELIUS_DEV_PORT\s*=\s*"?(\d+)"?\s*$') { return [int]$Matches[1] }
-    }
-  }
-  return 5173
+  return Get-CorneliusEnvNumber -Name 'CORNELIUS_DEV_PORT' -Default 5173
 }
 
 function Resolve-CorneliusNode {
@@ -130,8 +134,9 @@ function Test-CorneliusPrerequisites {
       [void][int]::TryParse($parts[0], [ref]$major)
       [void][int]::TryParse($parts[1], [ref]$minor)
     }
-    if ($major -lt 24 -or ($major -eq 24 -and $minor -lt 2)) {
-      $problems += "Node.js $version détecté : Cornelius demande Node.js 24.2 ou plus récent (node:sqlite, --env-file-if-exists). Voir .nvmrc."
+    # Même règle que package.json (engines : >=24.2.0 <25) et que les scripts Linux.
+    if ($major -ne 24 -or $minor -lt 2) {
+      $problems += "Node.js $version détecté : Cornelius demande Node.js 24, à partir de 24.2 (node:sqlite, --env-file-if-exists). Voir .nvmrc."
     }
   }
   if (-not (Test-Path -LiteralPath (Join-Path $Root '.env'))) {

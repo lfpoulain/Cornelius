@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { SatelliteGestureSettings } from './SatelliteGestureSettings';
 import { KeyRound, MicOff, TriangleAlert } from 'lucide-react';
 import type { NetworkStatus, Profile } from '../../../shared/types';
 import {
@@ -90,7 +91,7 @@ export function Satellites({
               <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>
                 L’accès depuis le réseau local est désactivé : un satellite ne peut pas se
-                connecter. Voir la carte « Accès depuis le réseau local » dans Mise en route.
+                connecter. Voir la carte « Accès depuis le réseau local » dans Clés et accès.
               </span>
             </p>
           )}
@@ -236,6 +237,9 @@ function SatelliteCard({
   const [name, setName] = useState(satellite.name);
   const [profileId, setProfileId] = useState(satellite.profileId ?? '');
   const [confirming, setConfirming] = useState<'token' | 'remove' | null>(null);
+  // Les deux boutons cèdent leur place à la confirmation : chaque ref rend le focus au sien.
+  const tokenButton = useRef<HTMLButtonElement>(null);
+  const removeButton = useRef<HTMLButtonElement>(null);
   const changed = name.trim() !== satellite.name || profileId !== (satellite.profileId ?? '');
   const id = 'satellite-' + satellite.id;
   const save = async () => {
@@ -320,10 +324,12 @@ function SatelliteCard({
           )}
         </form>
         <SatelliteSettingsPanel satellite={satellite} run={run} />
+        <SatelliteGestureSettings id={satellite.id} run={run} />
         {confirming === 'token' ? (
           <ConfirmAction
             message={`Créer un nouveau jeton pour « ${satellite.name} » ? L’ancien cesse aussitôt de fonctionner : il faudra saisir le nouveau dans le satellite.`}
             confirmLabel="Nouveau jeton"
+            returnFocusTo={tokenButton}
             onCancel={() => setConfirming(null)}
             onConfirm={() => {
               setConfirming(null);
@@ -340,6 +346,7 @@ function SatelliteCard({
           <ConfirmAction
             message={`Retirer « ${satellite.name} » ? Il est déconnecté et son jeton ne fonctionne plus.`}
             confirmLabel="Retirer"
+            returnFocusTo={removeButton}
             onCancel={() => setConfirming(null)}
             onConfirm={() => {
               setConfirming(null);
@@ -350,10 +357,20 @@ function SatelliteCard({
           />
         ) : (
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" variant="outline" onClick={() => setConfirming('token')}>
+            <Button
+              ref={tokenButton}
+              size="sm"
+              variant="outline"
+              onClick={() => setConfirming('token')}
+            >
               Nouveau jeton
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setConfirming('remove')}>
+            <Button
+              ref={removeButton}
+              size="sm"
+              variant="outline"
+              onClick={() => setConfirming('remove')}
+            >
               Retirer
             </Button>
           </div>
@@ -370,6 +387,9 @@ function SatelliteCard({
 function SatelliteSettingsPanel({ satellite, run }: { satellite: SatelliteView; run: RunAction }) {
   const id = 'satellite-' + satellite.id;
   const [volume, setVolume] = useState(Math.round(satellite.volume / 10));
+  // Volume changé à la voix (« parle moins fort ») : la fiche suit la liste rechargée, sauf
+  // pendant un réglage au curseur pas encore enregistré.
+  const savedVolume = Math.round(satellite.volume / 10);
   const [brightness, setBrightness] = useState(satellite.ledBrightness);
   const [color, setColor] = useState(satellite.ledColor);
   const [nightLight, setNightLight] = useState(satellite.nightLight);
@@ -382,13 +402,18 @@ function SatelliteSettingsPanel({ satellite, run }: { satellite: SatelliteView; 
     const pending = timers.current;
     return () => pending.forEach((timer) => clearTimeout(timer));
   }, []);
+  useEffect(() => {
+    if (!timers.current.has('volume')) setVolume(savedVolume);
+  }, [savedVolume]);
   const save = (key: string, label: string, patch: Partial<SatelliteSettings>, delayMs = 0) => {
     clearTimeout(timers.current.get(key));
-    const send = () =>
+    const send = () => {
+      timers.current.delete(key);
       void run(label, () => api.updateSatellite(satellite.id, patch), {
         key: id + '-' + key,
         payload: patch,
       });
+    };
     if (delayMs === 0) send();
     else timers.current.set(key, setTimeout(send, delayMs));
   };

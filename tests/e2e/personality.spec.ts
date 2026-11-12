@@ -1,14 +1,10 @@
 import { expect, test } from '@playwright/test';
-import { origin, screenshots } from './env';
+import { login, origin, screenshots } from './env';
 
 test('personnaliser le foyer et une personne, consulter les prompts et réinitialiser', async ({
   page,
 }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await page.getByRole('button', { name: 'Le foyer et les visages', exact: true }).click();
   await page.getByLabel('Prénom ou nom d’affichage').fill('Camille personnalité');
   await page.getByRole('button', { name: 'Ajouter au foyer', exact: true }).click();
@@ -108,11 +104,7 @@ test('Personnaliser : tutoiement ou vouvoiement, visage manquant et liens vers l
 }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   const created = await page.request.post('/api/admin/profiles', {
     headers: { origin },
     data: { name: 'Camille liens' },

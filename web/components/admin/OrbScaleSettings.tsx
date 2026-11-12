@@ -11,13 +11,18 @@ export function OrbScaleSettings({ state, run }: { state: MirrorState; run: RunA
   const saved = state.orbScale ?? 100;
   const [value, setValue] = useState(saved);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => setValue(saved), [saved]);
+  // Pas pendant un réglage : la confirmation d’un cran précédent ramènerait le curseur en
+  // arrière sous le doigt. L’enregistrement en attente fera foi.
+  useEffect(() => {
+    if (!timer.current) setValue(saved);
+  }, [saved]);
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
   // Enregistré une fois le curseur posé, pas à chaque cran.
   const save = (scale: number) => {
     setValue(scale);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
+      timer.current = null;
       void run(`Taille de l’orbe : ${scale} %.`, () => api.orbScale(scale), {
         key: 'orb-scale',
         payload: scale,
@@ -55,7 +60,7 @@ export function OrbScaleSettings({ state, run }: { state: MirrorState; run: RunA
           </output>
         </div>
         {value !== 100 && (
-          <Button variant="ghost" size="sm" onClick={() => save(100)}>
+          <Button variant="outline" size="sm" onClick={() => save(100)}>
             Revenir à 100 %
           </Button>
         )}

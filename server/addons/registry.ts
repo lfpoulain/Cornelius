@@ -27,11 +27,21 @@ import './core-imports.js';
  * toujours son identifiant.
  */
 
+export type AddonOrigin = 'builtin' | 'local' | 'repository';
+
 export interface AddonLoadReport {
   /** Modules acceptés, ordonnés par identifiant pour un catalogue déterministe. */
   addons: AddonDefinition[];
   /** Dossiers refusés : nom du dossier et raison courte, affichés au diagnostic. */
   rejected: { name: string; reason: string }[];
+  /** Provenance de chaque module accepté. */
+  origins: Map<string, AddonOrigin>;
+}
+
+/** Module installé depuis un dépôt (voir module-store) : son dossier dans la copie du dépôt. */
+export interface ManagedAddon {
+  id: string;
+  directory: string;
 }
 
 const entryFile = 'index.ts';
@@ -304,6 +314,11 @@ interface AddonLoadOptions {
   logs?: DiagnosticLog;
   /** Dossier des modules externes ; `null` n'en charge aucun. Défaut : `externalAddonsRoot()`. */
   externalRoot?: string | null;
+  /**
+   * Modules installés depuis des dépôts, chargés après les modules livrés et avant le
+   * dossier externe : une version installée l'emporte sur la copie du dossier local.
+   */
+  managed?: ManagedAddon[];
 }
 
 /**
@@ -311,11 +326,13 @@ interface AddonLoadOptions {
  * dossier cassé est journalisé et n'empêche jamais les autres de charger.
  */
 export async function loadAddons(options: AddonLoadOptions = {}): Promise<AddonLoadReport> {
-  const report: AddonLoadReport = { addons: [], rejected: [] };
-  await loadDirectory(root, false, report, options.logs);
+  const report: AddonLoadReport = { addons: [], rejected: [], origins: new Map() };
+  await loadDirectory(root, 'builtin', report, options.logs);
+  for (const managed of options.managed ?? [])
+    await loadModule(managed.id, resolve(managed.directory), 'repository', report, options.logs);
   const external = options.externalRoot === undefined ? externalAddonsRoot() : options.externalRoot;
   if (external && resolve(external) !== root) {
-    await loadDirectory(resolve(external), true, report, options.logs);
+    await loadDirectory(resolve(external), 'local', report, options.logs);
   }
   report.addons.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   if (report.addons.length > 0 || report.rejected.length > 0)
@@ -332,11 +349,10 @@ export async function loadAddons(options: AddonLoadOptions = {}): Promise<AddonL
  */
 async function loadDirectory(
   directoryRoot: string,
-  external: boolean,
+  origin: AddonOrigin,
   report: AddonLoadReport,
   logs: DiagnosticLog | undefined,
 ): Promise<void> {
-  const { addons, rejected } = report;
   let entries: string[] = [];
   try {
     entries = existsSync(directoryRoot) ? readdirSync(directoryRoot) : [];
@@ -355,49 +371,76 @@ async function loadDirectory(
     } catch {
       continue;
     }
-    const entry = resolve(directory, entryFile);
-    if (!existsSync(entry)) {
-      if (!external) rejected.push({ name, reason: `point d’entrée « ${entryFile} » absent.` });
+    if (!existsSync(resolve(directory, entryFile))) {
+      if (origin === 'builtin')
+        report.rejected.push({ name, reason: `point d’entrée « ${entryFile} » absent.` });
       continue;
     }
-    if (reservedAddonIds.has(name)) {
-      rejected.push({ name, reason: 'identifiant réservé à un outil de Cornelius.' });
-      logs?.write('warn', 'addon', 'Module refusé : identifiant réservé', { addonId: name });
-      continue;
-    }
-    if (external && addons.some((addon) => addon.id === name)) {
-      rejected.push({ name, reason: 'identifiant déjà pris par un module livré avec Cornelius.' });
-      logs?.write('warn', 'addon', 'Module externe refusé : identifiant déjà pris', {
+    // Installé depuis un dépôt : la copie du dossier local s'efface sans bruit.
+    if (origin === 'local' && report.origins.get(name) === 'repository') continue;
+    await loadModule(name, directory, origin, report, logs);
+  }
+}
+
+/** Charge un dossier de module isolément : une erreur le refuse, sans gêner les autres. */
+async function loadModule(
+  name: string,
+  directory: string,
+  origin: AddonOrigin,
+  report: AddonLoadReport,
+  logs: DiagnosticLog | undefined,
+): Promise<void> {
+  const { addons, rejected } = report;
+  const external = origin !== 'builtin';
+  const entry = resolve(directory, entryFile);
+  if (!idPattern.test(name) || !existsSync(entry)) {
+    rejected.push({ name, reason: `point d’entrée « ${entryFile} » absent.` });
+    return;
+  }
+  if (reservedAddonIds.has(name)) {
+    rejected.push({ name, reason: 'identifiant réservé à un outil de Cornelius.' });
+    logs?.write('warn', 'addon', 'Module refusé : identifiant réservé', { addonId: name });
+    return;
+  }
+  if (external && addons.some((addon) => addon.id === name)) {
+    rejected.push({
+      name,
+      reason:
+        report.origins.get(name) === 'builtin'
+          ? 'identifiant déjà pris par un module livré avec Cornelius.'
+          : 'identifiant déjà pris par un autre module.',
+    });
+    logs?.write('warn', 'addon', 'Module externe refusé : identifiant déjà pris', {
+      addonId: name,
+    });
+    return;
+  }
+  try {
+    const module = (await import(pathToFileURL(entry).href)) as { default?: unknown };
+    const invalid = validateAddonDefinition(module.default);
+    if (invalid) {
+      rejected.push({ name, reason: invalid });
+      logs?.write('warn', 'addon', 'Module refusé par le contrat v1', {
         addonId: name,
+        reason: invalid,
+        external,
       });
-      continue;
+      return;
     }
-    try {
-      const module = (await import(pathToFileURL(entry).href)) as { default?: unknown };
-      const invalid = validateAddonDefinition(module.default);
-      if (invalid) {
-        rejected.push({ name, reason: invalid });
-        logs?.write('warn', 'addon', 'Module refusé par le contrat v1', {
-          addonId: name,
-          reason: invalid,
-          external,
-        });
-        continue;
-      }
-      const addon = module.default as AddonDefinition;
-      if (addon.id !== name) {
-        rejected.push({ name, reason: `identifiant « ${addon.id} » différent du dossier.` });
-        logs?.write('warn', 'addon', 'Module refusé : identifiant incohérent', {
-          addonId: name,
-          declaredId: addon.id,
-          external,
-        });
-        continue;
-      }
-      addons.push(addon);
-    } catch (error) {
-      rejected.push({ name, reason: describe(error) });
-      logs?.write('warn', 'addon', 'Module non chargé', { addonId: name, error, external });
+    const addon = module.default as AddonDefinition;
+    if (addon.id !== name) {
+      rejected.push({ name, reason: `identifiant « ${addon.id} » différent du dossier.` });
+      logs?.write('warn', 'addon', 'Module refusé : identifiant incohérent', {
+        addonId: name,
+        declaredId: addon.id,
+        external,
+      });
+      return;
     }
+    addons.push(addon);
+    report.origins.set(name, origin);
+  } catch (error) {
+    rejected.push({ name, reason: describe(error) });
+    logs?.write('warn', 'addon', 'Module non chargé', { addonId: name, error, external });
   }
 }

@@ -9,7 +9,7 @@ import {
 import { api } from '../../api';
 import type { RunAction } from './types';
 import { useAdminResource } from './useAdminResource';
-import { KeepHeight, LoadingCard, PersonPicker, SaveBar, StableMessage } from './shared';
+import { KeepHeight, LoadError, LoadingCard, PersonPicker, SaveBar, StableMessage } from './shared';
 import { Label } from '../ui/label';
 import { personFromHash, personHref } from './person-links';
 import { faceHref } from './FaceEnrollment';
@@ -139,14 +139,7 @@ function PersonalityLoader({
   }, [onDirty]);
   if (resource.error)
     return (
-      <Alert variant="destructive">
-        <AlertDescription className="gap-3">
-          <p>{resource.error}</p>
-          <Button variant="outline" size="sm" onClick={() => void resource.reload()}>
-            Réessayer
-          </Button>
-        </AlertDescription>
-      </Alert>
+      <LoadError error={resource.error} loading={resource.loading} onRetry={resource.reload} />
     );
   if (!resource.data) return <LoadingCard label="Chargement de la personnalité…" />;
   return (

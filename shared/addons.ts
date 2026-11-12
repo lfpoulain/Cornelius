@@ -5,6 +5,8 @@
  * Contrat gelé : toute évolution incompatible incrémente `apiVersion`.
  */
 
+import { stripAccents } from './text.js';
+
 export type AddonScope = { kind: 'household'; userId: null } | { kind: 'user'; userId: string };
 
 export interface AddonInstance {
@@ -393,6 +395,34 @@ export interface ToolResult {
   error: { code: string; message: string; retryable: boolean } | null;
 }
 
+/** Résultat d'outil complet : seuls l'état et le résumé sont obligatoires. */
+export function toolResult(
+  status: ToolResult['status'],
+  summary: string,
+  extra: Partial<ToolResult> = {},
+): ToolResult {
+  return {
+    schemaVersion: 1,
+    status,
+    result: null,
+    snapshotId: null,
+    actionRunId: null,
+    summary,
+    error: null,
+    ...extra,
+  };
+}
+
+/** Échec d'outil ; le message d'erreur reprend le résumé s'il n'est pas précisé. */
+export function toolFailure(
+  summary: string,
+  code = 'unavailable',
+  retryable = false,
+  message = summary,
+): ToolResult {
+  return toolResult('failed', summary, { error: { code, message, retryable } });
+}
+
 export interface HttpActionDefinition {
   id: string;
   ref: string;
@@ -439,9 +469,7 @@ const ligatures: Record<string, string> = { œ: 'oe', æ: 'ae', ø: 'o', ß: 'ss
  * remplacé par un tiret. « Entrée principale » devient « entree-principale ».
  */
 export function refFromText(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/\p{M}+/gu, '')
+  return stripAccents(value)
     .toLowerCase()
     .replace(/[œæøßđł]/gu, (letter) => ligatures[letter] ?? '-')
     .replace(/[^a-z0-9_-]+/gu, '-')

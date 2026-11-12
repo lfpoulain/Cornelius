@@ -10,7 +10,7 @@ import { createMistralMemoryExtractor } from './voice/memory-extractor.js';
 import { isCardSettings } from '../shared/cards.js';
 import { isLiveVoice } from '../shared/voices.js';
 import { isOrbScale, ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
-import { AdminPassword, newPasswordError } from './admin-password.js';
+import { AdminPassword, equalSecret, newPasswordError } from './admin-password.js';
 import { SecretStore, secretValueError } from './secrets.js';
 import { TrustedDevices } from './trusted-devices.js';
 import { allowedHostname, isLoopback, isPrivateAddress, localAddresses } from './network.js';
@@ -29,7 +29,7 @@ import { PersonalMemory, type MemoryExtractor } from './memory.js';
 import { createMemoryExtractor } from './memory-extractor.js';
 import { registerMemory } from './memory-api.js';
 import { PersonalDataEraser } from './backups.js';
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import cookie from '@fastify/cookie';
@@ -67,11 +67,16 @@ import { registerHardware } from './hardware.js';
 import { WakeArbiter } from './wake-arbiter.js';
 import { SatelliteStore } from './satellites-store.js';
 import { SatelliteHub } from './satellites.js';
+import { SatelliteGestures } from './satellite-gestures.js';
 import { registerSatellites } from './satellites-api.js';
 import { SatellitePairing } from './satellites-pairing.js';
 import { AmbientModules } from './addons/ambient.js';
 import { AddonRuntime, defaultTimeZone } from './addons/runtime.js';
-import { loadAddons } from './addons/registry.js';
+import { fileURLToPath } from 'node:url';
+import { coreVersion, loadAddons, reservedAddonIds } from './addons/registry.js';
+import { ModuleStore } from './module-store/store.js';
+import { CoreUpdater } from './core-update.js';
+import { registerModuleStore } from './module-store-api.js';
 import { createHttpClient } from './addons/http.js';
 import { ActionExecutor, actionSecrets } from './actions.js';
 import { registerAddons } from './addons-api.js';
@@ -81,6 +86,7 @@ import { MailRepository } from './mail-store.js';
 import { Alarms } from './alarms.js';
 import { AlarmTools } from './alarms-tools.js';
 import { setSatelliteVolume } from './satellite-volume.js';
+import { VoiceUsage, voiceUsageMeasure } from './voice-usage.js';
 import { registerAlarms } from './alarms-api.js';
 import { AlarmsRepository } from './alarms-store.js';
 import { MAIL_PASSWORD_SECRET } from '../shared/mail.js';
@@ -92,6 +98,7 @@ import { HermesClient } from './hermes-client.js';
 import { Agents } from './agents.js';
 import { registerAgents } from './agents-api.js';
 import { ScreensaverLibrary } from './screensaver.js';
+import { GooglePhotosAlbum } from './google-photos.js';
 import { registerScreensaver } from './screensaver-api.js';
 import { ImageGeneration } from './image-generation.js';
 import { createOpenAIImageCreator, type OpenAIImageCreator } from './openai-images.js';
@@ -150,14 +157,20 @@ const nameSchema = compile<{ name: string }>({
 /** Jeton des déclencheurs externes (Home Assistant, baguette, bouton). */
 const TRIGGER_TOKEN_SECRET = 'CORNELIUS_TRIGGER_TOKEN';
 /** Routes appelées par une machine avec un jeton : ni cookie ni en-tête Origin. */
-function triggerRoute(url: string): boolean {
-  return url.split('?')[0]!.startsWith('/api/trigger/');
+function triggerRoute(path: string): boolean {
+  return path.startsWith('/api/trigger/');
 }
-function equalSecret(input: string, expected: string): boolean {
-  return timingSafeEqual(
-    createHash('sha256').update(input).digest(),
-    createHash('sha256').update(expected).digest(),
-  );
+/**
+ * Chemin tel que le routeur le comprend : sans la requête, et décodé. Le routeur décode les
+ * `%xx` avant de chercher la route (`/%61pi/state` est servi par `/api/state`) : un contrôle
+ * fait sur l'adresse brute se contourne. Null : encodage invalide.
+ */
+export function requestPath(url: string): string | null {
+  try {
+    return decodeURIComponent(url.split('?')[0]!);
+  } catch {
+    return null;
+  }
 }
 
 export async function createApp(
@@ -215,7 +228,7 @@ export async function createApp(
   const defaultPassword = () => adminPassword.isDefault();
   if (defaultPassword())
     logs.write('warn', 'local', 'Mot de passe administrateur par défaut', {
-      conseil: 'Le changer dans l’administration, Mise en route.',
+      conseil: 'Le changer dans l’administration, Clés et accès.',
     });
   // Clés des fournisseurs et jetons des modules : administration prioritaire sur .env.
   const envSecrets: Record<string, string | undefined> = {
@@ -240,7 +253,56 @@ export async function createApp(
   const addonInstances = new AddonRepository(db);
   const actionRepository = new ActionRepository(db);
   const http = createHttpClient();
-  const { addons, rejected } = await loadAddons({ logs, externalRoot: config.modulesDir ?? null });
+  // Modules installés depuis l'administration, chargés entre les livrés et le dossier local.
+  let builtinIds: ReadonlySet<string> = new Set();
+  const moduleStore = config.managedModulesDir
+    ? new ModuleStore({
+        directory: config.managedModulesDir,
+        coreVersion,
+        autoCheck: !!config.autoUpdateCheck,
+        reservedIds: () => new Set([...reservedAddonIds, ...builtinIds]),
+        logs,
+      })
+    : null;
+  const {
+    addons,
+    rejected,
+    origins: addonOrigins,
+  } = await loadAddons({
+    logs,
+    externalRoot: config.modulesDir ?? null,
+    managed: moduleStore?.plan() ?? [],
+  });
+  builtinIds = new Set(
+    [...addonOrigins].filter(([, origin]) => origin === 'builtin').map(([id]) => id),
+  );
+  moduleStore?.setLoaded({
+    loaded: new Map(
+      addons.map((addon) => [
+        addon.id,
+        { version: addon.version, origin: addonOrigins.get(addon.id)! },
+      ]),
+    ),
+    rejected,
+    local: addons
+      .filter((addon) => addonOrigins.get(addon.id) === 'local')
+      .map((addon) => ({
+        id: addon.id,
+        name: addon.display?.name ?? addon.sourceLabel,
+        version: addon.version,
+      })),
+    localDirectory:
+      config.modulesDir && addons.some((addon) => addonOrigins.get(addon.id) === 'local')
+        ? config.modulesDir
+        : null,
+  });
+  const coreUpdater = new CoreUpdater({
+    root: fileURLToPath(new URL('..', import.meta.url)),
+    version: coreVersion,
+    externallyManaged: !!config.updatesManagedExternally,
+    systemd: Boolean(process.env.INVOCATION_ID),
+    logs,
+  });
   if (rejected.length > 0)
     logs.write('warn', 'addon', 'Modules ignorés au démarrage', {
       rejected: rejected.map((item) => item.name),
@@ -291,12 +353,18 @@ export async function createApp(
       process.env,
     ),
   );
-  const homeAssistant = new HomeAssistant(new HomeAssistantRepository(db), http, logs);
+  const homeAssistant = new HomeAssistant(
+    new HomeAssistantRepository(db),
+    http,
+    logs,
+    undefined,
+    timeZone,
+  );
   homeAssistant.start();
   const imageGeneration = new ImageGeneration(
     db,
     true,
-    () => broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true),
+    () => broadcastDevices(),
     logs,
     now,
     // Une base en mémoire (tests) ne doit jamais purger les images du vrai miroir.
@@ -405,9 +473,25 @@ export async function createApp(
         ? 'Clé vocale configurée ; connexion uniquement au démarrage d’une session'
         : `Clé ${initialProvider === 'mistral' ? 'Mistral' : 'OpenAI'} absente`,
   );
-  const controller = new SessionController(profiles, live, now, preferences, (name, details) =>
-    logs.write('info', 'mesure', name, details),
+  const voiceUsage = new VoiceUsage(
+    db,
+    now,
+    () => timeZone,
+    () => live.provider(),
   );
+  // Chaque conversation ouverte chez le fournisseur s’ajoute au temps du jour, par fournisseur.
+  const recordVoiceUsage = voiceUsageMeasure(
+    voiceUsage,
+    () => live.provider(),
+    (error) =>
+      logs.write('warn', 'mesure', 'Temps de conversation non enregistré', {
+        error: error instanceof Error ? error.message : String(error),
+      }),
+  );
+  const controller = new SessionController(profiles, live, now, preferences, (name, details) => {
+    logs.write('info', 'mesure', name, details);
+    recordVoiceUsage(name, details);
+  });
   controller.setSetup({
     openaiKey: !!initialKey,
     mistralKey: !!secretStore.get('MISTRAL_API_KEY'),
@@ -424,6 +508,10 @@ export async function createApp(
     now,
     options.screensaverFetch,
   );
+  const googlePhotos = new GooglePhotosAlbum(db, options.screensaverFetch, now, (details) => {
+    logs.write('warn', 'screensaver', 'Échec de lecture de l’album Google Photos', details);
+  });
+  if (options.timers !== false) googlePhotos.start();
   imageGeneration.onActivity((activity) => controller.setImageActivity(activity));
   const ambient = new AmbientModules(
     addonRuntime,
@@ -468,7 +556,7 @@ export async function createApp(
       name,
       source: secretStore.source(name),
     });
-    broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+    broadcastDevices();
   });
   let lastDeviceLog = '';
   let imageGenerationRuntime!: ImageGenerationRuntime;
@@ -512,6 +600,14 @@ export async function createApp(
     live,
     heartbeat: options.timers !== false,
   });
+  const satelliteGestures = new SatelliteGestures({
+    db,
+    store: satelliteStore,
+    hub: satellites,
+    controller,
+    home: homeAssistant,
+  });
+  satellites.onGesture((id, gesture, current) => satelliteGestures.receive(id, gesture, current));
   live.attachSatelliteOutput((satelliteId, pcm) => satellites.play(satelliteId, pcm));
   live.attachSatelliteVolume((satelliteId, args) =>
     setSatelliteVolume(satelliteStore, satellites, satelliteId, args),
@@ -556,7 +652,7 @@ export async function createApp(
     db,
     controller,
     () => {
-      broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+      broadcastDevices();
     },
     now,
     undefined,
@@ -566,14 +662,14 @@ export async function createApp(
   // Raspberry Pi : la description de la scène est trop lourde, seule la reconnaissance reste.
   if (config.machine?.small) vision.restrict(smallMachineReason(config.machine));
   const downloads = new ModelDownloads(
-    () => broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true),
+    () => broadcastDevices(),
     (model) => vision.modelInstalled(model),
     undefined,
     options.modelLauncher,
   );
   imageGenerationRuntime = new ImageGenerationRuntime(
     imageGeneration,
-    () => broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true),
+    () => broadcastDevices(),
     imageGenerationToken,
     config.origins[0] ?? 'http://127.0.0.1:3000',
     options.imageGenerationRoot,
@@ -697,14 +793,14 @@ export async function createApp(
   const lanPairingMessage =
     'Appareil non autorisé : connectez-vous une fois avec le mot de passe administrateur pour en faire un miroir.';
   /** Pages, fichiers de l'interface et connexion : servis à tout appareil du réseau local. */
-  function lanPublic(url: string): boolean {
-    const path = url.split('?')[0]!;
+  function lanPublic(path: string): boolean {
     if (['/api/health', '/api/auth', '/api/login', '/api/logout'].includes(path)) return true;
     return !(
       path.startsWith('/api/') ||
       path.startsWith('/events') ||
       path.startsWith('/audio') ||
       path.startsWith('/wake-audio') ||
+      path.startsWith('/voice-audio') ||
       path.startsWith('/camera-stream')
     );
   }
@@ -728,17 +824,20 @@ export async function createApp(
       return reply.code(403).send({ error: 'Accès réservé au réseau local.' });
     if (!allowedHostname(request.hostname, lan, config.allowedHosts ?? []))
       return reply.code(403).send({ error: 'Hôte non autorisé.' });
+    // Tous les contrôles ci-dessous lisent le chemin décodé, celui que le routeur servira.
+    const path = requestPath(request.url);
+    if (path === null) return reply.code(400).send({ error: 'Adresse invalide.' });
     // La perception et le générateur d'images tournent sur la machine : jamais par le réseau.
     if (
-      (request.url.startsWith('/perception') || request.url.startsWith('/image-generation')) &&
+      (path.startsWith('/perception') || path.startsWith('/image-generation')) &&
       !fromLoopback(request)
     )
       return reply.code(403).send({ error: 'Réservé à cet ordinateur.' });
     // Déclencheurs externes (Home Assistant) : leur jeton remplace cookie et origine.
-    if (triggerRoute(request.url)) return;
+    if (triggerRoute(path)) return;
     // Le miroir n'a pas de mot de passe sur la machine. Depuis un autre appareil, ses données
     // (état, son, événements) demandent une session d'administration ou un appareil autorisé.
-    if (!fromMachine(request) && !lanPublic(request.url) && !lanAuthorized(request))
+    if (!fromMachine(request) && !lanPublic(path) && !lanAuthorized(request))
       return reply.code(401).send({ error: lanPairingMessage });
     const origin = request.headers.origin;
     const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
@@ -747,11 +846,12 @@ export async function createApp(
     if (
       (origin && !config.origins.includes(origin) && !sameOrigin) ||
       ((mutation ||
-        request.url.startsWith('/events') ||
-        request.url.startsWith('/perception') ||
-        request.url.startsWith('/audio') ||
-        request.url.startsWith('/wake-audio') ||
-        request.url.startsWith('/camera-stream')) &&
+        path.startsWith('/events') ||
+        path.startsWith('/perception') ||
+        path.startsWith('/audio') ||
+        path.startsWith('/wake-audio') ||
+        path.startsWith('/voice-audio') ||
+        path.startsWith('/camera-stream')) &&
         !origin)
     ) {
       return reply.code(403).send({ error: 'Origine non autorisée.' });
@@ -807,7 +907,7 @@ export async function createApp(
     wakeArbiter,
     vision,
     downloads,
-    authorize: (role) => (role === 'admin' ? requireAdmin : async () => {}),
+    requireAdmin,
     devices,
     currentKiosk: (req) =>
       !!kiosk && !!req.cookies[kioskCookie] && kiosk.kioskId === req.cookies[kioskCookie],
@@ -818,13 +918,15 @@ export async function createApp(
   });
 
   registerHomeAssistant(app, homeAssistant, requireAdmin, () => controller.homeAssistantChanged());
+  satelliteGestures.register(app, requireAdmin);
   registerAgents(app, agents, requireAdmin);
-  registerScreensaver(app, screensaver, controller, requireAdmin);
+  registerScreensaver(app, screensaver, controller, requireAdmin, googlePhotos);
   const satellitePairing = new SatellitePairing(logs, now);
   registerSatellites(app, {
     store: satelliteStore,
     hub: satellites,
     pairing: satellitePairing,
+    onRemove: (id) => satelliteGestures.forget(id),
     profiles,
     requireAdmin,
   });
@@ -859,6 +961,25 @@ export async function createApp(
       alarmsEnabled = enabled;
       controller.restart('Réglage des alarmes modifié.');
     },
+  });
+  // Recherche quotidienne des mises à jour (Cornelius et dépôts), sans rien appliquer.
+  let updateTimer: NodeJS.Timeout | null = null;
+  if (config.autoUpdateCheck) {
+    const checkUpdates = () => {
+      void coreUpdater.check();
+      void moduleStore?.checkAll();
+      updateTimer = setTimeout(checkUpdates, 24 * 3_600_000);
+      updateTimer.unref();
+    };
+    updateTimer = setTimeout(checkUpdates, 120_000);
+    updateTimer.unref();
+  }
+  registerModuleStore(app, {
+    store: moduleStore,
+    core: coreUpdater,
+    coreVersion,
+    instances: addonInstances,
+    requireAdmin,
   });
   registerAddons(app, {
     runtime: addonRuntime,
@@ -1019,7 +1140,7 @@ export async function createApp(
       return { ok: true };
     },
   );
-  app.get('/api/health', async () => ({ status: 'ok', version: '0.1.0' }));
+  app.get('/api/health', async () => ({ status: 'ok', version: coreVersion }));
   app.get<{ Querystring: { role?: string } }>('/api/auth', async (request, reply) => {
     if (request.query.role === 'admin') {
       const id = adminIdentity(request);
@@ -1045,7 +1166,7 @@ export async function createApp(
       if (defaultPassword() && !fromMachine(request))
         return reply.code(403).send({
           error:
-            'Mot de passe par défaut : changez-le d’abord dans l’administration, sur l’ordinateur du miroir (Mise en route), ou dans un terminal de cet ordinateur avec npm run password.',
+            'Mot de passe par défaut : changez-le d’abord dans l’administration, sur l’ordinateur du miroir (Clés et accès), ou dans un terminal de cet ordinateur avec npm run password.',
         });
       purgeSessions();
       const existing = request.cookies[adminCookie];
@@ -1084,7 +1205,7 @@ export async function createApp(
       const keep = adminIdentity(request);
       for (const id of [...sessions.keys()]) if (id !== keep) closeAdminSession(id);
       logs.write('info', 'local', 'Mot de passe administrateur changé');
-      broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+      broadcastDevices();
       return { ok: true, source: adminPassword.source() };
     },
   );
@@ -1211,7 +1332,7 @@ export async function createApp(
     trustedDevices.clear();
     for (const [socket, client] of clients)
       if (client.role === 'kiosk' && client.remote) socket.close(1008, lanPairingMessage);
-    broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+    broadcastDevices();
     return { ok: true };
   });
   app.post('/api/logout', async (request, reply) => {
@@ -1469,7 +1590,7 @@ export async function createApp(
     else if (wasBlocked) controller.resumeAutomatic();
     controller.publish();
     // La génération d’image par OpenAI suit le même blocage.
-    broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+    broadcastDevices();
     return controller.snapshot();
   });
   const privacySchema = compile<{ enabled: boolean }>({
@@ -1492,7 +1613,7 @@ export async function createApp(
       });
     controller.setPresenceTimings(request.body);
     perception.refreshPresenceTimings();
-    broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+    broadcastDevices();
     return controller.getPresenceTimings();
   });
   const delegationModeSchema = compile<{ mode: DelegationMode }>({
@@ -1538,6 +1659,28 @@ export async function createApp(
     controller.setSilenceClose(request.body);
     return controller.snapshot();
   });
+  app.get('/api/admin/voice-usage', { preHandler: requireAdmin }, async () => voiceUsage.view());
+  const voicePriceSchema = compile<{ perMinute: number | null; currency: '$' | '€' }>({
+    type: 'object',
+    additionalProperties: false,
+    required: ['perMinute', 'currency'],
+    properties: {
+      perMinute: { anyOf: [{ type: 'number', minimum: 0, maximum: 10 }, { type: 'null' }] },
+      currency: { enum: ['$', '€'] },
+    },
+  });
+  app.patch(
+    '/api/admin/voice-usage/price',
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      if (!voicePriceSchema(request.body))
+        return reply
+          .code(400)
+          .send({ error: 'Prix par minute invalide : de 0 à 10, en $ ou en €.' });
+      voiceUsage.setPrice(request.body.perMinute, request.body.currency);
+      return voiceUsage.view();
+    },
+  );
   app.patch('/api/admin/reply-close', { preHandler: requireAdmin }, async (request, reply) => {
     if (!enabledSchema(request.body))
       return reply.code(400).send({ error: 'Fermeture après la réponse invalide.' });
@@ -1577,12 +1720,12 @@ export async function createApp(
           .send({ error: 'Terminez la conversation avant de changer de fournisseur.' });
       if (!secretStore.get(provider === 'mistral' ? 'MISTRAL_API_KEY' : 'OPENAI_API_KEY'))
         return reply.code(400).send({
-          error: 'Ajoutez d’abord la clé de ce fournisseur dans Mise en route → Clés et jetons.',
+          error: 'Ajoutez d’abord la clé de ce fournisseur dans Clés et accès → Clés et jetons.',
         });
       controller.setVoiceProvider(provider);
       live.setGateway(voiceGateway());
       controller.setSetup({ voiceKey: !!selectedVoiceKey() });
-      broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+      broadcastDevices();
       return controller.snapshot();
     },
   );
@@ -1622,7 +1765,7 @@ export async function createApp(
       if (!key)
         return reply
           .code(400)
-          .send({ error: 'Ajoutez d’abord la clé OpenAI dans Mise en route → Clés et jetons.' });
+          .send({ error: 'Ajoutez d’abord la clé OpenAI dans Clés et accès → Clés et jetons.' });
       const { effectiveBaseUrl } = liveEndpoint();
       try {
         liveModels = await listLiveModels(key, effectiveBaseUrl);
@@ -1784,6 +1927,10 @@ export async function createApp(
     },
   );
 
+  function broadcastDevices() {
+    broadcast({ schemaVersion: 1, type: 'devices', status: devices() }, true);
+  }
+
   function broadcast(event: unknown, adminOnly = false) {
     const payload = JSON.stringify(event);
     for (const [socket, client] of clients) {
@@ -1862,6 +2009,8 @@ export async function createApp(
   heartbeatTimer?.unref();
   controllerTimer?.unref();
   app.addHook('onClose', async () => {
+    if (updateTimer) clearTimeout(updateTimer);
+    await googlePhotos.dispose();
     logs.write('info', 'local', 'Arrêt du serveur');
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     if (controllerTimer) clearInterval(controllerTimer);

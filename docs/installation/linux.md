@@ -89,7 +89,7 @@ Si le script s’arrête en route, corrigez la cause puis relancez-le avec les m
 
 `npm run setup` crée le fichier `.env` à la racine du dossier, lisible par vous seul. Il contient le port (`PORT=3000`), la base de données, le mot de passe de l’administration (`cornelius` au départ), un jeton privé pour la perception et une ligne `OPENAI_API_KEY=` vide. Sur un `.env` existant, il ne change rien et complète seulement les lignes manquantes.
 
-Le plus simple : collez la clé dans l’administration, rubrique **Mise en route**, carte **Clés et jetons** ; elle compte tout de suite. Vous pouvez aussi ouvrir `.env` avec un éditeur de texte et coller votre clé après le signe égal :
+Le plus simple : collez la clé dans l’administration, rubrique **Clés et accès**, carte **Clés et jetons** ; elle compte tout de suite. Vous pouvez aussi ouvrir `.env` avec un éditeur de texte et coller votre clé après le signe égal :
 
 ```sh
 nano .env
@@ -99,7 +99,7 @@ nano .env
 OPENAI_API_KEY=sk-...
 ```
 
-Le mot de passe de l’administration se change avec `npm run password`, dans le dossier de Cornelius : il compte aussitôt, sans redémarrage, comme celui choisi dans **Mise en route**. Après une modification de `.env`, redémarrez le serveur pour qu’il lise le fichier :
+Le mot de passe de l’administration se change avec `npm run password`, dans le dossier de Cornelius : il compte aussitôt, sans redémarrage, comme celui choisi dans **Clés et accès**. Après une modification de `.env`, redémarrez le serveur pour qu’il lise le fichier :
 
 ```sh
 systemctl --user restart cornelius        # avec les services systemd
@@ -188,6 +188,14 @@ Le premier réglage se fait ensuite pas à pas : voir [Premier démarrage](premi
 - Le choix du micro, des haut-parleurs et de la caméra se fait ensuite dans l’administration.
 
 ## Mettre à jour
+
+Le plus simple : **État du système → Mettre à jour vers …** dans l’administration. Sur `main`, Cornelius suit les versions publiées (tag `vX.Y.Z`) ; sur une autre branche (`beta`), la branche distante. La mise à jour lance `scripts/update.sh`, qui arrête Cornelius, avance le dépôt, réinstalle les dépendances qui ont changé, recompile l’interface et relance les services systemd, ou `scripts/start.sh` sans eux. Elle est refusée si des fichiers de Cornelius ont été modifiés à la main ou si l’historique a divergé, et revient au commit de départ en cas d’échec. Le déroulé est dans `data/run/logs/update.log`. Le même script se lance aussi à la main (`--check` montre seulement la version proposée) :
+
+```sh
+scripts/update.sh
+```
+
+Le script garde une variante GPU d’ONNX Runtime déjà installée. Après une mise à jour qui change les dépendances du mot d’appel ou du GPU, ou pour tout remettre d’aplomb, relancez l’installateur comme ci-dessous.
 
 Avec les services systemd, arrêtez-les, récupérez la nouvelle version, puis relancez l’installateur avec les mêmes options qu’au départ (par exemple `--gpu amd` si vous l’aviez utilisé). Il met à jour les dépendances Node et Python, recompile l’interface et redémarre les services :
 

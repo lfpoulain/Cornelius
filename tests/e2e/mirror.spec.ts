@@ -2,7 +2,7 @@ import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
 import { crc32, deflateSync } from 'node:zlib';
 import type { AmbientDisplay } from '../../shared/addons';
 import type { DisplayCard, StateEvent } from '../../shared/types';
-import { origin, screenshots } from './env';
+import { login, origin, screenshots } from './env';
 
 /** État simulé du miroir : /api/state et le WebSocket servent le même instantané. */
 async function mirrorFixture(page: Page, change: (state: StateEvent['state']) => void) {
@@ -174,11 +174,7 @@ test('le miroir garde son orbe centré et propose uniquement l’activation init
     // En veille, rien ne part vers OpenAI : l’orbe est grise.
     await expect.poll(async () => (await litPixels()).chroma).toBeLessThan(45);
     await page.screenshot({ path: `${screenshots}/mirror-sleeping.png` });
-    await admin.goto(url + '/admin');
-    await admin
-      .getByLabel('Mot de passe administrateur')
-      .fill('admin-browser-test-only-credentials-1234');
-    await admin.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+    await login(admin, url + '/admin');
     await expect(admin.locator('.admin-shell')).toHaveCSS('color-scheme', 'dark');
     await admin.getByRole('button', { name: /Le foyer/ }).click();
     for (const name of ['Camille', 'Robin']) {
@@ -802,6 +798,135 @@ test('écran de veille calé sur le réveil de Cornelius : un passant ne le reti
       };
     });
     await expect(mirror).toHaveAttribute('data-screensaver', 'off');
+  } finally {
+    fixture.close();
+  }
+});
+
+for (const fallback of [false, true]) {
+  for (const duringSlideshow of [false, true]) {
+    test(`écran de veille : saute trois 404 ${duringSlideshow ? 'pendant le diaporama' : 'au démarrage'} (${fallback ? 'sans WebGL' : 'WebGL'})`, async ({
+      page,
+    }) => {
+      await page.addInitScript(
+        ({ fallback }) => {
+          Math.random = () => 0.999999;
+          if (fallback) {
+            const original = HTMLCanvasElement.prototype.getContext;
+            HTMLCanvasElement.prototype.getContext = function (
+              this: HTMLCanvasElement,
+              kind: string,
+              ...args: unknown[]
+            ) {
+              if (kind.startsWith('webgl')) return null;
+              return original.apply(this, [kind, ...args] as Parameters<typeof original>);
+            } as typeof original;
+          }
+        },
+        { fallback },
+      );
+      const fixture = await mirrorFixture(page, (state) => {
+        state.presence = { ...state.presence, state: 'absent', peopleCount: 0, people: [] };
+        state.screensaver = {
+          ...screensaverState('presence'),
+          intervalMs: 1500,
+          transition: 'none',
+          imageCount: duringSlideshow ? 5 : 4,
+        };
+      });
+      const ids = [...(duringSlideshow ? ['first'] : []), 'bad-1', 'bad-2', 'bad-3', 'healthy'];
+      const attempted: string[] = [];
+      let recovered = false;
+      await page.route('**/api/screensaver', (route) =>
+        route.fulfill({
+          json: {
+            images: ids.map((id) => ({
+              id,
+              url: `/api/screensaver/google-photos/images/${id}`,
+              title: id,
+              credit: 'Photo synthétique',
+              origin: 'google-photos',
+            })),
+          },
+        }),
+      );
+      await page.route('**/api/screensaver/google-photos/images/*', (route) => {
+        const id = route.request().url().split('/').at(-1)!;
+        attempted.push(id);
+        return !recovered && id.startsWith('bad')
+          ? route.fulfill({ status: 404, json: { error: 'Photo indisponible.' } })
+          : route.fulfill({ contentType: 'image/png', body: solidPng(64, 40, [40, 160, 70]) });
+      });
+      try {
+        await page.goto('/');
+        const caption = page.locator('.mirror-screensaver-caption');
+        if (duringSlideshow) await expect(caption).toContainText('first');
+        await expect(caption).toContainText('healthy');
+        await expect(page.locator('.mirror-page')).toHaveAttribute('data-screensaver', 'on');
+        expect(attempted.filter((id) => id.startsWith('bad'))).toEqual(['bad-1', 'bad-2', 'bad-3']);
+        if (fallback)
+          await expect(page.locator('.mirror-screensaver-fallback img').first()).toHaveJSProperty(
+            'naturalWidth',
+            64,
+          );
+        else await expect(page.locator('.mirror-screensaver canvas')).toBeVisible();
+        recovered = true;
+        await expect(caption).toContainText('bad-1');
+      } finally {
+        fixture.close();
+      }
+    });
+  }
+}
+
+test('écran de veille : repli local puis retour de la photo distante sans nouvelle révision', async ({
+  page,
+}) => {
+  const fixture = await mirrorFixture(page, (state) => {
+    state.presence = { ...state.presence, state: 'absent', peopleCount: 0, people: [] };
+    state.screensaver = {
+      ...screensaverState('presence'),
+      intervalMs: 1500,
+      transition: 'none',
+      imageCount: 1,
+    };
+  });
+  let online = false;
+  await page.route('**/api/screensaver', (route) =>
+    route.fulfill({
+      json: {
+        images: [
+          {
+            id: 'remote',
+            url: '/api/screensaver/google-photos/images/remote',
+            title: 'Album distant',
+            credit: 'Test',
+            origin: 'google-photos',
+          },
+        ],
+        fallback: [
+          {
+            id: 'local',
+            url: '/api/screensaver/images/local',
+            title: 'Image locale',
+            credit: 'Test',
+            origin: 'upload',
+          },
+        ],
+      },
+    }),
+  );
+  const png = { contentType: 'image/png', body: solidPng(64, 40, [40, 160, 70]) };
+  await page.route('**/api/screensaver/images/local', (route) => route.fulfill(png));
+  await page.route('**/api/screensaver/google-photos/images/remote', (route) =>
+    route.fulfill(online ? png : { status: 404 }),
+  );
+  try {
+    await page.goto('/');
+    const caption = page.locator('.mirror-screensaver-caption');
+    await expect(caption).toContainText('Image locale');
+    online = true;
+    await expect(caption).toContainText('Album distant');
   } finally {
     fixture.close();
   }

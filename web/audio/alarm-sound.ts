@@ -1,6 +1,7 @@
 import { isAdmissionSoundId } from '../../shared/admission-sound';
 import type { AlarmSoundId } from '../../shared/alarms';
-import { playAdmissionSound, useSpeaker } from './admission-sound';
+import { playAdmissionSound } from './admission-sound';
+import { previewSound, useSpeaker } from './speaker';
 
 // Sonneries synthétisées localement, comme les sons d'ouverture : aucun fichier audio.
 
@@ -70,10 +71,6 @@ export async function ringAlarm(context: AudioContext, sound: AlarmSoundId, volu
 }
 
 /** Aperçu dans l'administration : un contexte dédié, ouvert par le clic puis fermé. */
-export async function previewAlarmSound(sound: AlarmSoundId) {
-  const context = new AudioContext();
-  await context.resume().catch(() => {});
-  await useSpeaker(context);
-  const duration = playAlarmSound(context, sound, 0.8);
-  setTimeout(() => void context.close(), Math.ceil(duration * 1000) + 300);
+export function previewAlarmSound(sound: AlarmSoundId) {
+  return previewSound((context) => playAlarmSound(context, sound, 0.8));
 }

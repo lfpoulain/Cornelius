@@ -1,12 +1,8 @@
 import { expect, test } from '@playwright/test';
-import { origin } from './env';
+import { login, origin } from './env';
 
 test('le module Cartes règle le nombre de cartes, leur durée et leur taille', async ({ page }) => {
-  await page.goto('/admin');
-  await page
-    .getByLabel('Mot de passe administrateur')
-    .fill('admin-browser-test-only-credentials-1234');
-  await page.getByRole('button', { name: 'Ouvrir cet espace' }).click();
+  await login(page, '/admin');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   try {
     await page.getByRole('button', { name: 'Modules', exact: true }).click();
