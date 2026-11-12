@@ -20,7 +20,13 @@ async function fixture(t: TestContext, secrets: Record<string, string | undefine
   const http: AddonHttpClient = {
     async fetch(request) {
       calls.push(request.url);
-      return { status: 200, headers: {}, text: () => '{}', json: () => ({}) };
+      return {
+        status: 200,
+        headers: {},
+        text: () => '{}',
+        json: () => ({}),
+        bytes: () => new TextEncoder().encode('{}'),
+      };
     },
   };
   const actionRepository = new ActionRepository(db);

@@ -82,6 +82,12 @@ export interface AddonHttpResponse {
   headers: Record<string, string>;
   text(): string;
   json(): unknown;
+  /**
+   * Corps brut, sans décodage : pour un format binaire (protobuf GTFS-RT, image, archive) que
+   * `text()` abîmerait. Une copie : la modifier ne touche ni le cache ni les autres lecteurs.
+   * Un module qui s'en sert déclare le `minCoreVersion` qui l'apporte.
+   */
+  bytes(): Uint8Array;
   /** Vrai si le corps a été coupé à `maxBytes` : la fin manque. */
   truncated?: boolean;
   /** Adresse finale, après les redirections suivies. */

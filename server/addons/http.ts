@@ -57,9 +57,9 @@ export function charsetOf(contentType: string | null, head: Uint8Array): string 
 async function readBounded(
   response: Response,
   maxBytes: number,
-): Promise<{ text: string; truncated: boolean }> {
+): Promise<{ bytes: Uint8Array; truncated: boolean }> {
   const body = response.body;
-  if (!body) return { text: '', truncated: false };
+  if (!body) return { bytes: new Uint8Array(0), truncated: false };
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
@@ -84,8 +84,7 @@ async function readBounded(
     offset += slice.byteLength;
     if (offset >= buffer.byteLength) break;
   }
-  const charset = charsetOf(response.headers.get('content-type'), buffer);
-  return { text: new TextDecoder(charset).decode(buffer), truncated };
+  return { bytes: buffer, truncated };
 }
 
 // Échecs de connexion : la requête n'a jamais quitté le serveur.
@@ -135,20 +134,31 @@ export function networkFailure(error: unknown): AddonCollectError {
   return new AddonCollectError('upstream', 'Connexion interrompue avant la réponse.', true);
 }
 
+/**
+ * Réponse lue, gardée en octets : le texte n'est décodé qu'à la demande, avec l'encodage
+ * déclaré. Un format binaire (`bytes()`) n'est donc jamais abîmé par un décodage, et le cache
+ * compte la taille réelle du corps.
+ */
 type Fetched = {
   status: number;
   headers: Record<string, string>;
-  text: string;
+  bytes: Uint8Array;
   truncated: boolean;
   url: string;
 };
+
+function textOf(fetched: Fetched): string {
+  const charset = charsetOf(fetched.headers['content-type'] ?? null, fetched.bytes);
+  return new TextDecoder(charset).decode(fetched.bytes);
+}
 
 function respond(fetched: Fetched): AddonHttpResponse {
   return {
     status: fetched.status,
     headers: fetched.headers,
-    text: () => fetched.text,
-    json: () => JSON.parse(fetched.text) as unknown,
+    text: () => textOf(fetched),
+    json: () => JSON.parse(textOf(fetched)) as unknown,
+    bytes: () => fetched.bytes.slice(),
     truncated: fetched.truncated,
     url: fetched.url,
   };
@@ -206,11 +216,11 @@ async function send(request: AddonHttpRequest, signal: AbortSignal): Promise<Fet
       target = next;
       continue;
     }
-    const { text, truncated } = await readBounded(response, request.maxBytes ?? defaultMaxBytes);
+    const { bytes, truncated } = await readBounded(response, request.maxBytes ?? defaultMaxBytes);
     return {
       status: response.status,
       headers: Object.fromEntries(response.headers.entries()),
-      text,
+      bytes,
       truncated,
       url: target.href,
     };
@@ -251,7 +261,7 @@ class SharedCache {
 
   put(key: string, fetched: Fetched, ms: number): void {
     if (fetched.status !== 200) return;
-    const size = fetched.text.length * 2;
+    const size = fetched.bytes.byteLength;
     if (size > cacheBytes / 4) return;
     this.drop(key);
     this.entries.set(key, { fetched, expires: this.now() + ms, size });
