@@ -406,6 +406,7 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | proxy-addr | 2.0.8 | MIT | exécution |
 | pvtsutils | 1.3.6 | MIT | exécution |
 | pvutils | 1.2.0 | MIT | exécution |
+| qrcode-generator | 1.4.4 | MIT | exécution |
 | qs | 6.16.1 | BSD-3-Clause | exécution |
 | quick-format-unescaped | 4.0.4 | MIT | exécution |
 | radix-ui | 1.6.7 | MIT | exécution |

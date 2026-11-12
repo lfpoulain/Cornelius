@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-12 : Cornelius portable
+
+**Ajouté**
+
+- **Cornelius portable** : carte de l’administration (rubrique **Clés et accès**) qui met Cornelius sur les téléphones du foyer, partout, sans l’ouvrir à Internet. Elle pilote un `tailscaled` voisin par son interface locale (`CORNELIUS_TAILSCALE_SOCKET`) : lien de connexion au compte et son code QR, publication sur le réseau privé (`serve`, jamais `funnel`) avec un certificat reconnu par les navigateurs, ce qui permet d’installer Cornelius comme application, codes QR pour ajouter un téléphone, liste des appareils, déconnexion avec confirmation. Le nom privé de Cornelius est accepté sans `CORNELIUS_ALLOWED_HOSTS`. Sans voisin Tailscale, rien ne change. Voir [Cornelius portable](docs/fonctionnalites/cornelius-portable.md). Dépendance ajoutée : `qrcode-generator` (MIT).
+
 ### 2026-11-11 : installation des modules et mises à jour
 
 **Ajouté**

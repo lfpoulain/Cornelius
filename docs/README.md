@@ -16,6 +16,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 | réussir le premier lancement | [Premier démarrage](installation/premier-demarrage.md) |
 | choisir ce qui ouvre la conversation | [Ouverture et présence](fonctionnalites/ouverture-et-presence.md), [Mot d’appel](fonctionnalites/mot-d-appel.md) |
 | parler à Cornelius depuis une autre pièce | [Les satellites audio](fonctionnalites/satellites.md) |
+| utiliser Cornelius sur mon téléphone, hors de la maison | [Cornelius portable](fonctionnalites/cornelius-portable.md) |
 | ajouter la météo, les transports ou une commande | [Les modules](modules/README.md) |
 | recevoir une image du miroir sur mon téléphone | [L’envoi par e-mail](fonctionnalites/envoi-par-e-mail.md) |
 | régler un réveil, un minuteur ou un rappel | [Les alarmes et les rappels](fonctionnalites/alarmes-et-rappels.md) |
@@ -39,6 +40,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 - [Le miroir](utilisation/miroir.md) : ce qu’on voit à l’écran, l’écran de veille, activer la voix, parler à Cornelius.
 - [L’administration](utilisation/administration.md) : chaque rubrique, dans l’ordre de la barre latérale.
 - [Accès depuis le réseau local](utilisation/reseau-local.md) : ouvrir le miroir et l’administration depuis un autre appareil, le certificat, le pare-feu.
+- [Cornelius portable](fonctionnalites/cornelius-portable.md) : Cornelius sur le téléphone, partout, sans l’ouvrir à Internet (Tailscale).
 - [Dépannage](utilisation/depannage.md) : symptômes courants, journal, mesure de la latence, demander de l’aide.
 
 ## Fonctionnalités

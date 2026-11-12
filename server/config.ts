@@ -49,6 +49,13 @@ export interface AppConfig {
   tlsKey?: string;
   /** Noms d'hôte supplémentaires acceptés (CORNELIUS_ALLOWED_HOSTS, séparés par des virgules). */
   allowedHosts?: string[];
+  /**
+   * Cornelius portable : socket de l'interface locale d'un `tailscaled` voisin
+   * (CORNELIUS_TAILSCALE_SOCKET). Absent, la fonction n'apparaît pas.
+   */
+  tailscaleSocket?: string;
+  /** Adresse où Tailscale relaie Cornelius (CORNELIUS_TAILSCALE_TARGET). */
+  tailscaleTarget?: string;
   /** Empreinte du certificat HTTPS en service, affichée dans l'administration. */
   tlsFingerprint?: string;
   /** Empreinte de la clé publique : celle que vérifient les satellites audio. */
@@ -127,6 +134,9 @@ export function loadConfig(): AppConfig & { port: number } {
       .split(',')
       .map((host) => host.trim())
       .filter(Boolean),
+    tailscaleSocket: process.env.CORNELIUS_TAILSCALE_SOCKET?.trim() || undefined,
+    tailscaleTarget:
+      process.env.CORNELIUS_TAILSCALE_TARGET?.trim() || `https+insecure://127.0.0.1:${httpsPort}`,
     openaiKey: process.env.OPENAI_API_KEY || undefined,
     perceptionToken: process.env.CORNELIUS_PERCEPTION_TOKEN || undefined,
     imageGenerationToken: process.env.CORNELIUS_IMAGE_GENERATION_TOKEN || undefined,
