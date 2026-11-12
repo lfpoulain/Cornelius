@@ -575,7 +575,8 @@ function cardKicker(card: DisplayCard): string {
     : label;
 }
 
-const Card = memo(function Card({
+/** Exportée pour les tests de rendu (icônes des cartes). */
+export const Card = memo(function Card({
   card,
   secondary = false,
 }: {
