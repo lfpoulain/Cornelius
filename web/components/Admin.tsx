@@ -30,6 +30,7 @@ import { OrbScaleSettings } from './admin/OrbScaleSettings';
 import { ScreensaverSettings } from './admin/ScreensaverSettings';
 import { Secrets } from './admin/Secrets';
 import { NetworkAccess } from './admin/NetworkAccess';
+import { PortableAccess } from './admin/PortableAccess';
 import { Satellites } from './admin/Satellites';
 import { GettingStarted, remainingSteps } from './admin/GettingStarted';
 import { SessionControls } from './admin/SessionControls';
@@ -615,6 +616,7 @@ export function Admin({
                       run={run}
                     />
                   )}
+                  {section === 'access' && <PortableAccess run={run} />}
                   {section === 'assistant' && <VoiceSettings state={state} run={run} />}
                   {section === 'assistant' && state.voiceProvider !== 'mistral' && (
                     <DelegationSettings state={state} run={run} />

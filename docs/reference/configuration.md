@@ -56,6 +56,8 @@ Voir [Accès depuis le réseau local](../utilisation/reseau-local.md).
 | `CORNELIUS_TLS_CERT`, `CORNELIUS_TLS_KEY` | vides | Certificat et clé (fichiers PEM) à utiliser. Sans eux, Cornelius crée un certificat dans `data/tls` et le recrée quand l’adresse de la machine change, en gardant la même clé (celle que retiennent les satellites audio). | serveur |
 | `CORNELIUS_MDNS` | `1` | `0`, `false`, `non` ou `no` : Cornelius ne s’annonce plus sur le réseau local (mDNS, service `_cornelius._tcp`) ; les [satellites audio](../fonctionnalites/satellites.md) ont alors besoin d’une adresse fixe. | serveur |
 | `CORNELIUS_ALLOWED_HOSTS` | vide | Noms d’hôte acceptés en plus de `localhost`, des adresses IP locales et du nom de la machine (avec ou sans `.local`), séparés par des virgules. | serveur |
+| `CORNELIUS_TAILSCALE_SOCKET` | vide | Socket de l’interface locale d’un `tailscaled` voisin, pour [Cornelius portable](../fonctionnalites/cornelius-portable.md). Vide, la carte n’apparaît pas. | serveur |
+| `CORNELIUS_TAILSCALE_TARGET` | `https+insecure://127.0.0.1:<port HTTPS>` | Adresse où Tailscale relaie Cornelius ; avec Docker, le nom réseau du service Cornelius (jamais le nom d’hôte du conteneur Tailscale). | serveur |
 
 ## Modules et commandes
 

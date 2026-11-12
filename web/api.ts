@@ -20,6 +20,7 @@ import type {
 } from '../shared/types';
 import type { DelegationMode } from '../shared/delegation';
 import type { LiveEndpointView } from '../shared/live-endpoint';
+import type { PortableStatus } from '../shared/portable';
 import type { CardSettings } from '../shared/cards';
 import type { AdmissionSound } from '../shared/admission-sound';
 import type { GreetingMode, SilenceClose } from '../shared/conversation';
@@ -507,6 +508,10 @@ export const api = {
     }),
   forgetTrustedDevices: () =>
     request<{ ok: boolean }>('/api/admin/trusted-devices', { method: 'DELETE' }),
+  portable: () => request<PortableStatus>('/api/admin/portable'),
+  connectPortable: () => post<PortableStatus>('/api/admin/portable/connect', {}, slow),
+  servePortable: (on: boolean) => post<PortableStatus>('/api/admin/portable/serve', { on }, slow),
+  logoutPortable: () => post<PortableStatus>('/api/admin/portable/logout', {}),
   forgetFace: (id: string) =>
     request<{ ok: boolean }>(`/api/admin/profiles/${encodeURIComponent(id)}/face`, {
       method: 'DELETE',
