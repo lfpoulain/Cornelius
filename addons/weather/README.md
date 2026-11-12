@@ -1,6 +1,6 @@
 # Module Météo
 
-Le module Météo donne les prévisions quotidiennes d’une commune française, fournies par Météo Concept. Cette fiche s’adresse à la personne qui règle le miroir et à celle qui lit le code du module (identifiant `weather`).
+Le module Météo donne les prévisions quotidiennes d’une commune française, fournies par Météo Concept. Météo Concept couvre la France seulement : ailleurs, installez plutôt Météo libre (Open-Meteo, sans jeton) depuis **Installer des modules** (voir [Installer des modules](../../docs/modules/README.md#installer-des-modules)). Cette fiche s’adresse à la personne qui règle le miroir et à celle qui lit le code du module (identifiant `weather`).
 
 ## Ce que fait le module
 
@@ -32,7 +32,7 @@ Il faut un code INSEE, ou bien la latitude et la longitude. Si les deux sont don
 
 ## Limites
 
-- Le code INSEE désigne une commune française. Le nom de la commune affiché vient du fournisseur.
+- Le code INSEE désigne une commune française : hors de France, aucune commune n’est trouvée. La carte « Météo » de l’administration le rappelle et renvoie vers Météo libre (Open-Meteo, sans jeton), dans **Installer des modules**. Le nom de la commune affiché vient du fournisseur.
 - Le fournisseur renvoie plus de jours que nécessaire : le module garde de 1 à 7 jours selon le réglage.
 - Un jeton refusé, un quota dépassé ou un service indisponible donnent une erreur claire. Après un premier succès, la dernière prévision reste affichée comme « dernier relevé connu ».
 

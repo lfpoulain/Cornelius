@@ -28,7 +28,7 @@ La rubrique **Modules** range les modules en trois groupes.
 | Groupe | Module | Ce qu’il fait | Détails |
 | --- | --- | --- | --- |
 | Au quotidien | Heure | Heure et date dans un fuseau horaire | [Fiche Heure](../../addons/clock/README.md) |
-| Au quotidien | Météo | Prévisions d’une commune (jeton Météo Concept) | [Fiche Météo](../../addons/weather/README.md) |
+| Au quotidien | Météo | Prévisions d’une commune française (jeton Météo Concept) ; ailleurs, Météo libre à installer | [Fiche Météo](../../addons/weather/README.md) |
 | Au quotidien | Transports | Prochains passages en Île-de-France (jeton PRIM) | [Fiche Transports](../../addons/transit/README.md) |
 | Au quotidien | Ragator | Réponses citées tirées des vidéos des Frères Poulain (serveur Ragator) | [Fiche Ragator](../../addons/ragator/README.md) |
 | Maison | Home Assistant | Appareils et capteurs de la maison | [Home Assistant](../fonctionnalites/home-assistant.md) |

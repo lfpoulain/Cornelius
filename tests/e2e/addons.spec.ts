@@ -9,7 +9,7 @@ test('l’écran Modules propose la recherche d’arrêt et de direction sans so
   await login(page, '/admin');
   await page.getByRole('button', { name: 'Modules', exact: true }).click();
   await page.locator('#module-transit > summary').click();
-  await expect(page.getByText('Météo Concept')).toBeVisible();
+  await expect(page.getByText('Météo Concept', { exact: true })).toBeVisible();
   await expect(page.getByText('Île-de-France Mobilités')).toBeVisible();
 
   await page

@@ -17,6 +17,13 @@ test('une source créée désactivée le reste après actualisation', async ({ p
   await login(page);
   await page.getByRole('button', { name: 'Modules', exact: true }).click();
   await page.locator('#module-weather > summary').click();
+  // Hors de France, la carte Météo renvoie vers Météo libre, à installer depuis le catalogue.
+  const horsFrance = page.getByTestId('weather-outside-france');
+  await expect(horsFrance).toContainText('Météo Concept couvre la France seulement.');
+  await expect(horsFrance.getByRole('link', { name: 'Installer des modules' })).toHaveAttribute(
+    'href',
+    '#catalogue',
+  );
   await page
     .locator('[data-slot="card"]')
     .filter({ has: page.getByText('Météo Concept', { exact: true }) })

@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-12 : la météo hors de France
+
+**Ajouté**
+
+- Administration : la carte « Météo » précise que Météo Concept couvre la France seulement et renvoie, ailleurs, vers Météo libre (Open-Meteo, sans jeton), avec un lien vers **Installer des modules**. Même précision dans la fiche du module et la documentation des modules (#47).
+
 ### 2026-11-11 : installation des modules et mises à jour
 
 **Ajouté**
