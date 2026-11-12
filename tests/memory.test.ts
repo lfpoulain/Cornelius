@@ -164,7 +164,6 @@ test('un identifiant inventé par un petit modèle devient un ajout, jamais une 
       proposal(
         change({ operation: 'update', memoryId: 'invente-1' }),
         change({ memoryId: 'invente-2', topic: 'boisson', fact: 'Préfère le thé vert.' }),
-        change({ operation: 'forget', memoryId: 'invente-3', fact: null }),
       ),
       f.turns,
     ),
@@ -204,6 +203,83 @@ test('un identifiant inventé par un petit modèle devient un ajout, jamais une 
       f.turns.map((turn) => ({ ...turn, version: 1 })),
     ),
     false,
+  );
+});
+test('une correction inventée sur un sujet connu ou un oubli inventé gardent le rejet du lot', (t) => {
+  const f = storeFixture(t);
+  assert.equal(
+    f.repository.apply(
+      f.batch,
+      proposal(change({ topic: 'boisson', fact: 'Préfère le thé.' })),
+      f.turns,
+    ),
+    true,
+  );
+  const avant = f.repository.list(f.alice.id);
+  assert.deepEqual(
+    avant.map((fact) => fact.fact),
+    ['Préfère le thé.'],
+  );
+  // « En fait je préfère le café » : un update vers un identifiant inventé, sur le même sujet.
+  const correction = f.repository.begin('session-correction', f.alice.id, 1)!;
+  const turns1 = f.turns.map((turn) => ({ ...turn, version: 1 }));
+  assert.equal(
+    f.repository.apply(
+      correction,
+      proposal(
+        change({
+          operation: 'update',
+          memoryId: 'invente-5',
+          topic: 'Boisson ',
+          fact: 'Préfère le café.',
+        }),
+      ),
+      turns1,
+    ),
+    false,
+  );
+  assert.deepEqual(
+    f.repository.list(f.alice.id),
+    avant,
+    'souvenir d’origine intact, pas de doublon',
+  );
+  // Un oubli vers un identifiant inventé : rejeté avec le lot, rien n'est oublié ni ajouté.
+  const oubli = f.repository.begin('session-oubli', f.alice.id, 1)!;
+  assert.equal(
+    f.repository.apply(
+      oubli,
+      proposal(
+        change({ topic: 'sport', fact: 'Joue au hockey.' }),
+        change({ operation: 'forget', memoryId: 'invente-6', topic: 'boisson', fact: null }),
+      ),
+      turns1,
+    ),
+    false,
+  );
+  assert.deepEqual(f.repository.list(f.alice.id), avant);
+  // Témoin : dans les mêmes conditions, une correction inventée sur un autre sujet devient un ajout.
+  const autre = f.repository.begin('session-autre-sujet', f.alice.id, 1)!;
+  assert.equal(
+    f.repository.apply(
+      autre,
+      proposal(
+        change({
+          operation: 'update',
+          memoryId: 'invente-7',
+          topic: 'sport',
+          fact: 'Joue au hockey.',
+        }),
+      ),
+      turns1,
+    ),
+    true,
+  );
+  assert.deepEqual(
+    f.repository
+      .list(f.alice.id)
+      .map((fact) => fact.fact)
+      .sort(),
+    ['Joue au hockey.', 'Préfère le thé.'],
   );
 });
 test('expiration, déduplication, suppression du profil et reprise sans transcription', (t) => {

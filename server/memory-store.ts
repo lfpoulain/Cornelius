@@ -258,17 +258,24 @@ export class MemoryRepository {
       const existing = new Map(this.list(stored.profileId).map((fact) => [fact.id, fact]));
       const anywhere = this.db.prepare('SELECT 1 FROM memories WHERE id = ?');
       // Les petits modèles locaux confondent souvent ajout et correction : un « update » vers un
-      // identifiant inventé, ou un « add » qui en porte un. Sans souvenir à viser, c'est un ajout ;
-      // un oubli sans souvenir n'a rien à faire. Un identifiant connu, de ce profil ou d'un autre,
-      // garde la vérification stricte ci-dessous, et chaque fait reste soumis à ses preuves.
-      const changes = proposal.changes.flatMap((change) => {
-        if (
+      // identifiant inventé, ou un « add » qui en porte un. Un « add » reste un ajout. Un
+      // « update » sans souvenir à viser devient un ajout seulement si le profil n'a aucun
+      // souvenir du même sujet : sinon ce serait garder deux faits contradictoires (« Préfère le
+      // thé. » et « Préfère le café. »), et le lot reste rejeté. Un « forget » sans souvenir reste
+      // rejeté : la demande d'oubli ne doit pas disparaître sans trace. Un identifiant connu, de ce
+      // profil ou d'un autre, garde la vérification stricte ci-dessous, et chaque fait reste soumis
+      // à ses preuves.
+      const subject = (topic: string) => topic.trim().toLocaleLowerCase('fr');
+      const subjects = new Set([...existing.values()].map((fact) => subject(fact.topic)));
+      const changes = proposal.changes.map((change) => {
+        const known =
           change.memoryId !== null &&
-          (existing.has(change.memoryId) || anywhere.get(change.memoryId))
-        )
-          return [change];
-        if (change.operation === 'forget') return [];
-        return [{ ...change, operation: 'add' as const, memoryId: null }];
+          (existing.has(change.memoryId) || !!anywhere.get(change.memoryId));
+        if (known) return change;
+        if (change.operation === 'add') return { ...change, memoryId: null };
+        if (change.operation === 'update' && !subjects.has(subject(change.topic)))
+          return { ...change, operation: 'add' as const, memoryId: null };
+        return change;
       });
       const touched = new Set<string>();
       for (const change of changes) {
