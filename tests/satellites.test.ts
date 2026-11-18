@@ -6,6 +6,7 @@ import { once } from 'node:events';
 import { setImmediate } from 'node:timers/promises';
 import test, { type TestContext } from 'node:test';
 import type { WebSocket } from 'ws';
+import type { PendingSatelliteView } from '../shared/satellites.js';
 import { createApp } from '../server/app.js';
 import { openDatabase, ProfileRepository } from '../server/storage.js';
 import { SatelliteStore } from '../server/satellites-store.js';
@@ -462,7 +463,7 @@ test('réglages depuis l’administration : validés, envoyés au satellite conn
   );
 });
 
-test('association : un satellite neuf attend, clignote, puis reçoit son jeton', async (t) => {
+test('association : une reconnexion exige une nouvelle validation de la demande', async (t) => {
   const f = await fixture(t);
   const cookie = await f.admin();
   const headers = { cookie, origin };
@@ -473,30 +474,77 @@ test('association : un satellite neuf attend, clignote, puis reçoit son jeton',
     socket.on('message', (data) => received.push(JSON.parse(String(data))));
     return { socket, received };
   };
+  const deviceName = 'cornelius-satellite-b0c6b4';
+  const pairRequest = JSON.stringify({
+    type: 'pair',
+    protocol: 1,
+    device: deviceName,
+    firmware: '0.2.0',
+  });
+  const pending = async () =>
+    (await f.app.inject({ url: '/api/admin/satellites', headers })).json<{
+      pending: PendingSatelliteView[];
+      satellites: unknown[];
+    }>();
   const invalid = await pair();
   invalid.socket.send(JSON.stringify({ type: 'pair', protocol: 1, device: 'Mauvais Nom!' }));
   assert.equal((await once(invalid.socket, 'close'))[0], 1008);
   const fresh = await pair();
-  fresh.socket.send(
-    JSON.stringify({
-      type: 'pair',
-      protocol: 1,
-      device: 'cornelius-satellite-b0c6b4',
-      firmware: '0.2.0',
-    }),
-  );
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  const waiting = once(fresh.socket, 'message');
+  fresh.socket.send(pairRequest);
+  await waiting;
   assert.deepEqual([...fresh.received], [{ type: 'waiting' }]);
-  const listed = (await f.app.inject({ url: '/api/admin/satellites', headers })).json();
+  const original = (await pending()).pending;
   assert.deepEqual(
-    listed.pending.map((entry: { device: string }) => entry.device),
-    ['cornelius-satellite-b0c6b4'],
+    original.map((entry) => entry.device),
+    [deviceName],
   );
-  const base = '/api/admin/satellites/pending/cornelius-satellite-b0c6b4';
+  const root = '/api/admin/satellites/pending/';
+  const previous = root + original[0]!.requestId;
+  const identified = once(fresh.socket, 'message');
+  assert.equal(
+    (await f.app.inject({ method: 'POST', url: previous + '/identify', headers })).statusCode,
+    200,
+  );
+  await identified;
+  assert.equal(fresh.received[1]?.type, 'identify');
+
+  const replacement = await pair();
+  const reconnected = once(replacement.socket, 'message');
+  replacement.socket.send(pairRequest);
+  await reconnected;
+  const refreshed = (await pending()).pending;
+  assert.deepEqual(
+    refreshed.map((entry) => entry.device),
+    [deviceName],
+  );
+  assert.notEqual(refreshed[0]!.requestId, original[0]!.requestId);
+  const base = root + refreshed[0]!.requestId;
+
+  for (const [method, url] of [
+    ['POST', previous + '/identify'],
+    ['POST', previous + '/accept'],
+    ['DELETE', previous],
+    ['POST', root + deviceName + '/accept'],
+  ] as const) {
+    const stale = await f.app.inject({
+      method,
+      url,
+      headers,
+      payload: url.endsWith('/accept') ? { name: 'Chambre' } : undefined,
+    });
+    assert.equal(stale.statusCode, 404, stale.body);
+  }
+  assert.deepEqual(await pending(), { satellites: [], pending: refreshed });
+  assert.deepEqual([...replacement.received], [{ type: 'waiting' }]);
+
+  const identifiedAgain = once(replacement.socket, 'message');
   assert.equal(
     (await f.app.inject({ method: 'POST', url: base + '/identify', headers })).statusCode,
     200,
   );
+  await identifiedAgain;
+  assert.equal(replacement.received[1]?.type, 'identify');
   assert.equal(
     (
       await f.app.inject({
@@ -508,6 +556,7 @@ test('association : un satellite neuf attend, clignote, puis reçoit son jeton',
     ).statusCode,
     401,
   );
+  const credentials = once(replacement.socket, 'message');
   const accepted = await f.app.inject({
     method: 'POST',
     url: base + '/accept',
@@ -515,9 +564,8 @@ test('association : un satellite neuf attend, clignote, puis reçoit son jeton',
     payload: { name: ' Chambre ' },
   });
   assert.equal(accepted.statusCode, 200, accepted.body);
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  assert.equal(fresh.received[1]?.type, 'identify');
-  const paired = fresh.received[2]!;
+  await credentials;
+  const paired = replacement.received[2]!;
   assert.deepEqual([paired.type, paired.name], ['paired', 'Chambre']);
   // Le jeton reçu ouvre bien la connexion des satellites ; plus rien n’attend.
   const device = await f.satellite(paired.token);

@@ -37,6 +37,8 @@ export interface SatelliteView extends SatelliteSettings {
 
 /** Un satellite neuf, connecté sans jeton, qui attend qu’on l’associe. */
 export interface PendingSatelliteView {
+  /** Identifiant temporaire de la demande, unique à cette connexion. */
+  requestId: string;
   /** Nom sur le réseau (cornelius-satellite-xxxxxx), aussi imprimé dans son journal série. */
   device: string;
   firmware: string;

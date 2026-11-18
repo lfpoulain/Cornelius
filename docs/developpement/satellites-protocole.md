@@ -102,7 +102,7 @@ Un satellite sans jeton ouvre `wss://<adresse>:3443/satellite/pair`, sans en-tê
 | serveur → satellite | `{"type":"identify"}` | « Faire clignoter » : l’anneau clignote quelques secondes |
 | serveur → satellite | `{"type":"paired","name":"Chambre","token":"…"}` | associé : le satellite enregistre le jeton et l’empreinte de la clé, puis redémarre et se connecte à `/satellite` |
 
-Aucun droit n’est accordé sans le clic « Associer ». Le serveur garde au plus 8 satellites en attente.
+Aucun droit n’est accordé sans le clic « Associer ». Le serveur garde au plus 8 demandes, pendant cinq minutes chacune. Les commandes de l’administration ciblent l’identifiant de la demande, lié à la connexion. Une reconnexion crée une nouvelle demande, même si le nom du satellite est identique.
 
 ## Fermetures
 
