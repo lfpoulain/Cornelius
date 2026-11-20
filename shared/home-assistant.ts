@@ -1,5 +1,15 @@
-/** Appareils que Luna peut allumer ou éteindre. */
-export const HOME_ASSISTANT_CONTROL_DOMAINS = ['light', 'switch'] as const;
+/**
+ * Appareils que Luna peut allumer ou éteindre : lumières, prises, modes (`input_boolean`),
+ * ventilateurs, scripts (lancer, arrêter) et scènes (activer seulement).
+ */
+export const HOME_ASSISTANT_CONTROL_DOMAINS = [
+  'light',
+  'switch',
+  'input_boolean',
+  'fan',
+  'script',
+  'scene',
+] as const;
 /** Entités lues seulement : capteurs, minuteries, thermostats, volets, serrures… */
 export const HOME_ASSISTANT_SENSOR_DOMAINS = [
   'sensor',
@@ -7,7 +17,6 @@ export const HOME_ASSISTANT_SENSOR_DOMAINS = [
   'timer',
   'input_datetime',
   'input_number',
-  'input_boolean',
   'input_select',
   'counter',
   'climate',
@@ -45,7 +54,23 @@ export interface HomeAssistantEntity {
 }
 
 export function isControllable(entity: Pick<HomeAssistantEntity, 'domain'>): boolean {
-  return entity.domain === 'light' || entity.domain === 'switch';
+  return (HOME_ASSISTANT_CONTROL_DOMAINS as readonly string[]).includes(entity.domain);
+}
+
+/** Une scène s’active seulement ; tout le reste s’allume et s’éteint. */
+export function controlActions(
+  entity: Pick<HomeAssistantEntity, 'domain'>,
+): ('turn_on' | 'turn_off')[] {
+  if (!isControllable(entity)) return [];
+  return entity.domain === 'scene' ? ['turn_on'] : ['turn_on', 'turn_off'];
+}
+
+/**
+ * Scripts et scènes se déclenchent : un script court repasse aussitôt à « off », l’état d’une
+ * scène est l’heure de sa dernière activation. Leur confirmation est une mise à jour de l’état.
+ */
+export function isTriggered(entity: Pick<HomeAssistantEntity, 'domain'>): boolean {
+  return entity.domain === 'script' || entity.domain === 'scene';
 }
 
 export interface HomeAssistantView {

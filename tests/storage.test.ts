@@ -121,6 +121,31 @@ test('delegation mode migrates existing settings and persists all choices across
   }
 });
 
+test('input_boolean devenu commandable : une sélection faite pour le lire est décochée', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cornelius-input-boolean-'));
+  const path = join(directory, 'cornelius.sqlite');
+  let db = openDatabase(path);
+  try {
+    db.prepare('UPDATE home_assistant SET selected = ?, revision = 4 WHERE id = 1').run(
+      JSON.stringify(['light.salon', 'input_boolean.mode_nuit', 'sensor.temperature']),
+    );
+    db.exec(`PRAGMA user_version = ${before("'input_boolean.'")}`);
+    db.close();
+    db = openDatabase(path);
+    const config = new HomeAssistantRepository(db).get();
+    assert.deepEqual(config.selected, ['light.salon', 'sensor.temperature']);
+    assert.equal(config.revision, 5);
+    // Rejouée sur une base déjà migrée, elle ne change rien.
+    db.exec(`PRAGMA user_version = ${before("'input_boolean.'")}`);
+    db.close();
+    db = openDatabase(path);
+    assert.equal(new HomeAssistantRepository(db).get().revision, 5);
+  } finally {
+    if (db.isOpen) db.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('failed migrations roll back the schema version and leave the previous database usable', () => {
   const directory = mkdtempSync(join(tmpdir(), 'cornelius-migration-failure-'));
   const path = join(directory, 'cornelius.sqlite');
