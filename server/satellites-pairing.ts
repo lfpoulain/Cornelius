@@ -1,23 +1,18 @@
+import { randomUUID } from 'node:crypto';
 import type { WebSocket } from 'ws';
+import type { PendingSatelliteView } from '../shared/satellites.js';
 import type { DiagnosticLog } from './logs.js';
 import { SATELLITE_PROTOCOL } from './satellites.js';
 
-/** Un satellite neuf qui attend d’être associé, tel que l’administration le voit. */
-export interface PendingSatellite {
-  /** Nom du satellite sur le réseau (cornelius-satellite-xxxxxx), qui l’identifie. */
-  device: string;
-  firmware: string;
-  address: string | null;
-  since: number;
-}
-
-interface Pending extends PendingSatellite {
+interface Pending extends PendingSatelliteView {
   socket: WebSocket;
+  expiry: ReturnType<typeof setTimeout>;
 }
 
 // Peu de satellites neufs à la fois : au-delà, les plus anciens attendront une reconnexion.
 const MAX_PENDING = 8;
 const HELLO_MS = 5000;
+const PAIRING_MS = 5 * 60_000;
 const DEVICE_PATTERN = /^[a-z0-9-]{3,48}$/u;
 
 /**
@@ -32,18 +27,24 @@ export class SatellitePairing {
     private readonly now: () => number = Date.now,
   ) {}
 
-  list(): PendingSatellite[] {
+  list(): PendingSatelliteView[] {
     return [...this.pending.values()]
       .sort((a, b) => a.since - b.since)
-      .map(({ device, firmware, address, since }) => ({ device, firmware, address, since }));
+      .map(({ requestId, device, firmware, address, since }) => ({
+        requestId,
+        device,
+        firmware,
+        address,
+        since,
+      }));
   }
 
   connect(socket: WebSocket, address: string | null): void {
-    let device: string | null = null;
+    let requestId: string | null = null;
     const helloTimer = setTimeout(() => socket.close(1008, 'Message pair attendu.'), HELLO_MS);
     helloTimer.unref?.();
     socket.on('message', (data, binary) => {
-      if (binary || device) return;
+      if (binary || requestId) return;
       let message: Record<string, unknown> = {};
       try {
         const parsed: unknown = JSON.parse(String(data));
@@ -62,19 +63,28 @@ export class SatellitePairing {
       )
         return socket.close(1008, 'Message pair invalide.');
       clearTimeout(helloTimer);
-      device = message.device;
-      this.pending.get(device)?.socket.close(1008, 'Satellite reconnecté.');
-      if (!this.pending.has(device) && this.pending.size >= MAX_PENDING) {
-        const oldest = this.list()[0];
-        if (oldest)
-          this.pending.get(oldest.device)?.socket.close(1008, 'Trop de satellites neufs.');
+      const device = message.device;
+      const waiting = this.list();
+      const previous = waiting.find((entry) => entry.device === device);
+      if (previous) this.closeRequest(previous.requestId, 1008, 'Satellite reconnecté.');
+      if (this.pending.size >= MAX_PENDING) {
+        this.closeRequest(waiting[0]!.requestId, 1008, 'Trop de satellites neufs.');
       }
-      this.pending.set(device, {
+      const id = randomUUID();
+      requestId = id;
+      const expiry = setTimeout(
+        () => this.closeRequest(id, 1008, 'Association expirée.'),
+        PAIRING_MS,
+      );
+      expiry.unref();
+      this.pending.set(id, {
+        requestId: id,
         socket,
         device,
         firmware: message.firmware,
         address,
         since: this.now(),
+        expiry,
       });
       this.logs.write('info', 'local', 'Satellite neuf en attente d’association', {
         device,
@@ -84,15 +94,15 @@ export class SatellitePairing {
     });
     socket.on('close', () => {
       clearTimeout(helloTimer);
-      if (device && this.pending.get(device)?.socket === socket) this.pending.delete(device);
+      if (requestId) this.removeRequest(requestId);
     });
     socket.on('error', () => socket.close());
   }
 
   /** Fait clignoter l’anneau du satellite, pour le reconnaître parmi d’autres. */
-  identify(device: string): boolean {
-    const entry = this.pending.get(device);
-    if (!entry) return false;
+  identify(requestId: string): boolean {
+    const entry = this.pending.get(requestId);
+    if (!entry || entry.socket.readyState !== 1) return false;
     this.send(entry.socket, { type: 'identify' });
     return true;
   }
@@ -101,28 +111,42 @@ export class SatellitePairing {
    * Association acceptée : le satellite reçoit son jeton et son nom, puis se reconnecte en
    * satellite ordinaire. Faux s’il n’attend plus (le satellite créé est alors à retirer).
    */
-  accept(device: string, satellite: { name: string; token: string }): boolean {
-    const entry = this.pending.get(device);
+  accept(requestId: string, satellite: { name: string; token: string }): boolean {
+    const entry = this.pending.get(requestId);
     if (!entry || entry.socket.readyState !== 1) return false;
-    this.pending.delete(device);
+    this.removeRequest(requestId);
     this.send(entry.socket, { type: 'paired', name: satellite.name, token: satellite.token });
-    this.logs.write('info', 'local', 'Satellite associé', { device, satellite: satellite.name });
+    this.logs.write('info', 'local', 'Satellite associé', {
+      device: entry.device,
+      satellite: satellite.name,
+    });
     // Le satellite ferme lui-même après avoir enregistré son jeton ; sinon, au bout de 5 s.
     setTimeout(() => entry.socket.close(1000, 'Associé.'), 5000).unref?.();
     return true;
   }
 
-  reject(device: string): boolean {
-    const entry = this.pending.get(device);
-    if (!entry) return false;
-    this.pending.delete(device);
-    entry.socket.close(1008, 'Association refusée.');
-    return true;
+  reject(requestId: string): boolean {
+    return this.closeRequest(requestId, 1008, 'Association refusée.');
   }
 
   dispose(): void {
-    for (const entry of this.pending.values()) entry.socket.close(1001, 'Arrêt du serveur');
-    this.pending.clear();
+    for (const requestId of this.pending.keys())
+      this.closeRequest(requestId, 1001, 'Arrêt du serveur');
+  }
+
+  private removeRequest(requestId: string): Pending | undefined {
+    const entry = this.pending.get(requestId);
+    if (!entry) return;
+    this.pending.delete(requestId);
+    clearTimeout(entry.expiry);
+    return entry;
+  }
+
+  private closeRequest(requestId: string, code: number, reason: string): boolean {
+    const entry = this.removeRequest(requestId);
+    if (!entry) return false;
+    entry.socket.close(code, reason);
+    return true;
   }
 
   private send(socket: WebSocket, value: unknown) {

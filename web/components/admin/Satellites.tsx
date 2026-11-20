@@ -621,7 +621,7 @@ function PendingSatellites({
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         {pending.map((entry) => (
-          <PendingSatellite key={entry.device} entry={entry} run={run} onChanged={onChanged} />
+          <PendingSatellite key={entry.requestId} entry={entry} run={run} onChanged={onChanged} />
         ))}
       </CardContent>
     </Card>
@@ -638,14 +638,14 @@ function PendingSatellite({
   onChanged: () => void;
 }) {
   const [name, setName] = useState('');
-  const id = 'pending-' + entry.device;
+  const id = 'pending-' + entry.requestId;
   return (
     <form
       className="space-y-3 rounded-lg border p-4"
       onSubmit={(event) => {
         event.preventDefault();
         if (!name.trim()) return;
-        void run('Satellite associé.', () => api.acceptSatellite(entry.device, name.trim()), {
+        void run('Satellite associé.', () => api.acceptSatellite(entry.requestId, name.trim()), {
           key: id + '-accept',
         }).then(onChanged);
       }}
@@ -675,7 +675,7 @@ function PendingSatellite({
           type="button"
           variant="outline"
           onClick={() =>
-            void run('Le satellite clignote.', () => api.identifySatellite(entry.device), {
+            void run('Le satellite clignote.', () => api.identifySatellite(entry.requestId), {
               key: id + '-identify',
             })
           }
@@ -686,7 +686,7 @@ function PendingSatellite({
           type="button"
           variant="ghost"
           onClick={() =>
-            void run('Association refusée.', () => api.rejectSatellite(entry.device), {
+            void run('Association refusée.', () => api.rejectSatellite(entry.requestId), {
               key: id + '-reject',
             }).then(onChanged)
           }

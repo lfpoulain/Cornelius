@@ -83,36 +83,40 @@ export function registerSatellites(
     satellites: store.list().map(view),
     pending: pairing.list(),
   }));
-  app.post<{ Params: { device: string } }>(
-    '/api/admin/satellites/pending/:device/accept',
+  app.post<{ Params: { requestId: string } }>(
+    '/api/admin/satellites/pending/:requestId/accept',
     { preHandler: requireAdmin },
     async (request, reply) => {
       if (!createSchema(request.body)) return reply.code(400).send({ error: 'Nom invalide.' });
-      if (!pairing.list().some((entry) => entry.device === request.params.device))
-        return reply.code(404).send({ error: 'Ce satellite n’attend plus : rebranchez-le.' });
+      if (!pairing.list().some((entry) => entry.requestId === request.params.requestId))
+        return reply
+          .code(404)
+          .send({ error: 'Cette demande n’est plus active. Identifiez à nouveau le satellite.' });
       const { satellite, token } = store.create(request.body.name.trim());
-      if (!pairing.accept(request.params.device, { name: satellite.name, token })) {
+      if (!pairing.accept(request.params.requestId, { name: satellite.name, token })) {
         store.remove(satellite.id);
-        return reply.code(409).send({ error: 'Ce satellite vient de se déconnecter : réessayez.' });
+        return reply
+          .code(409)
+          .send({ error: 'Le satellite vient de se déconnecter. Identifiez-le à nouveau.' });
       }
       return { satellite: view(satellite) };
     },
   );
-  app.post<{ Params: { device: string } }>(
-    '/api/admin/satellites/pending/:device/identify',
+  app.post<{ Params: { requestId: string } }>(
+    '/api/admin/satellites/pending/:requestId/identify',
     { preHandler: requireAdmin },
     async (request, reply) =>
-      pairing.identify(request.params.device)
+      pairing.identify(request.params.requestId)
         ? { ok: true }
-        : reply.code(404).send({ error: 'Ce satellite n’attend plus.' }),
+        : reply.code(404).send({ error: 'Cette demande n’est plus active.' }),
   );
-  app.delete<{ Params: { device: string } }>(
-    '/api/admin/satellites/pending/:device',
+  app.delete<{ Params: { requestId: string } }>(
+    '/api/admin/satellites/pending/:requestId',
     { preHandler: requireAdmin },
     async (request, reply) =>
-      pairing.reject(request.params.device)
+      pairing.reject(request.params.requestId)
         ? { ok: true }
-        : reply.code(404).send({ error: 'Ce satellite n’attend plus.' }),
+        : reply.code(404).send({ error: 'Cette demande n’est plus active.' }),
   );
   app.post('/api/admin/satellites', { preHandler: requireAdmin }, async (request, reply) => {
     if (!createSchema(request.body)) return reply.code(400).send({ error: 'Nom invalide.' });

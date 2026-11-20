@@ -475,18 +475,18 @@ export const api = {
     request<{ satellites: SatelliteView[]; pending?: PendingSatelliteView[] }>(
       '/api/admin/satellites',
     ),
-  acceptSatellite: (device: string, name: string) =>
+  acceptSatellite: (requestId: string, name: string) =>
     post<{ satellite: SatelliteView }>(
-      '/api/admin/satellites/pending/' + encodeURIComponent(device) + '/accept',
+      '/api/admin/satellites/pending/' + encodeURIComponent(requestId) + '/accept',
       { name },
     ),
-  identifySatellite: (device: string) =>
+  identifySatellite: (requestId: string) =>
     post<{ ok: boolean }>(
-      '/api/admin/satellites/pending/' + encodeURIComponent(device) + '/identify',
+      '/api/admin/satellites/pending/' + encodeURIComponent(requestId) + '/identify',
       {},
     ),
-  rejectSatellite: (device: string) =>
-    request<{ ok: boolean }>('/api/admin/satellites/pending/' + encodeURIComponent(device), {
+  rejectSatellite: (requestId: string) =>
+    request<{ ok: boolean }>('/api/admin/satellites/pending/' + encodeURIComponent(requestId), {
       method: 'DELETE',
     }),
   createSatellite: (name: string) =>
