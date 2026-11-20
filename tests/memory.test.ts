@@ -282,6 +282,44 @@ test('une correction inventée sur un sujet connu ou un oubli inventé gardent l
     ['Joue au hockey.', 'Préfère le thé.'],
   );
 });
+test('dans un même lot, deux corrections inventées sur un sujet nouveau ne deviennent pas deux ajouts', (t) => {
+  const f = storeFixture(t);
+  const contradictory = proposal(
+    change({
+      operation: 'update',
+      memoryId: 'invente-a',
+      topic: 'boisson',
+      fact: 'Préfère le thé.',
+    }),
+    change({
+      operation: 'update',
+      memoryId: 'invente-b',
+      topic: ' Boisson',
+      fact: 'Préfère le café.',
+    }),
+  );
+  assert.equal(f.repository.apply(f.batch, contradictory, f.turns), false);
+  assert.deepEqual(f.repository.list(f.alice.id), []);
+  // Un ajout suivi d'une correction inventée sur le même sujet : rejeté aussi.
+  const mixed = f.repository.begin('session-mixte', f.alice.id, 0)!;
+  assert.equal(
+    f.repository.apply(
+      mixed,
+      proposal(
+        change({ topic: 'boisson', fact: 'Préfère le thé.' }),
+        change({
+          operation: 'update',
+          memoryId: 'invente-c',
+          topic: 'boisson',
+          fact: 'Préfère le café.',
+        }),
+      ),
+      f.turns,
+    ),
+    false,
+  );
+  assert.deepEqual(f.repository.list(f.alice.id), []);
+});
 test('expiration, déduplication, suppression du profil et reprise sans transcription', (t) => {
   const f = storeFixture(t);
   assert.equal(

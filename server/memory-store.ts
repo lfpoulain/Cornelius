@@ -264,17 +264,25 @@ export class MemoryRepository {
       // thé. » et « Préfère le café. »), et le lot reste rejeté. Un « forget » sans souvenir reste
       // rejeté : la demande d'oubli ne doit pas disparaître sans trace. Un identifiant connu, de ce
       // profil ou d'un autre, garde la vérification stricte ci-dessous, et chaque fait reste soumis
-      // à ses preuves.
-      const subject = (topic: string) => topic.trim().toLocaleLowerCase('fr');
+      // à ses preuves. Les sujets ajoutés par le lot comptent aussi : deux « update » inventés sur
+      // un même sujet nouveau ne deviennent pas deux ajouts contradictoires. Le sujet est comparé
+      // sans casse ni espaces superflus ; un sujet reformulé (« boissons ») reste un autre sujet.
+      const subject = (topic: string) =>
+        topic.normalize('NFC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('fr');
       const subjects = new Set([...existing.values()].map((fact) => subject(fact.topic)));
       const changes = proposal.changes.map((change) => {
         const known =
           change.memoryId !== null &&
           (existing.has(change.memoryId) || !!anywhere.get(change.memoryId));
         if (known) return change;
-        if (change.operation === 'add') return { ...change, memoryId: null };
-        if (change.operation === 'update' && !subjects.has(subject(change.topic)))
+        if (change.operation === 'add') {
+          subjects.add(subject(change.topic));
+          return { ...change, memoryId: null };
+        }
+        if (change.operation === 'update' && !subjects.has(subject(change.topic))) {
+          subjects.add(subject(change.topic));
           return { ...change, operation: 'add' as const, memoryId: null };
+        }
         return change;
       });
       const touched = new Set<string>();
