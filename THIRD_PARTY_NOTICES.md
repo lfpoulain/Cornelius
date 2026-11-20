@@ -259,7 +259,7 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | atomic-sleep | 1.0.0 | MIT | exécution |
 | avvio | 9.3.0 | MIT | exécution |
 | balanced-match | 4.0.4 | MIT | exécution |
-| body-parser | 2.3.0 | MIT | exécution |
+| body-parser | 2.4.0 | MIT | exécution |
 | bonjour-service | 1.4.4 | MIT | exécution |
 | brace-expansion | 5.0.12 | MIT | exécution |
 | bytes | 3.1.2 | MIT | exécution |
