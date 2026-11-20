@@ -6,21 +6,24 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
-### 2026-11-08 : consigne des thermostats
+Rien pour l’instant.
 
-**Ajouté**
+## 0.4.0 · 2026-11-20
 
-- **Home Assistant → Régler les thermostats** (désactivé par défaut) : nouvel outil `home_assistant__climate`, pour la consigne seulement (« mets le bureau à 20 degrés »). La valeur est ramenée à la plage et au pas du thermostat, envoyée par `climate/set_temperature` puis confirmée par relecture ; un thermostat arrêté est refusé, le mode n’est jamais changé. Réglage `climateControl` de `PATCH /api/admin/home-assistant/access`, table `home_assistant_climate`. Les thermostats restent lisibles par `home_assistant__read`.
+Cornelius s’enrichit depuis l’administration : un catalogue de modules à installer d’un clic, et la mise à jour de Cornelius lui-même. Home Assistant commande les modes, ventilateurs, scripts et scènes, et règle la consigne des thermostats. Les modules gagnent les icônes dans les cartes et la lecture binaire, un module sans source ne prend plus la place d’un module réglé, et la mémoire devient utilisable avec un modèle local. L’administration est réorganisée, et un audit complet du code apporte de nombreuses corrections.
 
-### 2026-11-08 : modes, ventilateurs, scripts et scènes
+### 2026-11-20 : modules sans source et suites de relecture
 
-**Ajouté**
+**Corrigé**
 
-- **Home Assistant** : `input_boolean.*` (modes, « passe en mode nuit »), `fan.*`, `script.*` et `scene.*` se commandent avec `home_assistant__control`. Un script se lance (`turn_on`) et s’arrête (`turn_off`), une scène s’active seulement ; leur lancement est confirmé par la mise à jour de l’état. Les ventilateurs et scènes suivent l’exposition par défaut de Home Assistant pour l’import Assist. L’administration affiche « Lancer », « Arrêter » ou « Activer » selon le type.
-
-**Changé**
-
-- `input_boolean.*` passe des capteurs (lecture seule) aux appareils commandables. À la mise à jour, les `input_boolean` déjà cochés sont décochés : une sélection faite pour lire un mode ne devient pas une autorisation de le changer. Recochez ceux que Cornelius doit pouvoir changer.
+- **Modules** : un module sans source n’est plus proposé au modèle. Une Météo livrée sans source pouvait être choisie à la place d’un module réglé du même genre (Météo Canada, Météo libre…) et répondre « aucun module configuré » (#13, #53). Une personne reconnue ne voit que les modules qui ont une source active du foyer ou de son profil ; tant que personne n’est reconnu, un module est proposé dès qu’une source active existe. La consigne de délégation ne nomme plus de module précis.
+- **Modules → client HTTP** : l’encodage d’une réponse est fixé à la lecture, et chaque module reçoit sa copie des en-têtes : un module qui modifiait les en-têtes d’une réponse du cache partagé changeait le texte lu par les autres. `createTestModule` décode avec l’encodage déclaré, comme le cœur.
+- **Mémoire** : dans un même lot, deux corrections à identifiant inventé sur un même sujet nouveau, ou un ajout suivi d’une telle correction, ne deviennent plus deux souvenirs contradictoires. Le sujet est comparé sans casse ni espaces superflus.
+- **Home Assistant → thermostats** : sans `target_temp_step`, relire l’ancienne consigne (20 °C pour 20,5 °C demandés) ne confirme plus un changement qui n’a pas eu lieu.
+- **Home Assistant → modes** : les boutons d’un mode (`input_boolean`) disent « Activer » et « Désactiver ».
+- **Satellites** : chaque demande d’association est liée à sa connexion, avec un identifiant temporaire ; une reconnexion invalide l’ancienne demande, et une demande en attente expire après cinq minutes. Un appareil qui se reconnecte sous le même nom ne peut plus reprendre la demande d’un autre. Le protocole reste en version 1.
+- **Dépendances** : `body-parser` 2.4.0 (avis de sécurité GHSA-27r3-jxmh-p828, non exploitable dans Cornelius, qui sert son API avec Fastify).
+- **Documentation** : la référence des modules ne contient plus la copie de son début insérée au milieu du tableau `AddonDefinition`.
 
 ### 2026-11-12 : la météo hors de France
 
@@ -120,6 +123,22 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 - Home Assistant et architecture : couleur et blanc de `home_assistant__control`, comparaison à pleine intensité.
 - Test de la route `POST /api/admin/home-assistant/control` avec `rgbColor`.
 
+### 2026-11-08 : consigne des thermostats
+
+**Ajouté**
+
+- **Home Assistant → Régler les thermostats** (désactivé par défaut) : nouvel outil `home_assistant__climate`, pour la consigne seulement (« mets le bureau à 20 degrés »). La valeur est ramenée à la plage et au pas du thermostat, envoyée par `climate/set_temperature` puis confirmée par relecture ; un thermostat arrêté est refusé, le mode n’est jamais changé. Réglage `climateControl` de `PATCH /api/admin/home-assistant/access`, table `home_assistant_climate`. Les thermostats restent lisibles par `home_assistant__read`.
+
+### 2026-11-08 : modes, ventilateurs, scripts et scènes
+
+**Ajouté**
+
+- **Home Assistant** : `input_boolean.*` (modes, « passe en mode nuit »), `fan.*`, `script.*` et `scene.*` se commandent avec `home_assistant__control`. Un script se lance (`turn_on`) et s’arrête (`turn_off`), une scène s’active seulement ; leur lancement est confirmé par la mise à jour de l’état. Les ventilateurs et scènes suivent l’exposition par défaut de Home Assistant pour l’import Assist. L’administration affiche « Lancer », « Arrêter » ou « Activer » selon le type.
+
+**Changé**
+
+- `input_boolean.*` passe des capteurs (lecture seule) aux appareils commandables. À la mise à jour, les `input_boolean` déjà cochés sont décochés : une sélection faite pour lire un mode ne devient pas une autorisation de le changer. Recochez ceux que Cornelius doit pouvoir changer.
+
 ### 2026-11-08 : nouveaux appareils Home Assistant signalés
 
 **Ajouté**
@@ -139,6 +158,7 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 **Ajouté**
 
 - Source expérimentale Google Photos : lien d’album partagé, aperçu, actualisation réglable et retour aux images locales. Les images sont relayées depuis Google sans import sur disque, sans clé API ni connexion au compte. Le connecteur dépend du format non officiel de la page partagée et ne lit que sa page initiale (500 entrées au maximum). Voir [les réglages et limites](docs/fonctionnalites/google-photos.md).
+
 ## 0.3.0 · 2026-11-09
 
 Les satellites gagnent le bouton qui ferme la conversation, le volume à la voix et une fin de parole propre à chacun. Home Assistant règle la couleur et le blanc des lumières. S’y ajoutent les alarmes, minuteurs et rappels, le déclencheur Home Assistant et le serveur Live compatible.
