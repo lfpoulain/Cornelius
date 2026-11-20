@@ -13,6 +13,7 @@ import { isOrbScale, ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
 import { AdminPassword, equalSecret, newPasswordError } from './admin-password.js';
 import { SecretStore, secretValueError } from './secrets.js';
 import { TrustedDevices } from './trusted-devices.js';
+import { TailscalePortable } from './tailscale.js';
 import { allowedHostname, isLoopback, isPrivateAddress, localAddresses } from './network.js';
 import { isOpening } from '../shared/opening.js';
 import { duplicateNameMessage } from '../shared/profile-names.js';
@@ -224,6 +225,17 @@ export async function createApp(
   const customProvider = new CustomProviderRepository(db);
   const profiles = new ProfileRepository(db);
   const trustedDevices = new TrustedDevices(db, now);
+  // Cornelius portable : un tailscaled voisin, piloté depuis l'administration. Il relaie vers le
+  // port HTTPS du réseau local quand il est ouvert, sinon vers le port HTTP de la boucle locale
+  // (tailscaled partage alors le réseau de Cornelius : installation native, ou conteneur en
+  // network_mode: service).
+  const portable = new TailscalePortable(
+    config.tailscaleSocket ?? null,
+    config.tailscaleTarget ??
+      (config.lan
+        ? `https+insecure://127.0.0.1:${config.httpsPort ?? 3443}`
+        : `http://127.0.0.1:${config.port ?? 3000}`),
+  );
   const adminPassword = new AdminPassword(db, config.adminPassword, DEFAULT_ADMIN_PASSWORD, now);
   const defaultPassword = () => adminPassword.isDefault();
   if (defaultPassword())
@@ -735,7 +747,7 @@ export async function createApp(
       path: '/',
       httpOnly: true,
       sameSite: 'strict',
-      secure: config.secureCookies || request.protocol === 'https',
+      secure: config.secureCookies || request.protocol === 'https' || viaPortable(request),
       maxAge: adminSessionSeconds,
     });
   }
@@ -756,7 +768,7 @@ export async function createApp(
       path: '/',
       httpOnly: true,
       sameSite: 'strict',
-      secure: config.secureCookies || request.protocol === 'https',
+      secure: config.secureCookies || request.protocol === 'https' || viaPortable(request),
       maxAge: 365 * 24 * 3600,
     });
     return id;
@@ -779,8 +791,19 @@ export async function createApp(
    * elle est injectée dans le processus (tests, WebSocket simulés).
    */
   function fromLoopback(request: FastifyRequest): boolean {
+    if (viaPortable(request)) return false;
     const socket = request.raw.socket as { remoteAddress?: string } | undefined;
     return !socket || isLoopback(socket.remoteAddress);
+  }
+  /**
+   * La requête arrive par Cornelius portable : son hôte est le nom de Cornelius sur le réseau
+   * privé Tailscale. `tailscaled` la relaie depuis la boucle locale (ou depuis son conteneur) :
+   * elle vient pourtant d'un téléphone. Elle n'est donc jamais traitée comme venant de la
+   * machine, et passe par l'autorisation d'un appareil, comme un appareil du réseau local.
+   */
+  function viaPortable(request: FastifyRequest): boolean {
+    const host = request.hostname.toLowerCase();
+    return portable.hostnames().some((name) => name.toLowerCase() === host);
   }
   /**
    * La requête vient de l'ordinateur du miroir, qui n'a besoin d'aucune autorisation. Sans
@@ -820,9 +843,14 @@ export async function createApp(
     // Clients : la machine elle-même, et le réseau local quand il est ouvert. Une adresse
     // publique (port redirigé par un routeur) est toujours refusée.
     const lan = config.lan === true;
-    if (!fromLoopback(request) && !(lan && isPrivateAddress(request.raw.socket?.remoteAddress)))
+    // Cornelius portable : relayé par tailscaled, depuis la boucle locale ou son conteneur
+    // (adresse privée), même quand le réseau local est fermé (CORNELIUS_LAN=0). Son nom vient de
+    // tailscaled : il est accepté sans CORNELIUS_ALLOWED_HOSTS.
+    const remote = request.raw.socket?.remoteAddress;
+    const portableRelay = viaPortable(request) && (isLoopback(remote) || isPrivateAddress(remote));
+    if (!portableRelay && !fromLoopback(request) && !(lan && isPrivateAddress(remote)))
       return reply.code(403).send({ error: 'Accès réservé au réseau local.' });
-    if (!allowedHostname(request.hostname, lan, config.allowedHosts ?? []))
+    if (!portableRelay && !allowedHostname(request.hostname, lan, config.allowedHosts ?? []))
       return reply.code(403).send({ error: 'Hôte non autorisé.' });
     // Tous les contrôles ci-dessous lisent le chemin décodé, celui que le routeur servira.
     const path = requestPath(request.url);
@@ -842,7 +870,10 @@ export async function createApp(
     const origin = request.headers.origin;
     const mutation = !['GET', 'HEAD', 'OPTIONS'].includes(request.method);
     // Même origine que la page (miroir ou administration ouverts depuis un autre appareil).
-    const sameOrigin = origin === `${request.protocol}://${request.host}`;
+    // Par Cornelius portable, le navigateur parle HTTPS à tailscaled, qui peut relayer en HTTP.
+    const sameOrigin =
+      origin === `${request.protocol}://${request.host}` ||
+      (portableRelay && origin === `https://${request.host}`);
     if (
       (origin && !config.origins.includes(origin) && !sameOrigin) ||
       ((mutation ||
@@ -1326,6 +1357,57 @@ export async function createApp(
       secretStore.delete(request.params.env);
       return { secrets: secretViews() };
     },
+  );
+  // Cornelius portable : état, connexion au compte, publication sur le réseau privé, déconnexion.
+  const portableReply = async (
+    reply: { code(status: number): { send(body: unknown): unknown } },
+    action: () => Promise<void>,
+    wait?: (status: Awaited<ReturnType<TailscalePortable['status']>>) => boolean,
+  ) => {
+    try {
+      await action();
+    } catch (error) {
+      logs.write('warn', 'local', 'Cornelius portable : action refusée', { error });
+      return reply
+        .code(502)
+        .send({ error: error instanceof Error ? error.message : String(error) });
+    }
+    // Tailscale applique certaines actions avec un léger retard (lien de connexion, certificat) :
+    // quelques secondes au plus, quelle que soit la lenteur de chaque lecture.
+    const deadline = Date.now() + 5000;
+    let status = await portable.status();
+    while (wait && !wait(status) && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      status = await portable.status();
+    }
+    return status;
+  };
+  app.get('/api/admin/portable', { preHandler: requireAdmin }, async () => portable.status());
+  app.post('/api/admin/portable/connect', { preHandler: requireAdmin }, async (_request, reply) =>
+    portableReply(
+      reply,
+      () => portable.connect(),
+      (status) => !!status.authUrl || status.state === 'running',
+    ),
+  );
+  app.post<{ Body: { on?: unknown } }>(
+    '/api/admin/portable/serve',
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      const on = request.body?.on === true;
+      return portableReply(
+        reply,
+        () => portable.setServing(on),
+        (status) => status.serving === on,
+      );
+    },
+  );
+  app.post('/api/admin/portable/logout', { preHandler: requireAdmin }, async (_request, reply) =>
+    portableReply(
+      reply,
+      () => portable.logout(),
+      (status) => status.state !== 'running',
+    ),
   );
   // Retire l'autorisation de tous les appareils du réseau : chacun devra se reconnecter.
   app.delete('/api/admin/trusted-devices', { preHandler: requireAdmin }, async () => {
@@ -2006,6 +2088,13 @@ export async function createApp(
           if (kiosk?.socket.readyState === 1) kiosk.socket.ping();
           broadcast(controller.keepalive());
         }, 1000);
+  // Cornelius portable : le nom privé est connu dès le démarrage, puis suivi.
+  const portableTimer =
+    options.timers === false || !portable.configured
+      ? null
+      : setInterval(() => void portable.status().catch(() => {}), 30_000);
+  if (portableTimer) void portable.status().catch(() => {});
+  portableTimer?.unref();
   heartbeatTimer?.unref();
   controllerTimer?.unref();
   app.addHook('onClose', async () => {
@@ -2014,6 +2103,7 @@ export async function createApp(
     logs.write('info', 'local', 'Arrêt du serveur');
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     if (controllerTimer) clearInterval(controllerTimer);
+    if (portableTimer) clearInterval(portableTimer);
     unsubscribe();
     ambient.dispose();
     homeAssistant.dispose();
