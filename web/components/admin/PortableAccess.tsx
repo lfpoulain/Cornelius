@@ -67,20 +67,23 @@ export function PortableAccess({ run }: { run: RunAction }) {
   const [confirming, setConfirming] = useState(false);
   const switchId = useId();
 
-  // État suivi seul : vite pendant la connexion au compte, lentement ensuite.
+  // État suivi seul : vite pendant la connexion au compte, lentement ensuite. Sans tailscaled
+  // configuré, la carte reste masquée et rien n'est plus demandé.
   useEffect(() => {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     const refresh = async () => {
       try {
         const next = await api.portable();
-        if (!stopped) setStatus(next);
+        if (stopped) return;
+        setStatus(next);
+        if (!next.configured) return;
         timer = setTimeout(
           refresh,
           next.state === 'needs-login' || next.state === 'starting' ? 2000 : 15000,
         );
       } catch {
-        timer = setTimeout(refresh, 15000);
+        if (!stopped) timer = setTimeout(refresh, 15000);
       }
     };
     void refresh();
@@ -184,7 +187,7 @@ export function PortableAccess({ run }: { run: RunAction }) {
             </dl>
 
             {!status.https && (
-              <p className="rounded-lg border border-[#e8bc8866] bg-[#2a2519] px-3.5 py-3 text-[#f3d7b0]">
+              <p className="rounded-lg border border-warning/40 bg-warning/10 px-3.5 py-3 text-warning">
                 Les certificats HTTPS ne sont pas encore permis sur votre réseau privé. Dans la
                 console Tailscale, page DNS, activez « MagicDNS » puis « HTTPS Certificates », puis
                 revenez ici.
@@ -248,7 +251,7 @@ export function PortableAccess({ run }: { run: RunAction }) {
                 <h3 className="font-medium">Appareils du réseau privé</h3>
                 <ul className="mt-1 divide-y" aria-label="Appareils du réseau privé">
                   {status.devices.map((device) => (
-                    <li key={device.name} className="flex flex-wrap gap-x-3 py-1.5">
+                    <li key={device.id} className="flex flex-wrap gap-x-3 py-1.5">
                       <span
                         className={`mt-1.5 inline-block size-2 rounded-full ${device.online ? 'bg-success' : 'bg-input'}`}
                         aria-hidden="true"
@@ -263,7 +266,7 @@ export function PortableAccess({ run }: { run: RunAction }) {
               </div>
             )}
 
-            <p className="flex items-start gap-2.5 rounded-lg border border-[#93e0cd44] bg-[#93e0cd0d] px-3.5 py-3 text-xs">
+            <p className="flex items-start gap-2.5 rounded-lg border border-primary/20 bg-primary/5 px-3.5 py-3 text-xs">
               <LockKeyhole className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>
                 Cornelius reste fermé à Internet : seuls les appareils connectés à votre compte

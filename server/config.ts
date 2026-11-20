@@ -43,6 +43,8 @@ export interface AppConfig {
   lan?: boolean;
   /** Annonce mDNS (_cornelius._tcp) pour les satellites audio ; vraie par défaut. */
   mdns?: boolean;
+  /** Port HTTP de la boucle locale (PORT, 3000 par défaut). */
+  port?: number;
   /** Port HTTPS du réseau local (le port HTTP, lui, ne sert que la machine). */
   httpsPort?: number;
   tlsCert?: string;
@@ -54,7 +56,10 @@ export interface AppConfig {
    * (CORNELIUS_TAILSCALE_SOCKET). Absent, la fonction n'apparaît pas.
    */
   tailscaleSocket?: string;
-  /** Adresse où Tailscale relaie Cornelius (CORNELIUS_TAILSCALE_TARGET). */
+  /**
+   * Adresse où Tailscale relaie Cornelius (CORNELIUS_TAILSCALE_TARGET). Par défaut le port
+   * HTTPS de la boucle locale, ou son port HTTP quand le réseau local est fermé.
+   */
   tailscaleTarget?: string;
   /** Empreinte du certificat HTTPS en service, affichée dans l'administration. */
   tlsFingerprint?: string;
@@ -135,8 +140,8 @@ export function loadConfig(): AppConfig & { port: number } {
       .map((host) => host.trim())
       .filter(Boolean),
     tailscaleSocket: process.env.CORNELIUS_TAILSCALE_SOCKET?.trim() || undefined,
-    tailscaleTarget:
-      process.env.CORNELIUS_TAILSCALE_TARGET?.trim() || `https+insecure://127.0.0.1:${httpsPort}`,
+    // Sans réglage, la cible dépend du réseau local (voir createApp).
+    tailscaleTarget: process.env.CORNELIUS_TAILSCALE_TARGET?.trim() || undefined,
     openaiKey: process.env.OPENAI_API_KEY || undefined,
     perceptionToken: process.env.CORNELIUS_PERCEPTION_TOKEN || undefined,
     imageGenerationToken: process.env.CORNELIUS_IMAGE_GENERATION_TOKEN || undefined,

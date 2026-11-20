@@ -2,6 +2,8 @@
 export type PortableState = 'unavailable' | 'stopped' | 'needs-login' | 'starting' | 'running';
 
 export interface PortableDevice {
+  /** Identifiant du nœud Tailscale, unique même si deux appareils portent le même nom. */
+  id: string;
   name: string;
   os: string;
   online: boolean;

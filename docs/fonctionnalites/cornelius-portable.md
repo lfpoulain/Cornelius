@@ -19,7 +19,13 @@ Si l’interrupteur reste grisé, les certificats HTTPS ne sont pas permis sur v
 
 - Rien n’est ouvert sur la box : Tailscale relie les appareils entre eux, sans redirection de port.
 - Cornelius est publié avec `serve` (réseau privé), jamais avec `funnel` (Internet).
-- Un téléphone retiré de votre compte Tailscale ne voit plus Cornelius. Pour retirer aussi son autorisation, utilisez **Retirer les autorisations** dans la carte **Accès depuis le réseau local**.
+- **Un téléphone n’est jamais « l’ordinateur du miroir ».** Tailscale relaie chaque requête depuis la machine elle-même (ou depuis son conteneur), mais Cornelius reconnaît son nom privé et traite la requête comme celle d’un appareil du réseau local : le miroir, les événements, le son et la caméra demandent une autorisation, donnée à la première connexion avec le mot de passe administrateur ; le mot de passe par défaut n’ouvre pas l’administration ; la perception et le générateur d’images restent réservés à la machine.
+- Un téléphone retiré de votre compte Tailscale ne voit plus Cornelius. Pour retirer aussi son autorisation, utilisez **Retirer les autorisations** dans la carte **Accès depuis le réseau local** : les miroirs ouverts par Cornelius portable sont déconnectés aussi.
+
+## Limites
+
+- **Un Tailscale dédié à Cornelius.** Cornelius ne retire que la publication qu’il a créée, et refuse d’ouvrir Cornelius portable si le port 443 de ce Tailscale publie déjà autre chose. Mais **Déconnecter** déconnecte tout le démon : si le socket visait le Tailscale de la machine hôte, la machine entière quitterait le réseau privé. Cornelius refuse cette déconnexion quand le démon publie d’autres services ; dans tous les cas, utilisez le Tailscale voisin décrit plus bas, réservé à Cornelius.
+- **Limite des connexions partagée.** Tous les téléphones arrivent par Tailscale avec la même adresse : la limite des tentatives de connexion (`CORNELIUS_LOGIN_RATE_LIMIT`) est commune à tous. Quelques mots de passe erronés sur un téléphone font patienter brièvement les autres.
 
 ## Installation : le Tailscale voisin
 
@@ -62,6 +68,10 @@ services:
 - Le démon est lancé directement, sans le script de démarrage de l’image : celui-ci n’accorde qu’une minute pour se connecter, puis redémarre et invalide le lien.
 
 Le nom privé de Cornelius est accepté automatiquement : inutile de l’ajouter à `CORNELIUS_ALLOWED_HOSTS`.
+
+### Avec le réseau local fermé
+
+Cornelius portable fonctionne aussi avec `CORNELIUS_LAN=0` : seul le réseau local est fermé. Cornelius n’écoute alors qu’en HTTP sur la boucle locale (`PORT`, 3000 par défaut), et Tailscale doit partager son réseau : installation native sur la même machine, ou conteneur Tailscale en `network_mode: service:cornelius`. La cible par défaut devient `http://127.0.0.1:3000` ; le téléphone, lui, parle toujours HTTPS avec le certificat de Tailscale. Le montage de l’exemple ci-dessus, avec deux conteneurs sur un réseau Docker, demande le réseau local ouvert (port HTTPS sur toutes les interfaces).
 
 ## Voir aussi
 

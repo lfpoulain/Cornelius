@@ -155,6 +155,8 @@ export class TailscalePortable {
       url: serving && dnsName ? `https://${dnsName}` : null,
       devices: peers
         .map((peer) => ({
+          // Identifiant du nœud : deux téléphones peuvent porter le même nom (« iphone »).
+          id: String(peer.ID || peer.PublicKey || peer.DNSName || ''),
           name: String(
             peer.HostName || noDot(String(peer.DNSName ?? '')).split('.')[0] || 'Appareil',
           ),
@@ -176,24 +178,63 @@ export class TailscalePortable {
     if (reply.status >= 300) throw new Error(`Connexion refusée par Tailscale (${reply.status}).`);
   }
 
-  /** Publie Cornelius sur le réseau privé (HTTPS, port 443), ou retire la publication. */
+  /**
+   * Ce que ce `tailscaled` publie en dehors de Cornelius : ports, sites ou publication publique.
+   * Cornelius ne touche jamais à ces entrées.
+   */
+  private others(config: Json, dnsName: string): boolean {
+    const key = `${dnsName}:443`;
+    const ours = this.servesCornelius(config, dnsName);
+    const tcp = Object.keys(config.TCP ?? {}).filter((port) => !(ours && port === '443'));
+    const web = Object.entries((config.Web ?? {}) as Record<string, Json>).filter(
+      ([name, site]) =>
+        !(ours && name === key && Object.keys(site?.Handlers ?? {}).every((path) => path === '/')),
+    );
+    const funnel = Object.values((config.AllowFunnel ?? {}) as Record<string, boolean>).some(
+      Boolean,
+    );
+    return tcp.length > 0 || web.length > 0 || funnel || !!config.Services;
+  }
+
+  /**
+   * Publie Cornelius sur le réseau privé (HTTPS, port 443), ou retire la publication. Seule la
+   * publication de Cornelius est ajoutée ou retirée : un port 443 déjà pris par autre chose
+   * n'est jamais remplacé, et le reste de la configuration est gardé tel quel.
+   */
   async setServing(on: boolean): Promise<void> {
     const status = await this.json('GET', 'status');
     const dnsName = status.Self?.DNSName ? noDot(String(status.Self.DNSName)) : null;
     if (!dnsName) throw new Error('Ce serveur n’est pas encore connecté au réseau privé.');
     const { config, etag } = await this.serveConfig();
     const key = `${dnsName}:443`;
+    const ours = this.servesCornelius(config, dnsName);
     const next: Json = {
       ...config,
       TCP: { ...(config.TCP ?? {}) },
       Web: { ...(config.Web ?? {}) },
     };
     if (on) {
+      if (ours) {
+        this.knownName = dnsName;
+        return;
+      }
+      if (config.TCP?.['443'] || config.Web?.[key])
+        throw new Error(
+          'Le port 443 de ce Tailscale publie déjà autre chose : Cornelius ne le remplace pas. Utilisez un Tailscale dédié à Cornelius.',
+        );
       next.TCP['443'] = { HTTPS: true };
       next.Web[key] = { Handlers: { '/': { Proxy: this.target } } };
     } else {
-      delete next.TCP['443'];
-      delete next.Web[key];
+      // Rien de Cornelius à retirer : la configuration n'est pas touchée.
+      if (!ours) return;
+      const site = config.Web[key] as Json;
+      const handlers: Json = { ...site.Handlers };
+      delete handlers['/'];
+      if (Object.keys(handlers).length) next.Web[key] = { ...site, Handlers: handlers };
+      else {
+        delete next.Web[key];
+        delete next.TCP['443'];
+      }
     }
     // Jamais sur Internet : la publication publique (« funnel ») n'est pas touchée ici et reste
     // désactivée.
@@ -205,8 +246,18 @@ export class TailscalePortable {
     if (on) this.knownName = dnsName;
   }
 
-  /** Déconnecte ce serveur du compte : l'adresse privée disparaît. */
+  /**
+   * Déconnecte ce serveur du compte : l'adresse privée disparaît. Refusé si ce `tailscaled`
+   * publie autre chose que Cornelius : il n'est pas dédié à Cornelius, et le déconnecter
+   * couperait aussi ces services.
+   */
   async logout(): Promise<void> {
+    const status = await this.json('GET', 'status');
+    const dnsName = status.Self?.DNSName ? noDot(String(status.Self.DNSName)) : null;
+    if (dnsName && this.others((await this.serveConfig()).config, dnsName))
+      throw new Error(
+        'Ce Tailscale publie aussi d’autres services : le déconnecter les couperait. Il n’est pas dédié à Cornelius ; déconnectez-le depuis son hôte.',
+      );
     try {
       await this.setServing(false);
     } catch {
