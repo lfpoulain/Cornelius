@@ -23,6 +23,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 - [Les satellites audio](docs/fonctionnalites/satellites.md) et [la documentation](docs/README.md) renvoient vers la page du satellite Android.
 
+### 2026-11-12 : icônes dans les cartes des modules
+
+**Ajouté**
+
+- Modules : une carte et l’affichage permanent peuvent porter des icônes, sur la valeur principale et devant chaque ligne (`icon`, facultatif). Liste fermée `cardIcons` (noms Lucide : soleil, nuages, pluie, neige, verglas, orage, brouillard, vent, thermomètre, alerte…), dessinée par le miroir à la taille du texte. Les icônes sont décoratives : le texte et l’oral ne changent pas. Aucun changement pour les modules existants.
+
 ### 2026-11-11 : installation des modules et mises à jour
 
 **Ajouté**
@@ -105,7 +111,6 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 **Ajouté**
 
 - Source expérimentale Google Photos : lien d’album partagé, aperçu, actualisation réglable et retour aux images locales. Les images sont relayées depuis Google sans import sur disque, sans clé API ni connexion au compte. Le connecteur dépend du format non officiel de la page partagée et ne lit que sa page initiale (500 entrées au maximum). Voir [les réglages et limites](docs/fonctionnalites/google-photos.md).
-
 ## 0.3.0 · 2026-11-09
 
 Les satellites gagnent le bouton qui ferme la conversation, le volume à la voix et une fin de parole propre à chacun. Home Assistant règle la couleur et le blanc des lumières. S’y ajoutent les alarmes, minuteurs et rappels, le déclencheur Home Assistant et le serveur Live compatible.

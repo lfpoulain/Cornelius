@@ -576,6 +576,7 @@ export class AddonRuntime {
       addonId: addon.id,
       instanceRef: instance.ref,
       title: presentation.title,
+      ...(presentation.icon ? { icon: presentation.icon } : {}),
       primaryValue: presentation.primaryValue,
       subtitle: presentation.subtitle,
       description: presentation.description,

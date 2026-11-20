@@ -1214,3 +1214,15 @@ body {
     animation: none;
   }
 }
+
+/* Icônes des cartes et de l'affichage permanent (cardIcons) : à la taille du texte qu'elles
+   précèdent, alignées sur sa ligne. */
+.card-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.35em;
+  vertical-align: -0.14em;
+  flex-shrink: 0;
+  stroke-width: 1.75;
+}

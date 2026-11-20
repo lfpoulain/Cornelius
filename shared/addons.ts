@@ -52,10 +52,12 @@ export interface ModuleCard {
   addonId: string;
   instanceRef: string | null;
   title: string;
+  /** Icône de la valeur principale (`cardIcons`), facultative. */
+  icon?: CardIcon;
   primaryValue: string | null;
   subtitle: string | null;
   description: string | null;
-  items: { label: string; value: string }[];
+  items: CardItem[];
   sources: string[];
   snapshotId: string;
   stale: boolean;
@@ -161,10 +163,12 @@ export interface AddonPresentContext {
 
 export interface AddonPresentation {
   title: string;
+  /** Icône de la valeur principale (`cardIcons`), facultative. */
+  icon?: CardIcon;
   primaryValue: string | null;
   subtitle: string | null;
   description: string | null;
-  items: { label: string; value: string }[];
+  items: CardItem[];
   /** Faits courts destinés à l'oral. */
   summary: string;
   sources?: string[];
@@ -176,9 +180,11 @@ export interface AddonAmbientPresentation {
   showCollectedAt?: boolean;
   layout: 'metric' | 'list';
   title: string;
+  /** Icône de la valeur (`cardIcons`), facultative. */
+  icon?: CardIcon;
   value: string | null;
   subtitle: string | null;
-  items: { label: string; value: string }[];
+  items: CardItem[];
   /**
    * Instant (ISO 8601) où cette présentation cesse d'être juste sans nouvelle collecte :
    * 17 h pour « ce soir », la fin d'un rendez-vous, minuit. Le cœur la recalcule alors, sans
@@ -266,6 +272,49 @@ export const addonIcons = [
 ] as const;
 
 export type AddonIcon = (typeof addonIcons)[number];
+
+/**
+ * Icônes des cartes du miroir et de l'affichage permanent (noms Lucide) : météo et alertes.
+ * Liste fermée, comme celle de l'administration : un nom inconnu rend la carte non conforme.
+ * Un module qui s'en sert déclare le `minCoreVersion` qui l'apporte, ou vérifie que
+ * `cardIcons` existe avant d'envoyer une icône.
+ */
+export const cardIcons = [
+  'cloud',
+  'cloud-drizzle',
+  'cloud-fog',
+  'cloud-hail',
+  'cloud-lightning',
+  'cloud-moon',
+  'cloud-moon-rain',
+  'cloud-rain',
+  'cloud-snow',
+  'cloud-sun',
+  'cloud-sun-rain',
+  'droplets',
+  'haze',
+  'moon',
+  'snowflake',
+  'sun',
+  'sunrise',
+  'sunset',
+  'thermometer',
+  'thermometer-snowflake',
+  'thermometer-sun',
+  'tornado',
+  'triangle-alert',
+  'umbrella',
+  'wind',
+] as const;
+
+export type CardIcon = (typeof cardIcons)[number];
+
+/** Ligne d'une carte : libellé, valeur et, facultative, une icône devant le libellé. */
+export interface CardItem {
+  label: string;
+  value: string;
+  icon?: CardIcon;
+}
 
 /**
  * Présentation du module dans l'administration, facultative : sans elle, le module prend

@@ -259,16 +259,75 @@ Adaptez la correspondance aux statuts réels du fournisseur. `retryable` informe
 | Champ | Limite |
 | --- | --- |
 | `title` | 1 à 80 caractères |
+| `icon` | Facultatif : icône de la valeur principale, un nom de `cardIcons` |
 | `primaryValue` | `null` ou 1 à 120 caractères |
 | `subtitle` | `null` ou 1 à 120 caractères |
 | `description` | `null` ou 1 à 500 caractères |
-| `items` | 5 lignes `{ label, value }` au plus ; 1 à 80 et 1 à 160 caractères |
+| `items` | 5 lignes `{ label, value, icon? }` au plus ; 1 à 80 et 1 à 160 caractères ; `icon` facultatif, devant le libellé |
 | `sources` | Facultatif ; 3 chaînes distinctes au plus, de 1 à 128 caractères ; les modules fournis y mettent leur `id` |
 | `summary` | 1 à 500 caractères : des faits courts à dire, pas une consigne au modèle |
 
 Un champ vide vaut `null`, jamais `''`. Aucun HTML, code ou instruction : du texte et des faits. L’oral et la carte DOIVENT venir du même relevé. Un relevé `stale` DEVRAIT être annoncé comme « dernier relevé connu ».
 
 Le cœur ajoute `schemaVersion`, `cardType`, `addonId`, `instanceRef`, `snapshotId` et `stale`, puis vérifie la carte. **En cas de refus** (champ trop long, trop de lignes, chaîne vide) ou si `present` lève une exception, l’outil échoue en `malformed` et Cornelius dit « Données reçues mais illisibles. ». Le journal note « Carte de module non conforme » avec les premières erreurs, ou « Présentation de carte impossible ». Le miroir garde trois cartes au plus.
+
+### Les icônes des cartes
+
+Une carte peut porter une icône sur sa valeur principale (`icon` de la présentation) et devant le libellé de chaque ligne (`icon` d’un élément de `items`). L’affichage permanent aussi : `icon` sur `value` et sur ses lignes. Le miroir les dessine à la taille du texte qu’elles précèdent ([web/components/card-icons.tsx](../../web/components/card-icons.tsx)).
+
+Le nom vient d’une **liste fermée**, `cardIcons` de `#cornelius/addons` (noms [Lucide](https://lucide.dev/icons/)) :
+
+| Usage | Noms |
+| --- | --- |
+| Ciel | `sun`, `moon`, `cloud`, `cloud-sun`, `cloud-moon`, `haze` |
+| Précipitations | `cloud-drizzle`, `cloud-rain`, `cloud-sun-rain`, `cloud-moon-rain`, `cloud-snow`, `snowflake`, `cloud-hail` (verglas, grêle), `umbrella`, `droplets` |
+| Orages, brouillard, vent | `cloud-lightning`, `cloud-fog`, `wind`, `tornado` |
+| Températures, soleil | `thermometer`, `thermometer-snowflake`, `thermometer-sun`, `sunrise`, `sunset` |
+| Alerte | `triangle-alert` |
+
+Règles :
+
+- Une icône est **décorative** : le texte qui l’accompagne DOIT dire la même chose (« Neige faible », pas une ligne vide), et l’oral (`summary`) ne la cite pas.
+- Un nom hors de la liste rend la carte non conforme (« Données reçues mais illisibles. »). Un module ne DOIT pas en inventer : un besoin nouveau (transports, maison…) se propose dans Cornelius, qui allonge la liste et la table du miroir ensemble.
+- Sans icône, rien ne change : le champ est facultatif, et la carte d’un module qui ne s’en sert pas reste la même.
+
+Exemple (un module météo) :
+
+```ts
+present(snapshot) {
+  const data = snapshot.data!;
+  return {
+    title: `Météo · ${data.ville}`,
+    icon: 'cloud-sun', // la valeur principale
+    primaryValue: '2 °C',
+    subtitle: 'Partiellement nuageux',
+    description: null,
+    items: [
+      { label: 'Ce soir', value: 'Neige faible, min. −6 °C', icon: 'cloud-snow' },
+      { label: 'Vent', value: '25 km/h' }, // une ligne sans icône
+    ],
+    summary: 'À Québec, il fait 2 degrés, partiellement nuageux. Ce soir, neige faible.',
+  };
+}
+```
+
+**Compatibilité.** Un cœur plus ancien ne connaît pas `icon` et **refuse la carte entière**. Un module qui veut aussi fonctionner sur ce cœur ne DOIT donc envoyer une icône que si `cardIcons` existe, et la remplacer sinon par un émoji dans le texte (ce que fait le module Météo Canada) :
+
+```ts
+import * as contrat from '#cornelius/addons';
+
+const icones = (contrat as { cardIcons?: readonly string[] }).cardIcons;
+/** Une icône si le cœur la dessine, sinon rien (la carte reste conforme partout). */
+const icone = (nom: string) => (icones?.includes(nom) ? { icon: nom } : {});
+const avecEmoji = (nom: string, emoji: string, texte: string) =>
+  icones?.includes(nom) ? texte : `${emoji} ${texte}`;
+
+items.push({ label: avecEmoji('cloud-snow', '🌨️', 'Ce soir'), value: 'Neige faible', ...icone('cloud-snow') });
+```
+
+Un module qui ne veut fonctionner qu’avec les icônes déclare plutôt le `minCoreVersion` qui les apporte, sans détection.
+
+**Tester.** `createTestModule` vérifie la carte avec le même schéma que le cœur : `f.contract(result)` signale une icône inconnue. Un test peut couvrir les deux cœurs en lisant la même détection (`cardIcons` présent ou non) pour choisir le résultat attendu.
 
 ## L’affichage permanent
 
@@ -278,9 +337,10 @@ Le cœur ajoute `schemaVersion`, `cardType`, `addonId`, `instanceRef`, `snapshot
 | --- | --- |
 | `layout` | `'metric'` (une valeur en grand) ou `'list'` (des lignes) |
 | `title` | 1 à 80 caractères |
+| `icon` | Facultatif : icône de la valeur, un nom de `cardIcons` |
 | `value` | `null` ou 1 à 120 caractères |
 | `subtitle` | `null` ou 1 à 120 caractères |
-| `items` | 3 lignes `{ label, value }` au plus ; 1 à 80 et 1 à 160 caractères |
+| `items` | 3 lignes `{ label, value, icon? }` au plus ; 1 à 80 et 1 à 160 caractères ; `icon` facultatif |
 | `showCollectedAt` | Facultatif, vrai par défaut ; faux masque la date du relevé (utile pour un calcul local comme l’heure), sauf en repli |
 | `refreshAt` | Facultatif : instant ISO 8601 où cette présentation cesse d’être juste sans nouvelle collecte |
 
@@ -464,6 +524,7 @@ Les mêmes exports qu’avant restent disponibles : `validateAddonDefinition`, `
 
 | Cornelius | Ajouts compatibles v1 |
 | --- | --- |
+| Prochaine version | Icônes des cartes et de l’affichage permanent : `icon` sur la valeur et sur les lignes, liste `cardIcons` |
 | 0.2.0 | `display` ; `arguments` des outils et `context.args` ; `context.timeZone` ; `refreshAt` de l’affichage permanent ; présentation d’un relevé vide ; fraîcheur jusqu’à 24 heures ; client HTTP : redirections, encodage, `truncated`, `url`, User-Agent, `cacheMs` ; formulaire : listes déroulantes et listes répétées ; `clearLabel` ; `createTestModule` |
 | 0.1.0 | Contrat v1, outil à la demande (`query`), secrets, recherche assistée, affichage permanent, `minCoreVersion` |
 

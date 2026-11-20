@@ -24,6 +24,10 @@
     "addonId": { "type": "string", "minLength": 1, "maxLength": 64 },
     "instanceRef": { "type": ["string", "null"], "minLength": 1, "maxLength": 64 },
     "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "icon": {
+      "description": "Icone facultative de la valeur principale (liste cardIcons du contrat).",
+      "enum": ["cloud", "cloud-drizzle", "cloud-fog", "cloud-hail", "cloud-lightning", "cloud-moon", "cloud-moon-rain", "cloud-rain", "cloud-snow", "cloud-sun", "cloud-sun-rain", "droplets", "haze", "moon", "snowflake", "sun", "sunrise", "sunset", "thermometer", "thermometer-snowflake", "thermometer-sun", "tornado", "triangle-alert", "umbrella", "wind"]
+    },
     "primaryValue": { "type": ["string", "null"], "minLength": 1, "maxLength": 120 },
     "subtitle": { "type": ["string", "null"], "minLength": 1, "maxLength": 120 },
     "description": { "type": ["string", "null"], "minLength": 1, "maxLength": 500 },
@@ -36,7 +40,8 @@
         "required": ["label", "value"],
         "properties": {
           "label": { "type": "string", "minLength": 1, "maxLength": 80 },
-          "value": { "type": "string", "minLength": 1, "maxLength": 160 }
+          "value": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "icon": { "$ref": "#/properties/icon" }
         }
       }
     },
