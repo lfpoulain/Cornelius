@@ -156,6 +156,132 @@ test('mises à jour et oublis automatiques exigent des preuves actuelles et incr
   );
   assert.deepEqual(f.repository.list(f.alice.id), []);
 });
+test('un identifiant inventé par un petit modèle devient un ajout, jamais une écriture ailleurs', (t) => {
+  const f = storeFixture(t);
+  assert.equal(
+    f.repository.apply(
+      f.batch,
+      proposal(
+        change({ operation: 'update', memoryId: 'invente-1' }),
+        change({ memoryId: 'invente-2', topic: 'boisson', fact: 'Préfère le thé vert.' }),
+      ),
+      f.turns,
+    ),
+    true,
+  );
+  const facts = f.repository.list(f.alice.id);
+  assert.deepEqual(facts.map((fact) => fact.fact).sort(), [
+    'Préfère des réponses courtes.',
+    'Préfère le thé vert.',
+  ]);
+  assert.equal(
+    facts.some((fact) => fact.id.startsWith('invente')),
+    false,
+  );
+  const foreign = f.repository.begin('session-bob', f.bob.id, 0)!;
+  const bobTurns = f.turns.map((turn) => ({ ...turn, profileId: f.bob.id }));
+  assert.equal(
+    f.repository.apply(
+      foreign,
+      proposal(change({ operation: 'update', memoryId: facts[0]!.id, fact: 'Remplacé.' })),
+      bobTurns,
+    ),
+    false,
+  );
+  assert.deepEqual(f.repository.list(f.bob.id), []);
+  assert.equal(
+    f.repository.list(f.alice.id).some((fact) => fact.fact === 'Remplacé.'),
+    false,
+  );
+  const unproven = f.repository.begin('session-sans-preuve', f.alice.id, 1)!;
+  assert.equal(
+    f.repository.apply(
+      unproven,
+      proposal(
+        change({ operation: 'update', memoryId: 'invente-4', evidenceTurnIds: ['invented'] }),
+      ),
+      f.turns.map((turn) => ({ ...turn, version: 1 })),
+    ),
+    false,
+  );
+});
+test('une correction inventée sur un sujet connu ou un oubli inventé gardent le rejet du lot', (t) => {
+  const f = storeFixture(t);
+  assert.equal(
+    f.repository.apply(
+      f.batch,
+      proposal(change({ topic: 'boisson', fact: 'Préfère le thé.' })),
+      f.turns,
+    ),
+    true,
+  );
+  const avant = f.repository.list(f.alice.id);
+  assert.deepEqual(
+    avant.map((fact) => fact.fact),
+    ['Préfère le thé.'],
+  );
+  // « En fait je préfère le café » : un update vers un identifiant inventé, sur le même sujet.
+  const correction = f.repository.begin('session-correction', f.alice.id, 1)!;
+  const turns1 = f.turns.map((turn) => ({ ...turn, version: 1 }));
+  assert.equal(
+    f.repository.apply(
+      correction,
+      proposal(
+        change({
+          operation: 'update',
+          memoryId: 'invente-5',
+          topic: 'Boisson ',
+          fact: 'Préfère le café.',
+        }),
+      ),
+      turns1,
+    ),
+    false,
+  );
+  assert.deepEqual(
+    f.repository.list(f.alice.id),
+    avant,
+    'souvenir d’origine intact, pas de doublon',
+  );
+  // Un oubli vers un identifiant inventé : rejeté avec le lot, rien n'est oublié ni ajouté.
+  const oubli = f.repository.begin('session-oubli', f.alice.id, 1)!;
+  assert.equal(
+    f.repository.apply(
+      oubli,
+      proposal(
+        change({ topic: 'sport', fact: 'Joue au hockey.' }),
+        change({ operation: 'forget', memoryId: 'invente-6', topic: 'boisson', fact: null }),
+      ),
+      turns1,
+    ),
+    false,
+  );
+  assert.deepEqual(f.repository.list(f.alice.id), avant);
+  // Témoin : dans les mêmes conditions, une correction inventée sur un autre sujet devient un ajout.
+  const autre = f.repository.begin('session-autre-sujet', f.alice.id, 1)!;
+  assert.equal(
+    f.repository.apply(
+      autre,
+      proposal(
+        change({
+          operation: 'update',
+          memoryId: 'invente-7',
+          topic: 'sport',
+          fact: 'Joue au hockey.',
+        }),
+      ),
+      turns1,
+    ),
+    true,
+  );
+  assert.deepEqual(
+    f.repository
+      .list(f.alice.id)
+      .map((fact) => fact.fact)
+      .sort(),
+    ['Joue au hockey.', 'Préfère le thé.'],
+  );
+});
 test('expiration, déduplication, suppression du profil et reprise sans transcription', (t) => {
   const f = storeFixture(t);
   assert.equal(

@@ -35,6 +35,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 - Modules : `bytes()` sur la réponse du client HTTP rend le corps brut, sans décodage. Un module peut désormais lire un format binaire, que `text()` abîmait sans retour : les flux temps réel GTFS-RT (protobuf) des transports en commun, une image, une archive. Le texte n’est plus décodé qu’à la demande, et le cache partagé compte la taille réelle en octets. Aucun changement pour les modules existants. `createTestModule` accepte une réponse simulée en `Uint8Array`.
 
+### 2026-11-12 : mémoire avec un modèle local
+
+**Corrigé**
+
+- Mémoire : avec un fournisseur personnalisé (Ollama par exemple), un petit modèle propose souvent un fait nouveau sous la forme d’une correction (`update`) vers un identifiant qu’il invente. Le lot entier était rejeté, et rien n’était retenu. Une correction vers un identifiant inconnu devient désormais un ajout, mais seulement si le profil n’a aucun souvenir du même sujet : sinon le lot reste rejeté, pour ne pas garder deux faits contradictoires (« Préfère le thé. » et « Préfère le café. »). Un oubli vers un identifiant inconnu reste rejeté. Un identifiant connu, de ce profil ou d’un autre, garde la vérification stricte, et chaque fait doit toujours citer ses preuves (#45).
+
 ### 2026-11-11 : installation des modules et mises à jour
 
 **Ajouté**
