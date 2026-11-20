@@ -18,6 +18,7 @@ import { validators } from '../../shared/validation.js';
 import { AddonRepository, openDatabase } from '../storage.js';
 import { AddonRuntime, type AddonReadOutcome } from './runtime.js';
 import { validateAddonDefinition } from './registry.js';
+import { charsetOf } from './http.js';
 
 export { AddonRuntime } from './runtime.js';
 export { validateAddonDefinition } from './registry.js';
@@ -78,7 +79,11 @@ function asResponse(reply: TestReply) {
       : new TextEncoder().encode(
           body === undefined ? '' : typeof body === 'string' ? body : JSON.stringify(body),
         );
-  const text = new TextDecoder().decode(bytes);
+  // Même règle que le client du cœur : l'encodage déclaré par l'en-tête ou le document.
+  const contentType =
+    Object.entries(headers ?? {}).find(([name]) => name.toLowerCase() === 'content-type')?.[1] ??
+    null;
+  const text = new TextDecoder(charsetOf(contentType, bytes)).decode(bytes);
   return {
     status,
     headers: headers ?? {},

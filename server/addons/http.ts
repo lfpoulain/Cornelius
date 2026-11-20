@@ -137,25 +137,30 @@ export function networkFailure(error: unknown): AddonCollectError {
 /**
  * Réponse lue, gardée en octets : le texte n'est décodé qu'à la demande, avec l'encodage
  * déclaré. Un format binaire (`bytes()`) n'est donc jamais abîmé par un décodage, et le cache
- * compte la taille réelle du corps.
+ * compte la taille réelle du corps. L'encodage est fixé à la lecture : une réponse servie par
+ * le cache partagé ne dépend pas de ce qu'un autre module a fait de ses en-têtes.
  */
 type Fetched = {
   status: number;
   headers: Record<string, string>;
   bytes: Uint8Array;
+  charset: string;
+  /** Texte décodé au premier `text()` ou `json()`, puis réutilisé. */
+  decoded?: string;
   truncated: boolean;
   url: string;
 };
 
 function textOf(fetched: Fetched): string {
-  const charset = charsetOf(fetched.headers['content-type'] ?? null, fetched.bytes);
-  return new TextDecoder(charset).decode(fetched.bytes);
+  fetched.decoded ??= new TextDecoder(fetched.charset).decode(fetched.bytes);
+  return fetched.decoded;
 }
 
 function respond(fetched: Fetched): AddonHttpResponse {
   return {
     status: fetched.status,
-    headers: fetched.headers,
+    // Copie : un module qui modifie ses en-têtes ne touche pas ceux du cache partagé.
+    headers: { ...fetched.headers },
     text: () => textOf(fetched),
     json: () => JSON.parse(textOf(fetched)) as unknown,
     bytes: () => fetched.bytes.slice(),
@@ -221,6 +226,7 @@ async function send(request: AddonHttpRequest, signal: AbortSignal): Promise<Fet
       status: response.status,
       headers: Object.fromEntries(response.headers.entries()),
       bytes,
+      charset: charsetOf(response.headers.get('content-type'), bytes),
       truncated,
       url: target.href,
     };

@@ -111,6 +111,22 @@ test('encodage : charset de l’en-tête, déclaration XML, sinon UTF-8', async 
   assert.equal(charsetOf('text/html; charset=inconnu', new Uint8Array()), 'utf-8');
 });
 
+test('cache partagé : un module qui modifie ses en-têtes ne change ni l’encodage ni les en-têtes des autres', async (t) => {
+  const latin1 = new Uint8Array([0x63, 0x61, 0x66, 0xe9]); // « café » en ISO-8859-1
+  network(t, {
+    'https://a.example/latin1': () =>
+      new Response(latin1, { headers: { 'content-type': 'text/plain; charset=ISO-8859-1' } }),
+  });
+  const client = createHttpClient();
+  const request = { url: 'https://a.example/latin1', cacheMs: 60_000 };
+  const first = await client.fetch(request);
+  first.headers['content-type'] = 'text/plain; charset=utf-8';
+  const second = await client.fetch(request);
+  assert.equal(second.text(), 'café');
+  assert.equal(second.headers['content-type'], 'text/plain; charset=ISO-8859-1');
+  assert.equal(first.text(), 'café');
+});
+
 test('une réponse coupée à maxBytes le signale ; une réponse entière non', async (t) => {
   network(t, {
     'https://a.example/gros': () => new Response('x'.repeat(5000)),
