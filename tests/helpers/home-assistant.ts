@@ -44,6 +44,8 @@ export async function fakeHomeAssistant() {
     aliasBatchDenied: false,
     malformed: false,
     holdRead: false,
+    /** Thermostat qui arrondit lui-même la consigne au degré, sans annoncer son pas. */
+    climateWholeDegrees: false,
   };
   let releaseRead: (() => void) | undefined;
   const server = createServer(async (req, res) => {
@@ -70,9 +72,14 @@ export async function fakeHomeAssistant() {
       const entity = states.get(String(body.entity_id));
       if (options.apply && entity && options.serviceStatus === 200) {
         const apply = () => {
+          const climate = path.endsWith('/climate/set_temperature');
           // Une scène garde l’heure d’activation ; un script court se termine aussitôt.
           if (path.startsWith('/api/services/scene/')) entity.state = new Date().toISOString();
           else if (path.startsWith('/api/services/script/')) entity.state = 'off';
+          else if (climate)
+            (entity.attributes as Record<string, unknown>).temperature = options.climateWholeDegrees
+              ? Math.round(body.temperature as number)
+              : body.temperature;
           else entity.state = path.endsWith('/turn_on') ? 'on' : 'off';
           entity.last_updated = new Date().toISOString();
           const attributes = entity.attributes as Record<string, unknown>;

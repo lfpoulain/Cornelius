@@ -32,7 +32,12 @@ const selection = compile<{ selected: string[]; revision: number }>({
   },
 });
 // Les autorisations s’enregistrent seules, sans emporter une sélection en cours de modification.
-const access = compile<{ enabled?: boolean; knownPeopleOnly?: boolean; revision: number }>({
+const access = compile<{
+  enabled?: boolean;
+  knownPeopleOnly?: boolean;
+  climateControl?: boolean;
+  revision: number;
+}>({
   type: 'object',
   additionalProperties: false,
   required: ['revision'],
@@ -40,6 +45,7 @@ const access = compile<{ enabled?: boolean; knownPeopleOnly?: boolean; revision:
   properties: {
     enabled: { type: 'boolean' },
     knownPeopleOnly: { type: 'boolean' },
+    climateControl: { type: 'boolean' },
     revision,
   },
 });

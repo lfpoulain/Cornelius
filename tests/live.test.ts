@@ -357,6 +357,29 @@ test('Live ouvre une seule session, limite les droits du navigateur et se libèr
     'priority',
   );
 });
+test('consigne des thermostats : consigne de délégation seulement avec home_assistant__climate', () => {
+  const tool = (name: string) => ({
+    name,
+    description: name,
+    parameters: { type: 'object', additionalProperties: false, properties: {} },
+  });
+  const instructions = (names: string[]) => {
+    const config = liveConfiguration(names.map(tool));
+    return {
+      delegation: (config.delegation as MediaSessionConfig.Responses).responses.instructions ?? '',
+      live: config.instructions ?? '',
+    };
+  };
+  const without = instructions(['home_assistant__read']);
+  assert.ok(!without.delegation.includes('home_assistant__climate'));
+  const withClimate = instructions(['home_assistant__climate']);
+  assert.match(
+    withClimate.delegation,
+    /consigne d’un thermostat, appelle home_assistant__climate/u,
+  );
+  // Le thermostat seul suffit pour que la conversation sache déléguer une demande de maison.
+  assert.match(withClimate.live, /allume le salon/u);
+});
 test('une clôture sans acquittement du fournisseur libère la session et permet une nouvelle', async (t) => {
   const f = fixture(t);
   await f.ready();

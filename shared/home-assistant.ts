@@ -89,6 +89,8 @@ export interface HomeAssistantView {
    * cocher si Cornelius doit s’en servir. Rien ne devient utilisable sans être coché.
    */
   newEntities: string[];
+  /** Luna peut régler la consigne des thermostats cochés (désactivé par défaut). */
+  climateControl: boolean;
 }
 
 export interface HomeAssistantCommand {

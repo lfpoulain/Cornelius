@@ -73,7 +73,8 @@ export function liveConfiguration(
   const satelliteVolume = extraTools.some((tool) => tool.name === 'satellite__volume');
   const homeSensors = extraTools.some((tool) => tool.name === 'home_assistant__read');
   const homeControl = extraTools.some((tool) => tool.name === 'home_assistant__control');
-  const homeDevices = homeSensors || homeControl;
+  const homeClimate = extraTools.some((tool) => tool.name === 'home_assistant__climate');
+  const homeDevices = homeSensors || homeControl || homeClimate;
   const config: MediaSessionConfig = {
     model: 'gpt-live-1',
     store: false,
@@ -125,6 +126,9 @@ Les identifiants exacts des sources et des commandes autorisées sont dans la de
           // Sans appareil autorisé (ou réservé aux personnes reconnues), Luna n’en entend pas parler.
           (homeControl
             ? ' Pour les appareils Home Assistant autorisés, utilise home_assistant__control ; accepted signifie seulement commande acceptée, et seul confirmed autorise à confirmer l’état observé.'
+            : '') +
+          (homeClimate
+            ? ' Pour régler la consigne d’un thermostat, appelle home_assistant__climate avec la température en °C ; pour « monte de deux degrés », lis d’abord la consigne avec home_assistant__read. Redis la consigne renvoyée, qui peut être arrondie au pas du thermostat.'
             : '') +
           (homeSensors
             ? ' Pour l’état d’un capteur de la maison (température, minuterie, fin d’un programme de lave-linge ou de four, ouverture, consommation), appelle home_assistant__read avec son identifiant exact : endsAtLocal et remainingMinutes sont calculés par le serveur, reprends-les tels quels sans recalculer ; un état unknown ou unavailable signifie que la donnée manque. Affiche ensuite une carte concise avec ui__show_luna_card.'

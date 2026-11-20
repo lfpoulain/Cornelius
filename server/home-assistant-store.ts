@@ -21,6 +21,8 @@ export interface HomeAssistantConfig {
   revision: number;
   /** Outils de Luna masqués et refusés tant qu’aucune personne reconnue n’est active. */
   knownPeopleOnly: boolean;
+  /** Luna peut régler la consigne des thermostats cochés ; sinon ils restent en lecture. */
+  climateControl: boolean;
 }
 
 /** Secret serveur : jamais sérialisé dans une réponse API ou un outil. */
@@ -35,9 +37,17 @@ export class HomeAssistantRepository {
       selected: JSON.parse(String(row.selected)),
       catalog: JSON.parse(String(row.catalog)),
       revision: Number(row.revision),
+      ...this.access(),
+    };
+  }
+  private access() {
+    return {
       knownPeopleOnly:
         this.db.prepare('SELECT known_people_only FROM home_assistant_access WHERE id = 1').get()
           ?.known_people_only === 1,
+      climateControl:
+        this.db.prepare('SELECT enabled FROM home_assistant_climate WHERE id = 1').get()
+          ?.enabled === 1,
     };
   }
   save(config: HomeAssistantConfig): HomeAssistantConfig {
@@ -58,6 +68,9 @@ export class HomeAssistantRepository {
     this.db
       .prepare('UPDATE home_assistant_access SET known_people_only = ? WHERE id = 1')
       .run(Number(config.knownPeopleOnly));
+    this.db
+      .prepare('UPDATE home_assistant_climate SET enabled = ? WHERE id = 1')
+      .run(Number(config.climateControl));
     return this.get();
   }
 }
