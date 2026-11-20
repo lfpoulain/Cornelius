@@ -537,6 +537,17 @@ function AddonCard({
         <MissingSecret key={secret.env} secret={secret} run={run} onChanged={onChanged} />
       ))}
       <p className="text-sm text-muted-foreground">{display.description}</p>
+      {definition.id === 'weather' && (
+        // Hors de France, Météo Concept ne trouve pas la commune : le dire avant le jeton et la source.
+        <p className="text-sm text-muted-foreground" data-testid="weather-outside-france">
+          Météo Concept couvre la France seulement. Ailleurs, installez Météo libre (Open-Meteo,
+          sans jeton) depuis{' '}
+          <a className="font-medium text-primary underline underline-offset-4" href="#catalogue">
+            Installer des modules
+          </a>
+          .
+        </p>
+      )}
       {instances.length === 0 && !adding && (
         <p className="text-sm text-muted-foreground">Aucune source configurée pour ce module.</p>
       )}
