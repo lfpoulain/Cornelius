@@ -178,3 +178,87 @@ test('deux demandes identiques en vol n’en font qu’une ; l’annulation de l
   assert.equal((await second).text(), 'partagé');
   assert.equal(calls, 1);
 });
+
+test('bytes() rend le corps brut intact (format binaire), text() décode toujours', async (t) => {
+  // Octets invalides en UTF-8 (0xff, 0x80), comme dans un message protobuf GTFS-RT.
+  const brut = new Uint8Array([0x0a, 0x03, 0xff, 0x80, 0x00, 0x12, 0x01, 0x41]);
+  network(t, {
+    'https://flux.example/tripUpdates': () =>
+      new Response(brut, { status: 200, headers: { 'content-type': 'application/x-protobuf' } }),
+    'https://flux.example/texte': () =>
+      new Response(new TextEncoder().encode('Montréal'), { status: 200 }),
+  });
+  const client = createHttpClient();
+  const binaire = await client.fetch({ url: 'https://flux.example/tripUpdates' });
+  assert.deepEqual([...binaire.bytes()], [...brut]);
+  // Le décodage en texte, lui, remplace les octets invalides : ils seraient perdus.
+  assert.match(binaire.text(), /�/u);
+  const texte = await client.fetch({ url: 'https://flux.example/texte' });
+  assert.equal(texte.text(), 'Montréal');
+  assert.deepEqual([...texte.bytes()], [...new TextEncoder().encode('Montréal')]);
+});
+
+test('bytes() d’une réponse partagée par le cache : une copie, coupée à maxBytes', async (t) => {
+  const brut = new Uint8Array(1000).map((_, i) => i % 256);
+  const seen = network(t, {
+    'https://flux.example/reseau.pb': () => new Response(brut, { status: 200 }),
+  });
+  const client = createHttpClient();
+  const request = { url: 'https://flux.example/reseau.pb', cacheMs: 30_000, maxBytes: 600 };
+  const premiere = await client.fetch(request);
+  const lu = premiere.bytes();
+  assert.equal(lu.byteLength, 600);
+  assert.equal(premiere.truncated, true);
+  lu.fill(0);
+  const seconde = await client.fetch(request);
+  assert.equal(seen.length, 1, 'servie par le cache');
+  assert.deepEqual([...seconde.bytes()], [...brut.subarray(0, 600)], 'le cache n’est pas modifié');
+});
+
+test('text(), json() et bytes() sur la même réponse, dans les deux ordres, sans relire le réseau', async (t) => {
+  const corps = '{"ville":"Montréal","temperature":-3}';
+  const seen = network(t, {
+    'https://api.example/a': () => new Response(corps, { status: 200 }),
+    'https://api.example/b': () => new Response(corps, { status: 200 }),
+  });
+  const client = createHttpClient();
+  const a = await client.fetch({ url: 'https://api.example/a' });
+  assert.deepEqual([...a.bytes()], [...new TextEncoder().encode(corps)]);
+  assert.equal(a.text(), corps);
+  assert.deepEqual(a.json(), { ville: 'Montréal', temperature: -3 });
+  const b = await client.fetch({ url: 'https://api.example/b' });
+  assert.deepEqual(b.json(), { ville: 'Montréal', temperature: -3 });
+  assert.equal(b.text(), corps);
+  assert.deepEqual([...b.bytes()], [...new TextEncoder().encode(corps)]);
+  assert.equal(seen.length, 2, 'une seule lecture du réseau par réponse');
+});
+
+test('bytes() suit les redirections comme text(), sans jeton vers un autre domaine', async (t) => {
+  const brut = new Uint8Array([0x08, 0xff, 0xfe, 0x80, 0x01]);
+  const seen = network(t, {
+    'https://ancien.example/flux.pb': redirect('https://cdn.example/flux.pb', 301),
+    'https://cdn.example/flux.pb': () => new Response(brut, { status: 200 }),
+  });
+  const response = await createHttpClient().fetch({
+    url: 'https://ancien.example/flux.pb',
+    headers: { apiKey: 'secret' },
+  });
+  assert.equal(response.url, 'https://cdn.example/flux.pb');
+  assert.deepEqual([...response.bytes()], [...brut]);
+  assert.equal(seen[1]!.headers.apiKey, undefined);
+});
+
+test('le cache partagé compte des octets réels : 3 Mo de texte y entrent', async (t) => {
+  // Compté en caractères UTF-16 (deux octets chacun), ce corps pesait 6 Mo et dépassait le
+  // quart du cache (4 Mo) : il n'était jamais gardé. En octets, il pèse 3 Mo.
+  const corps = 'a'.repeat(3 * 1024 * 1024);
+  const seen = network(t, {
+    'https://api.example/gros': () => new Response(corps, { status: 200 }),
+  });
+  const client = createHttpClient();
+  const request = { url: 'https://api.example/gros', cacheMs: 30_000, maxBytes: 4 * 1024 * 1024 };
+  assert.equal((await client.fetch(request)).bytes().byteLength, corps.length);
+  const deuxieme = await client.fetch(request);
+  assert.equal(seen.length, 1, 'servi par le cache');
+  assert.equal(deuxieme.text().length, corps.length);
+});

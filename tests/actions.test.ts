@@ -26,6 +26,7 @@ function stub() {
         headers: {},
         text: () => response.body,
         json: () => JSON.parse(response.body) as unknown,
+        bytes: () => new Uint8Array(0),
       };
     },
   };

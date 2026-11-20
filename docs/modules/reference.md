@@ -196,7 +196,21 @@ L’aperçu d’une source sous son nom (« 20 vélos · Mairie - Opéra ») est
 
 ## Le client HTTP
 
-La requête accepte `url`, `method` (`GET` par défaut, ou `POST`), `headers`, `body` (une chaîne), `timeoutMs` (4 000 par défaut), `maxBytes` (256 Kio par défaut), `signal` et `cacheMs`. La réponse expose `status`, `headers`, `text()` et `json()`, tous deux **synchrones**, `truncated` et `url`. Il n’y a pas de propriété `ok`.
+La requête accepte `url`, `method` (`GET` par défaut, ou `POST`), `headers`, `body` (une chaîne), `timeoutMs` (4 000 par défaut), `maxBytes` (256 Kio par défaut), `signal` et `cacheMs`. La réponse expose `status`, `headers`, `text()`, `json()` et `bytes()`, tous **synchrones**, `truncated` et `url`. Il n’y a pas de propriété `ok`.
+
+`bytes()` rend le corps brut, sans décodage, pour un format binaire que `text()` abîmerait : un flux temps réel GTFS-RT (protobuf), une image, une archive. C’est une copie, qu’un module peut modifier sans toucher au cache ni aux autres lecteurs. `text()`, `json()` et `bytes()` lisent le même corps, dans n’importe quel ordre et autant de fois que nécessaire, sans relire le réseau. Les mêmes règles s’appliquent aux trois : `maxBytes` et `truncated`, `timeoutMs`, redirections et `cacheMs`. Le cache partagé compte la taille réelle du corps, en octets, quelle que soit la forme lue. Dans `createTestModule`, une réponse simulée peut être un `Uint8Array`, rendu tel quel.
+
+**Rester compatible avec un cœur 0.3.0**, qui n’a pas `bytes()` : soit le module déclare `minCoreVersion: '0.4.0'`, soit il vérifie que la méthode existe avant de s’en servir, et sinon se passe du format binaire (le corps a été décodé en texte, ses octets ne sont plus récupérables) :
+
+```ts
+const response = await context.http.fetch({ url, maxBytes: 6 * 1024 * 1024, cacheMs: 30_000 });
+// Cœur 0.3.0 : pas de bytes(). Le type est élargi pour compiler contre les deux versions.
+const bytes = (response as { bytes?: () => Uint8Array }).bytes;
+if (typeof bytes !== 'function') return sansTempsReel(); // repli : rien d’inventé
+const flux = lireProtobuf(bytes.call(response));
+```
+
+Un module qui lit un gros fichier binaire à chaque question DEVRAIT retenir, après la première réponse, que le cœur n’a pas `bytes()`, pour ne pas le retélécharger en vain (le module Transports STM le fait).
 
 Le client du cœur ([server/addons/http.ts](../../server/addons/http.ts)) ne filtre pas les hôtes : le module DEVRAIT fixer l’adresse du fournisseur et encoder chaque partie variable (`encodeURIComponent`). Il garantit en revanche :
 
@@ -325,7 +339,7 @@ const avecEmoji = (nom: string, emoji: string, texte: string) =>
 items.push({ label: avecEmoji('cloud-snow', '🌨️', 'Ce soir'), value: 'Neige faible', ...icone('cloud-snow') });
 ```
 
-Un module qui ne veut fonctionner qu’avec les icônes déclare plutôt le `minCoreVersion` qui les apporte, sans détection.
+Un module qui ne veut fonctionner qu’avec les icônes déclare plutôt `minCoreVersion: '0.4.0'`, sans détection.
 
 **Tester.** `createTestModule` vérifie la carte avec le même schéma que le cœur : `f.contract(result)` signale une icône inconnue. Un test peut couvrir les deux cœurs en lisant la même détection (`cardIcons` présent ou non) pour choisir le résultat attendu.
 
@@ -524,7 +538,7 @@ Les mêmes exports qu’avant restent disponibles : `validateAddonDefinition`, `
 
 | Cornelius | Ajouts compatibles v1 |
 | --- | --- |
-| Prochaine version | Icônes des cartes et de l’affichage permanent : `icon` sur la valeur et sur les lignes, liste `cardIcons` |
+| 0.4.0 | Icônes des cartes et de l’affichage permanent : `icon` sur la valeur et sur les lignes, liste `cardIcons` ; client HTTP : `bytes()`, corps brut d’une réponse (format binaire) ; `createTestModule` accepte une réponse en `Uint8Array` |
 | 0.2.0 | `display` ; `arguments` des outils et `context.args` ; `context.timeZone` ; `refreshAt` de l’affichage permanent ; présentation d’un relevé vide ; fraîcheur jusqu’à 24 heures ; client HTTP : redirections, encodage, `truncated`, `url`, User-Agent, `cacheMs` ; formulaire : listes déroulantes et listes répétées ; `clearLabel` ; `createTestModule` |
 | 0.1.0 | Contrat v1, outil à la demande (`query`), secrets, recherche assistée, affichage permanent, `minCoreVersion` |
 

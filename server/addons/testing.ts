@@ -26,13 +26,14 @@ export { AddonRepository, openDatabase } from '../storage.js';
 /** Réponse détaillée : statut, corps, en-têtes, et corps coupé à `maxBytes` (`truncated`). */
 export interface TestResponse {
   status: number;
-  body?: string | Record<string, unknown> | unknown[];
+  /** Un `Uint8Array` est rendu tel quel par `bytes()` (format binaire, protobuf GTFS-RT…). */
+  body?: string | Uint8Array | Record<string, unknown> | unknown[];
   headers?: Record<string, string>;
   truncated?: boolean;
 }
 
-/** Réponse simulée : un objet est envoyé en JSON, une chaîne telle quelle. */
-export type TestReply = string | Record<string, unknown> | unknown[] | TestResponse;
+/** Réponse simulée : un objet est envoyé en JSON, une chaîne ou des octets tels quels. */
+export type TestReply = string | Uint8Array | Record<string, unknown> | unknown[] | TestResponse;
 
 /**
  * Table des réponses : chaque clé est cherchée dans l'adresse demandée, la première qui y
@@ -62,6 +63,7 @@ function isReplyObject(reply: TestReply): reply is TestResponse {
     typeof reply === 'object' &&
     reply !== null &&
     !Array.isArray(reply) &&
+    !(reply instanceof Uint8Array) &&
     typeof (reply as { status?: unknown }).status === 'number'
   );
 }
@@ -70,12 +72,19 @@ function asResponse(reply: TestReply) {
   const { status, body, headers, truncated } = isReplyObject(reply)
     ? reply
     : { status: 200, body: reply, headers: {}, truncated: false };
-  const text = body === undefined ? '' : typeof body === 'string' ? body : JSON.stringify(body);
+  const bytes =
+    body instanceof Uint8Array
+      ? body
+      : new TextEncoder().encode(
+          body === undefined ? '' : typeof body === 'string' ? body : JSON.stringify(body),
+        );
+  const text = new TextDecoder().decode(bytes);
   return {
     status,
     headers: headers ?? {},
     text: () => text,
     json: () => JSON.parse(text) as unknown,
+    bytes: () => bytes.slice(),
     // Une réponse coupée à maxBytes par le client du cœur, simulée.
     truncated: truncated === true,
   };

@@ -47,6 +47,7 @@ function fixture(t: TestContext, definition = addon) {
           headers: {},
           text: () => JSON.stringify(result.body),
           json: () => result.body,
+          bytes: () => new Uint8Array(0),
         };
       },
     },

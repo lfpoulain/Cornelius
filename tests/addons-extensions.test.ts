@@ -44,6 +44,7 @@ function fixture(
           headers: {},
           text: () => '{"name":"Gare","available":4}',
           json: () => ({ name: 'Gare', available: 4 }),
+          bytes: () => new Uint8Array(0),
         };
       },
     },

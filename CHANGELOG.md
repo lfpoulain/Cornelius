@@ -29,6 +29,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 - Modules : une carte et l’affichage permanent peuvent porter des icônes, sur la valeur principale et devant chaque ligne (`icon`, facultatif). Liste fermée `cardIcons` (noms Lucide : soleil, nuages, pluie, neige, verglas, orage, brouillard, vent, thermomètre, alerte…), dessinée par le miroir à la taille du texte. Les icônes sont décoratives : le texte et l’oral ne changent pas. Aucun changement pour les modules existants.
 
+### 2026-11-12 : lecture binaire pour les modules
+
+**Ajouté**
+
+- Modules : `bytes()` sur la réponse du client HTTP rend le corps brut, sans décodage. Un module peut désormais lire un format binaire, que `text()` abîmait sans retour : les flux temps réel GTFS-RT (protobuf) des transports en commun, une image, une archive. Le texte n’est plus décodé qu’à la demande, et le cache partagé compte la taille réelle en octets. Aucun changement pour les modules existants. `createTestModule` accepte une réponse simulée en `Uint8Array`.
+
 ### 2026-11-11 : installation des modules et mises à jour
 
 **Ajouté**
