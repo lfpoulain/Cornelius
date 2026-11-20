@@ -444,6 +444,17 @@ test('la recherche assistée trouve un arrêt puis ses directions', async (t) =>
 test('les outils exposés portent le préfixe du module et l’instanceRef requis', () => {
   const f = fixture({});
   try {
+    // Sans source, aucun module n'est proposé au modèle.
+    assert.deepEqual(f.runtime.tools(), []);
+    for (const addon of f.runtime.definitions())
+      f.instances.createInstance({
+        addonId: addon.id,
+        profileId: null,
+        ref: 'maison',
+        label: 'Maison',
+        config: {},
+        configVersion: addon.configVersion,
+      });
     const tools = f.runtime.tools();
     const names = tools.map((tool) => tool.name);
     for (const name of ['clock__read', 'transit__read', 'weather__read'])
@@ -586,7 +597,7 @@ test('la description des outils porte les sources autorisées, jamais un context
   assert.doesNotMatch(tool.description, /contexte/u);
 });
 
-test('un profil résolu sans source autorisée le dit explicitement dans la description', (t) => {
+test('un module sans source pour le profil reconnu n’est pas proposé au modèle', (t) => {
   const f = fixture({ primApiKey: 'cle-test' });
   t.after(() => f.db.close());
   const profiles = new ProfileRepository(f.db);
@@ -605,9 +616,42 @@ test('un profil résolu sans source autorisée le dit explicitement dans la desc
     },
     configVersion: 1,
   });
-  const tool = f.runtime.tools(bob.id).find((entry) => entry.name === 'transit__read')!;
-  assert.match(tool.description, /Aucune source/u);
-  assert.doesNotMatch(tool.description, /Bus Alice/u);
+  const names = (profileId: string | null) => f.runtime.tools(profileId).map((tool) => tool.name);
+  // Bob n'a aucune source Transports : l'outil ne lui est pas proposé, ni la météo sans source.
+  assert.ok(!names(bob.id).includes('transit__read'));
+  assert.ok(!names(bob.id).includes('weather__read'));
+  const aliceTool = f.runtime.tools(alice.id).find((entry) => entry.name === 'transit__read')!;
+  assert.match(aliceTool.description, /Bus Alice/u);
+  // Session anonyme : une source personnelle existe, l'outil reste proposé, sans la nommer.
+  assert.ok(names(null).includes('transit__read'));
+  assert.ok(!names(null).includes('weather__read'));
+  // Une source du foyer vaut pour tout le monde.
+  f.instances.createInstance({
+    addonId: 'transit',
+    profileId: null,
+    ref: 'foyer',
+    label: 'Bus du foyer',
+    config: {
+      stopAreaId: 'stop_area:IDFM:222',
+      stopAreaLabel: 'Arrêt du foyer',
+      routeId: null,
+      routeLabel: null,
+    },
+    configVersion: 1,
+  });
+  assert.ok(names(bob.id).includes('transit__read'));
+  // Une source désactivée ne compte pas.
+  const disabled = f.instances.createInstance({
+    addonId: 'weather',
+    profileId: alice.id,
+    ref: 'alice',
+    label: 'Météo Alice',
+    config: { insee: '75056' },
+    configVersion: 1,
+  });
+  f.instances.updateInstance(disabled.id, { enabled: false });
+  assert.ok(!names(null).includes('weather__read'));
+  assert.ok(!names(alice.id).includes('weather__read'));
 });
 
 test('un propriétaire non résolu garde une description neutre, sans négation prématurée', (t) => {

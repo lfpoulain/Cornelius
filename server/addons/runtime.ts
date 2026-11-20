@@ -184,14 +184,31 @@ export class AddonRuntime {
     return this.addons.get(id);
   }
 
-  /** Outils exposés à Luna, préfixés par l'identifiant d'addon et limités au profil actif. */
+  /**
+   * Outils exposés à Luna, préfixés par l'identifiant d'addon et limités au profil actif. Un
+   * module sans source n'est pas proposé : sinon le modèle peut le choisir à la place d'un module
+   * réglé qui fait la même chose (une météo sans source contre une météo réglée). Personne
+   * reconnue : il faut une source du foyer ou de son profil. Session anonyme : le module n'est
+   * écarté que s'il n'a aucune source, pour personne ; sinon un outil personnel apparaîtrait puis
+   * disparaîtrait à la reconnaissance.
+   */
   tools(profileId: string | null = null): AddonToolDescriptor[] {
     const authorized = this.sourcesFor(profileId);
+    const withAnySource =
+      profileId === null
+        ? new Set(
+            this.options.instances
+              .listInstances()
+              .filter((instance) => instance.enabled)
+              .map((instance) => instance.addonId),
+          )
+        : null;
     return this.list().flatMap((addon) => {
       const sources = authorized.filter((source) => source.addonId === addon.id);
+      if (sources.length === 0 && !withAnySource?.has(addon.id)) return [];
       return addon.tools.map((tool) => ({
         name: `${addon.id}${toolSeparator}${tool.name}`,
-        description: this.describeTool(addon, tool.description, sources, profileId !== null),
+        description: this.describeTool(tool.description, sources),
         parameters: toolParameters(tool),
       }));
     });
@@ -199,20 +216,12 @@ export class AddonRuntime {
 
   /**
    * La description porte les sources autorisées : le modèle tient ses identifiants du
-   * tooling seul, jamais d'un contexte livré à l'ouverture. Tant que le propriétaire n'est
-   * pas résolu (session anonyme du mode 1), la description reste neutre : l'identité est
-   * ajoutée après reconnaissance, et une négation prématurée serait contredite.
+   * tooling seul, jamais d'un contexte livré à l'ouverture. Sans source visible (session
+   * anonyme, seules des sources personnelles existent), la description reste neutre : elles
+   * sont ajoutées après reconnaissance.
    */
-  private describeTool(
-    addon: AddonDefinition,
-    description: string,
-    sources: { ref: string | null; label: string }[],
-    resolved: boolean,
-  ): string {
-    if (sources.length === 0)
-      return resolved
-        ? `${description} Aucune source « ${addon.sourceLabel} » n’est autorisée pour ce profil.`
-        : description;
+  private describeTool(description: string, sources: { ref: string | null; label: string }[]) {
+    if (sources.length === 0) return description;
     const list = sources
       .map((source) => (source.ref ? `${source.ref} (${source.label})` : source.label))
       .join(', ');
