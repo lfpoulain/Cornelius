@@ -176,6 +176,16 @@ interface ActiveSession {
   assistantText: string;
   replyStarted: boolean;
   askedQuestion: boolean;
+  /** Dernier morceau de réponse reçu. */
+  lastOutputAt: number;
+  /** Réponses commencées depuis la dernière phrase de la personne. */
+  repliesSinceTurn: number;
+  /** La réponse précédant celle en cours finissait par une question : figé à son début. */
+  questionBeforeReply: boolean;
+  /** Début de la phrase en cours de la personne (premier morceau transcrit). */
+  userTurnStartedAt: number;
+  /** conversation__end accepté : instant de la demande. */
+  toolEndAt: number | null;
   /** Satellite : fin de lecture estimée de l’audio déjà envoyé (16 kHz). */
   playbackUntil: number;
   audioCaughtUp: boolean;
@@ -240,6 +250,14 @@ const SATELLITE_AUDIO_FORMAT = { type: 'audio/pcm', rate: 16000 } as const;
 const SATELLITE_ECHO_GUARD_MS = 600;
 /** Silence après la dernière transcription de la personne : sa phrase est complète. */
 const USER_TURN_SETTLE_MS = 700;
+/** Pause dans la parole de Cornelius au-delà de laquelle un nouveau morceau ouvre une réponse. */
+const REPLY_GAP_MS = 1000;
+/**
+ * Retard maximal de la transcription sur l'appel de conversation__end : une phrase commencée
+ * avant est celle qui a conduit le modèle à fermer, pas une nouvelle demande.
+ */
+const TOOL_END_TRANSCRIPT_LAG_MS = 1500;
+const QUESTION_END = /[?？]\s*$/u;
 /** PCM16 mono à 16 kHz : 32 octets par milliseconde. */
 const SATELLITE_PCM_BYTES_PER_MS = 32;
 // Outils sans objet sur un satellite : pas d’écran ni de caméra ; sans profil, pas de mémoire.
@@ -407,6 +425,11 @@ export class LiveTransport implements SessionTransport {
       assistantText: '',
       replyStarted: false,
       askedQuestion: false,
+      lastOutputAt: 0,
+      repliesSinceTurn: 0,
+      questionBeforeReply: false,
+      userTurnStartedAt: 0,
+      toolEndAt: null,
       playbackUntil: 0,
       audioCaughtUp: false,
       contextAppends: new Map(),
@@ -1087,9 +1110,15 @@ export class LiveTransport implements SessionTransport {
       this.memory?.transcript(active.scope, event);
     if (event.type === 'session.input_transcript.delta') {
       if (!active.userTurn) {
-        // Nouvelle phrase : la réponse précédente de Cornelius était-elle une question ?
-        active.askedQuestion = /[?？]\s*$/u.test(active.assistantText);
+        // Nouvelle phrase : la réponse précédente de Cornelius était-elle une question ? Si la
+        // transcription est en retard, la réponse à cette phrase a déjà commencé : la réponse
+        // d'avant compte aussi. Dans le doute, le serveur laisse décider le modèle.
+        active.askedQuestion =
+          QUESTION_END.test(active.assistantText) ||
+          (active.repliesSinceTurn >= 2 && active.questionBeforeReply);
         active.replyStarted = false;
+        active.repliesSinceTurn = 0;
+        active.userTurnStartedAt = this.now();
       }
       if (typeof event.delta === 'string' && active.userTurn.length < 500)
         active.userTurn += event.delta;
@@ -1109,8 +1138,14 @@ export class LiveTransport implements SessionTransport {
     )
       this.endOnClosingPhrase(active);
     if (event.type === 'session.output_transcript.delta' && typeof event.delta === 'string') {
-      if (!active.replyStarted) active.assistantText = '';
+      const now = this.now();
+      if (!active.replyStarted || now - active.lastOutputAt > REPLY_GAP_MS) {
+        active.questionBeforeReply = QUESTION_END.test(active.assistantText);
+        active.assistantText = '';
+        active.repliesSinceTurn += 1;
+      }
       active.replyStarted = true;
+      active.lastOutputAt = now;
       active.assistantText = (active.assistantText + event.delta).slice(-300).trim();
     }
     if (event.type === 'session.delegation.created') {
@@ -1142,6 +1177,10 @@ export class LiveTransport implements SessionTransport {
     const said = active.userTurn;
     if (!said) return;
     active.userTurn = '';
+    // La phrase qui a provoqué conversation__end, transcrite après coup, ne l'annule pas.
+    const causedToolEnd =
+      active.toolEndAt !== null &&
+      active.userTurnStartedAt < active.toolEndAt + TOOL_END_TRANSCRIPT_LAG_MS;
     if (!this.controller.isEndWordEnabled()) return;
     if (isClosingPhrase(said, this.controller.getEndPhrases())) {
       // « Ça va bien, merci » répond à une question ; « c’est bon » arrête ce qui sonne
@@ -1155,7 +1194,7 @@ export class LiveTransport implements SessionTransport {
       return;
     }
     // Une nouvelle demande après le mot de fin : la conversation continue.
-    if (isNewRequest(said) && this.controller.cancelEnd(active.scope))
+    if (!causedToolEnd && isNewRequest(said) && this.controller.cancelEnd(active.scope))
       this.logs?.write('info', 'session', 'Fin de conversation annulée', {
         interactionId: active.scope.interactionId,
       });
@@ -1385,6 +1424,7 @@ export class LiveTransport implements SessionTransport {
       if (name === END_CONVERSATION_TOOL && this.controller.isEndWordEnabled()) {
         this.beginTool(active, delegation);
         const accepted = this.controller.requestEnd(active.scope);
+        if (accepted) active.toolEndAt = this.now();
         if (accepted)
           this.logs?.write('info', 'session', 'Fin de conversation demandée', {
             interactionId: active.scope.interactionId,

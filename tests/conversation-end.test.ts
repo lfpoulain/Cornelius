@@ -38,15 +38,32 @@ test('phrase de fin : une demande, une réponse ou un mot seul ne clôturent pas
     assert.equal(isClosingPhrase(said), false, said);
 });
 
-test('nouvelle demande : une vraie phrase, pas une hésitation', () => {
+test('nouvelle demande : une vraie phrase, pas une hésitation ni une confirmation', () => {
   for (const said of [
     'Ah, et la météo de demain ?',
+    'Et demain ?',
+    'Demain ?',
+    'Ça va ?',
     'Allume le salon',
     'Attends',
     'Quelle heure ?',
   ])
     assert.equal(isNewRequest(said), true, said);
-  for (const said of ['', 'Euh…', 'Oui', 'ok', 'Hein ?', 'Ah !', 'non'])
+  for (const said of [
+    '',
+    'Euh…',
+    'Oui',
+    'ok',
+    'Hein ?',
+    'Ah !',
+    'non',
+    'Non, c’est bon.',
+    'D’accord.',
+    'Parfait !',
+    'Non merci.',
+    'Super.',
+    'Oui, merci beaucoup.',
+  ])
     assert.equal(isNewRequest(said), false, said);
 });
 

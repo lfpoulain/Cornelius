@@ -109,13 +109,16 @@ const fillers = new Set([
 ]);
 
 /**
- * Une vraie demande (« ah, et la météo de demain ? ») plutôt qu’une hésitation : elle annule un
- * mot de fin déjà reconnu.
+ * Une vraie demande (« ah, et la météo de demain ? ») plutôt qu’une hésitation ou une
+ * confirmation (« non, c’est bon », « d’accord », « non merci ») : elle annule un mot de fin
+ * déjà reconnu.
  */
 export function isNewRequest(text: string): boolean {
-  const words = normalizePhrase(text)
-    .split(' ')
-    .filter((word) => word.length >= 2 && !fillers.has(word));
+  const all = normalizePhrase(text).split(' ');
+  // « Ça va ? », « Demain ? » : une question demande quelque chose, même en mots de fin.
+  const question = /[?？]\s*$/u.test(text);
+  if (!question && all.every((word) => fillers.has(word) || closingWords.has(word))) return false;
+  const words = all.filter((word) => word.length >= 2 && !fillers.has(word));
   return words.length >= 2 || words.some((word) => word.length >= 4);
 }
 
