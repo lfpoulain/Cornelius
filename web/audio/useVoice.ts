@@ -83,7 +83,9 @@ export function useVoice(state: MirrorState | null, fresh: boolean) {
       else if (fresh && scope.phase === 'connecting') {
         try {
           const create =
-            state?.voiceProvider === 'mistral' ? createProviderAudioSession : createAudioSession;
+            state?.voiceProvider === 'mistral' || state?.voiceProvider === 'local'
+              ? createProviderAudioSession
+              : createAudioSession;
           const audio = create(
             sessionScope,
             (kind) => {

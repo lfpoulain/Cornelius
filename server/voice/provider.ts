@@ -29,6 +29,7 @@ export interface VoiceConfiguration {
 }
 export interface VoiceConnection {
   audio(pcm: Buffer): void;
+  vad?(speaking: boolean): void;
   result(id: string, output: string): void;
   update(config: VoiceConfiguration, toolsChanged?: boolean): Promise<void>;
   close(): Promise<void>;

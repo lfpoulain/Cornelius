@@ -5,7 +5,8 @@ import {
   withMemoryFallback,
 } from './custom-provider.js';
 import { isVoiceProvider } from '../shared/voice-provider.js';
-import { createVoiceGateway } from './voice/live-bridge.js';
+import { buildLocalProviderInstructions, createVoiceGateway } from './voice/live-bridge.js';
+import { warmupLocalOllamaPrefix } from './voice/local.js';
 import { createMistralMemoryExtractor } from './voice/memory-extractor.js';
 import { isCardSettings } from '../shared/cards.js';
 import { isLiveVoice } from '../shared/voices.js';
@@ -387,15 +388,52 @@ export async function createApp(
   const alarmTools = new AlarmTools(alarms, now);
   const agents = new Agents(new AgentRepository(db, now), new HermesClient(http, now), now);
   const initialKey = openaiKey();
-  const selectedVoiceKey = () =>
-    secretStore.get(
-      preferences.getVoiceProvider() === 'mistral' ? 'MISTRAL_API_KEY' : 'OPENAI_API_KEY',
-    );
+  if (
+    config.defaultVoiceProvider === 'local' &&
+    config.localVoice &&
+    preferences.getVoiceProvider() === 'openai' &&
+    !initialKey
+  ) {
+    preferences.setVoiceProvider('local');
+  }
+  const selectedVoiceReady = () => {
+    const provider = preferences.getVoiceProvider();
+    if (provider === 'local') return !!config.localVoice?.ollamaUrl;
+    return !!secretStore.get(provider === 'mistral' ? 'MISTRAL_API_KEY' : 'OPENAI_API_KEY');
+  };
   const voiceGateway = () => {
-    const key = selectedVoiceKey();
+    const provider = preferences.getVoiceProvider();
+    if (provider === 'local') {
+      const local = config.localVoice;
+      if (!local?.ollamaUrl) return null;
+      return createVoiceGateway(
+        {
+          async connect(voiceConfig, emit) {
+            const { createLocalVoiceAdapter } = await import('./voice/local.js');
+            return createLocalVoiceAdapter({
+              ollamaUrl: local.ollamaUrl,
+              ollamaModel: local.ollamaModel,
+              keepAlive: local.keepAlive,
+              sttUrl: local.sttUrl,
+              sttModel: local.sttModel,
+              sttPrompt: local.sttPrompt,
+              sttHotwords: local.sttHotwords,
+              ttsUrl: local.ttsUrl,
+              ttsModel: local.ttsModel,
+              ttsVoice: local.ttsVoice,
+              whisper: { host: local.whisperHost, port: local.whisperPort },
+              piper: { host: local.piperHost, port: local.piperPort, voice: local.piperVoice },
+              searxngUrl: local.searxngUrl,
+            }).connect(voiceConfig, emit);
+          },
+        },
+        { provider: 'local' },
+      );
+    }
+    const key = secretStore.get(provider === 'mistral' ? 'MISTRAL_API_KEY' : 'OPENAI_API_KEY');
     return !key
       ? null
-      : preferences.getVoiceProvider() === 'mistral'
+      : provider === 'mistral'
         ? createVoiceGateway({
             async connect(config, emit) {
               const { createMistralVoiceAdapter } = await import('./voice/mistral.js');
@@ -463,15 +501,19 @@ export async function createApp(
     now,
   );
   const initialProvider = preferences.getVoiceProvider();
-  const initialVoiceKey = selectedVoiceKey();
+  const initialVoiceReady = selectedVoiceReady();
   logs.write(
-    !initialVoiceKey ? 'warn' : 'info',
+    !initialVoiceReady ? 'warn' : 'info',
     initialProvider,
     preferences.getOpenAIBlocked()
       ? 'Connexions IA bloquées par l’administration'
-      : initialVoiceKey
-        ? 'Clé vocale configurée ; connexion uniquement au démarrage d’une session'
-        : `Clé ${initialProvider === 'mistral' ? 'Mistral' : 'OpenAI'} absente`,
+      : initialVoiceReady
+        ? initialProvider === 'local'
+          ? 'Moteur vocal local configuré ; connexion uniquement au démarrage d’une session'
+          : 'Clé vocale configurée ; connexion uniquement au démarrage d’une session'
+        : initialProvider === 'local'
+          ? 'CORNELIUS_LOCAL_OLLAMA_URL absent'
+          : `Clé ${initialProvider === 'mistral' ? 'Mistral' : 'OpenAI'} absente`,
   );
   const voiceUsage = new VoiceUsage(
     db,
@@ -495,7 +537,7 @@ export async function createApp(
   controller.setSetup({
     openaiKey: !!initialKey,
     mistralKey: !!secretStore.get('MISTRAL_API_KEY'),
-    voiceKey: !!selectedVoiceKey(),
+    voiceKey: selectedVoiceReady(),
   });
   const screensaver = new ScreensaverLibrary(
     db,
@@ -549,7 +591,7 @@ export async function createApp(
       if (!options.memoryExtractor) memory.setExtractor(configuredMemoryExtractor());
       controller.setSetup({
         mistralKey: !!secretStore.get('MISTRAL_API_KEY'),
-        voiceKey: !!selectedVoiceKey(),
+        voiceKey: selectedVoiceReady(),
       });
     }
     logs.write('info', 'local', value ? 'Clé enregistrée' : 'Clé retirée', {
@@ -625,7 +667,7 @@ export async function createApp(
     return {
       presenceTimings: controller.getPresenceTimings(),
       machine: config.machine,
-      apiConfigured: !!selectedVoiceKey(),
+      apiConfigured: selectedVoiceReady(),
       perceptionConfigured: !!config.perceptionToken,
       defaultPassword: defaultPassword(),
       enrolledFaces: local.enrolledProfileIds.length,
@@ -1718,13 +1760,18 @@ export async function createApp(
         return reply
           .code(409)
           .send({ error: 'Terminez la conversation avant de changer de fournisseur.' });
-      if (!secretStore.get(provider === 'mistral' ? 'MISTRAL_API_KEY' : 'OPENAI_API_KEY'))
+      if (provider === 'local') {
+        if (!config.localVoice?.ollamaUrl)
+          return reply.code(400).send({
+            error: 'Configurez d’abord CORNELIUS_LOCAL_OLLAMA_URL dans .env.',
+          });
+      } else if (!secretStore.get(provider === 'mistral' ? 'MISTRAL_API_KEY' : 'OPENAI_API_KEY'))
         return reply.code(400).send({
           error: 'Ajoutez d’abord la clé de ce fournisseur dans Clés et accès → Clés et jetons.',
         });
       controller.setVoiceProvider(provider);
       live.setGateway(voiceGateway());
-      controller.setSetup({ voiceKey: !!selectedVoiceKey() });
+      controller.setSetup({ voiceKey: selectedVoiceReady() });
       broadcastDevices();
       return controller.snapshot();
     },
@@ -2031,5 +2078,85 @@ export async function createApp(
     perception.dispose();
     db.close();
   });
+  if (
+    options.timers !== false &&
+    preferences.getVoiceProvider() === 'local' &&
+    config.localVoice?.ollamaUrl
+  ) {
+    const local = config.localVoice;
+    const warmupTools = [
+      ...addonRuntime.tools(null),
+      ...homeAssistant.tools(true),
+      ...imageGeneration.tools(),
+      ...alarmTools.tools(null),
+      {
+        name: 'vision__look',
+        description:
+          'Regarder maintenant devant le miroir avec la caméra locale (uniquement si la personne demande ce que tu vois ou montre quelque chose).',
+        parameters: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['question'],
+          properties: { question: { type: 'string', maxLength: 500 } },
+        },
+      },
+      ...memory.tools(),
+    ].filter((t) => t.name !== 'ui__show_luna_card');
+    const baseCfg = liveConfiguration(
+      warmupTools,
+      personality.get(null),
+      preferences.getDelegationMode(),
+      { webSearch: preferences.getWebSearchEnabled() },
+    );
+    const householdSuffix = baseCfg.instructions
+      ? (() => {
+          const idx = baseCfg.instructions.indexOf('\n\nPersonnalisation du style de Cornelius');
+          return idx === -1 ? '' : baseCfg.instructions.slice(idx).trim();
+        })()
+      : '';
+    const delegationTools = (
+      (baseCfg.delegation as { responses?: { tools?: unknown[] } } | undefined)?.responses?.tools ??
+      []
+    ).flatMap((raw) => {
+      const t = raw as {
+        type?: unknown;
+        name?: unknown;
+        description?: unknown;
+        parameters?: unknown;
+      };
+      return t?.type === 'function' && typeof t.name === 'string'
+        ? [
+            {
+              name: t.name,
+              description: String(t.description ?? ''),
+              parameters: (t.parameters ?? {}) as Record<string, unknown>,
+            },
+          ]
+        : [];
+    });
+    const warmupSystem = [
+      buildLocalProviderInstructions(delegationTools, preferences.getWebSearchEnabled()),
+      householdSuffix,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    void warmupLocalOllamaPrefix({
+      ollamaUrl: local.ollamaUrl,
+      ollamaModel: local.ollamaModel,
+      keepAlive: local.keepAlive,
+      systemInstructions: warmupSystem,
+      tools: delegationTools,
+      webSearch: preferences.getWebSearchEnabled(),
+      searxngUrl: local.searxngUrl,
+    })
+      .then((res) => {
+        if (res.ok) {
+          console.info(
+            `[local-voice] Boot KV-cache warmup ready (${res.durationMs}ms, promptTokens=${res.promptEvalCount ?? '-'})`,
+          );
+        }
+      })
+      .catch(() => {});
+  }
   return { app, controller, profiles, logs, memory, agents, alarms };
 }

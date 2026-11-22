@@ -420,6 +420,20 @@ export class LiveTransport implements SessionTransport {
       },
     };
   }
+  browserVad(scope: Scope, speaking: boolean) {
+    const active = this.active;
+    if (
+      !active ||
+      this.disposed ||
+      active.finalized ||
+      active.closing ||
+      active.blocked ||
+      !active.attached ||
+      !sameScope(scope, active.scope)
+    )
+      return;
+    active.audio?.sendVad?.(speaking);
+  }
   private connectServerAudio(active: ActiveSession) {
     const gateway = active.gateway;
     if (!gateway?.connect) {
@@ -1557,17 +1571,61 @@ export class LiveTransport implements SessionTransport {
         tool = invoked.tool;
         // Satellite : pas d’écran, le résumé du module suffit à la réponse parlée.
         if (invoked.outcome.ok && !active.closing && !active.finalized && !active.satelliteId) {
-          const shown = this.controller.showModuleCard(
-            active.scope,
-            callId,
-            invoked.outcome.card,
-            this.now() + 60_000,
-            {
-              [invoked.outcome.card.sources[0] ?? invoked.outcome.card.addonId]: bridge.sourceLabel(
-                invoked.outcome.card.addonId,
-              ),
-            },
-          );
+          let immichPhotosShown = false;
+          if (invoked.outcome.card.addonId === 'immich') {
+            const rawItems = (
+              invoked.outcome.snapshot?.data as {
+                items?: Array<{ id?: string; date?: string; description?: string }>;
+              } | null
+            )?.items;
+            const photoItems = Array.isArray(rawItems)
+              ? rawItems
+                  .filter((it) => typeof it?.id === 'string' && /^[a-f0-9-]{36}$/i.test(it.id))
+                  .slice(0, 3)
+              : [];
+            for (let idx = 0; idx < photoItems.length; idx++) {
+              const photo = photoItems[idx]!;
+              const shownPhoto = this.controller.showImageCard(
+                active.scope,
+                `${callId}:photo:${idx}`,
+                {
+                  schemaVersion: 1,
+                  cardType: 'image',
+                  title: 'Souvenir Immich',
+                  prompt: `${photo.date ?? 'Photo'} - ${photo.description ?? 'Immich'}`.slice(
+                    0,
+                    200,
+                  ),
+                  imageUrl: `/api/immich/photo/${photo.id}`,
+                  model: 'gpt-image-1-mini',
+                  width: 1024,
+                  height: 1024,
+                  primaryValue: null,
+                  subtitle: null,
+                  description: null,
+                  items: [],
+                  sources: [],
+                },
+                this.now() + 90_000,
+              );
+              if (shownPhoto) immichPhotosShown = true;
+            }
+            if (immichPhotosShown) {
+              this.append(active, 'card-displayed', cardDisplayRule);
+            }
+          }
+          const shown = immichPhotosShown
+            ? false
+            : this.controller.showModuleCard(
+                active.scope,
+                callId,
+                invoked.outcome.card,
+                this.now() + 60_000,
+                {
+                  [invoked.outcome.card.sources[0] ?? invoked.outcome.card.addonId]:
+                    bridge.sourceLabel(invoked.outcome.card.addonId),
+                },
+              );
           if (shown) {
             this.append(active, 'card-displayed', cardDisplayRule);
             const displayed = this.controller.displayedCards()[0];

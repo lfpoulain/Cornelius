@@ -1,8 +1,28 @@
 import { resolve } from 'node:path';
 import { liveBaseUrlError, normalizeLiveBaseUrl } from '../shared/live-endpoint.js';
+import { isVoiceProvider, type VoiceProvider } from '../shared/voice-provider.js';
 import type { MachineStatus } from '../shared/types.js';
 import { externalAddonsRoot } from './addons/registry.js';
 import { detectMachine } from './machine.js';
+
+export interface LocalVoiceConfig {
+  ollamaUrl: string;
+  ollamaModel: string;
+  keepAlive?: string;
+  sttUrl?: string;
+  sttModel?: string;
+  sttPrompt?: string;
+  sttHotwords?: string;
+  ttsUrl?: string;
+  ttsModel?: string;
+  ttsVoice?: string;
+  whisperHost: string;
+  whisperPort: number;
+  piperHost: string;
+  piperPort: number;
+  piperVoice?: string;
+  searxngUrl?: string;
+}
 
 export interface AppConfig {
   databasePath: string;
@@ -13,6 +33,8 @@ export interface AppConfig {
   openaiKey?: string;
   perceptionToken?: string;
   imageGenerationToken?: string;
+  defaultVoiceProvider?: VoiceProvider;
+  localVoice?: LocalVoiceConfig;
   /**
    * Jeton des déclencheurs externes (CORNELIUS_TRIGGER_TOKEN) : Home Assistant, baguette ou
    * bouton démarrent une conversation par POST /api/trigger/start. Absent, la route est fermée.
@@ -159,5 +181,30 @@ export function loadConfig(): AppConfig & { port: number } {
     ],
     secureCookies: false,
     staticRoot: resolve('dist/web'),
+    defaultVoiceProvider: isVoiceProvider(process.env.CORNELIUS_VOICE_PROVIDER?.trim())
+      ? (process.env.CORNELIUS_VOICE_PROVIDER!.trim() as VoiceProvider)
+      : undefined,
+    localVoice: process.env.CORNELIUS_LOCAL_OLLAMA_URL?.trim()
+      ? {
+          ollamaUrl: process.env.CORNELIUS_LOCAL_OLLAMA_URL.trim(),
+          ollamaModel: process.env.CORNELIUS_LOCAL_OLLAMA_MODEL?.trim() || 'qwen3:8b',
+          keepAlive: process.env.CORNELIUS_LOCAL_OLLAMA_KEEP_ALIVE?.trim() || '-1',
+          sttUrl: process.env.CORNELIUS_LOCAL_STT_URL?.trim() || undefined,
+          sttModel:
+            process.env.CORNELIUS_LOCAL_STT_MODEL?.trim() ||
+            'deepdml/faster-whisper-large-v3-turbo-ct2',
+          sttPrompt: process.env.CORNELIUS_LOCAL_STT_PROMPT?.trim() || undefined,
+          sttHotwords: process.env.CORNELIUS_LOCAL_STT_HOTWORDS?.trim() || undefined,
+          ttsUrl: process.env.CORNELIUS_LOCAL_TTS_URL?.trim() || undefined,
+          ttsModel: process.env.CORNELIUS_LOCAL_TTS_MODEL?.trim() || 'kokoro',
+          ttsVoice: process.env.CORNELIUS_LOCAL_TTS_VOICE?.trim() || 'ff_siwis',
+          whisperHost: process.env.CORNELIUS_LOCAL_WHISPER_HOST?.trim() || '127.0.0.1',
+          whisperPort: Number(process.env.CORNELIUS_LOCAL_WHISPER_PORT ?? 10300),
+          piperHost: process.env.CORNELIUS_LOCAL_PIPER_HOST?.trim() || '127.0.0.1',
+          piperPort: Number(process.env.CORNELIUS_LOCAL_PIPER_PORT ?? 10200),
+          piperVoice: process.env.CORNELIUS_LOCAL_PIPER_VOICE?.trim() || undefined,
+          searxngUrl: process.env.CORNELIUS_LOCAL_SEARXNG_URL?.trim() || undefined,
+        }
+      : undefined,
   };
 }

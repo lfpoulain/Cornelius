@@ -466,6 +466,16 @@ ${googlePhotosMigration}`,
     enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1))
   ) STRICT;
   INSERT OR IGNORE INTO home_assistant_climate (id) VALUES (1);`,
+  // Fournisseur vocal local (Ollama + Speaches/Whisper + Kokoro/Piper).
+  `DROP TABLE IF EXISTS voice_provider_preferences_v2;
+  CREATE TABLE voice_provider_preferences_v2 (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    provider TEXT NOT NULL DEFAULT 'openai' CHECK (provider IN ('openai', 'mistral', 'local'))
+  ) STRICT;
+  INSERT INTO voice_provider_preferences_v2 (id, provider)
+    SELECT id, provider FROM voice_provider_preferences;
+  DROP TABLE voice_provider_preferences;
+  ALTER TABLE voice_provider_preferences_v2 RENAME TO voice_provider_preferences;`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */

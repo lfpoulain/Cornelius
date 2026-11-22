@@ -6,7 +6,13 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
-Rien pour l’instant.
+### Mode vocal 100 % local (Ollama, Speaches/Whisper, Kokoro/Piper, SearXNG)
+
+**Ajouté**
+
+- **Fournisseur vocal `local`** : prise en charge complète d’une chaîne vocale locale sans clé API cloud (`CORNELIUS_VOICE_PROVIDER=local`, `server/voice/local.ts`, `server/voice/wyoming.ts`, `deploy/ai-local.compose.yml`).
+- **STT et TTS** : compatibilité HTTP OpenAI (`Speaches` / `faster-whisper` avec filtrage `verbose_json`, streaming `Kokoro` 24 kHz vers 16 kHz) et protocole Wyoming (`whisper` / `piper`) en alternative ou repli.
+- **Fiabilité et latence** : préchauffage du cache KV Ollama au démarrage, stabilisation du préfixe système et des schémas d’outils, en-tête de contexte live (`Caméra` et `Date`) devant le tour actif, génération automatique du prompt et des hotwords STT à partir des modules configurés, normalisation des arguments d’outils et recherche web locale via SearXNG.
 
 ## 0.4.0 · 2026-11-20
 

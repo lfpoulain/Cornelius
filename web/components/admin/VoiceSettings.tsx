@@ -50,7 +50,12 @@ export function VoiceSettings({ state, run }: { state: MirrorState; run: RunActi
             ))}
           </NativeSelect>
         </Field>
-        {state.voiceProvider === 'mistral' ? (
+        {state.voiceProvider === 'local' ? (
+          <p className="text-sm text-muted-foreground">
+            Mode 100 % local actif : Ollama, Speaches/Whisper et Kokoro/Piper tournent sur votre
+            infrastructure sans aucune clé cloud.
+          </p>
+        ) : state.voiceProvider === 'mistral' ? (
           <p className="text-sm text-muted-foreground">
             Voxtral 3 écoute et répond en français avec la voix Marie. La clé OpenAI reste
             disponible pour les images.

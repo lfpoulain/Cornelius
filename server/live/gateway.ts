@@ -17,6 +17,8 @@ export interface LiveConnection {
 export interface LiveAudioConnection extends LiveConnection {
   /** PCM16 mono au format choisi au démarrage, sans en-tête. */
   sendAudio(pcm: Buffer): void;
+  /** Signal Silero VAD optionnel issu du service perception. */
+  sendVad?(speaking: boolean): void;
 }
 export interface LiveHandlers {
   open(): void;
@@ -24,7 +26,7 @@ export interface LiveHandlers {
   failure(): void;
 }
 export interface LiveGateway {
-  provider?: 'openai' | 'mistral';
+  provider?: 'openai' | 'mistral' | 'local';
   serverAudio?: boolean;
   hangup?(id: string): Promise<void>;
   /** Ouvre la connexion HTTPS que réutilisera la création de session, sans rien créer. */

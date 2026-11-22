@@ -88,21 +88,30 @@ export function readinessChecklist(input: ReadinessInput): ReadinessItem[] {
   const voice = opening.trigger === 'voice' || state.wakeWord.enabled;
   const camera = needsCamera(opening, devices?.perception.vision?.mode);
   return [
-    openaiKey
+    state.voiceProvider === 'local'
       ? {
           id: 'openai-key',
-          status: 'done',
-          title: state.voiceProvider === 'mistral' ? 'Clé Mistral' : 'Clé OpenAI',
-          detail: 'Renseignée. Elle reste sur cet ordinateur.',
+          status: openaiKey ? 'done' : 'todo',
+          title: 'Moteur vocal local',
+          detail: openaiKey
+            ? 'Ollama, Whisper et Piper configurés sur le réseau local.'
+            : 'Endpoints locaux non configurés.',
         }
-      : {
-          id: 'openai-key',
-          status: 'todo',
-          title: state.voiceProvider === 'mistral' ? 'Clé Mistral' : 'Clé OpenAI',
-          detail:
-            'Sans elle, Cornelius ne peut pas parler. Collez-la dans « Clés et accès », carte « Clés et jetons » : elle compte tout de suite.',
-          action: { kind: 'section', section: 'access' },
-        },
+      : openaiKey
+        ? {
+            id: 'openai-key',
+            status: 'done',
+            title: state.voiceProvider === 'mistral' ? 'Clé Mistral' : 'Clé OpenAI',
+            detail: 'Renseignée. Elle reste sur cet ordinateur.',
+          }
+        : {
+            id: 'openai-key',
+            status: 'todo',
+            title: state.voiceProvider === 'mistral' ? 'Clé Mistral' : 'Clé OpenAI',
+            detail:
+              'Sans elle, Cornelius ne peut pas parler. Collez-la dans « Clés et accès », carte « Clés et jetons » : elle compte tout de suite.',
+            action: { kind: 'section', section: 'access' },
+          },
     perceptionItem(perception, camera),
     cameraItem(devices, perception, camera),
     state.browserConnected
