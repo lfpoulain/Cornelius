@@ -1,4 +1,5 @@
 import { request as httpRequest } from 'node:http';
+import type { DatabaseSync } from 'node:sqlite';
 import type { PortableState, PortableStatus } from '../shared/portable.js';
 
 export type { PortableDevice, PortableState, PortableStatus } from '../shared/portable.js';
@@ -23,6 +24,45 @@ interface Reply {
 
 const noDot = (name: string) => name.replace(/\.$/u, '');
 
+/**
+ * Le `tailscaled` que Cornelius a lui-même relié au compte : demande de connexion en cours,
+ * puis identifiant du nœud une fois la connexion faite. Seul ce démon-là peut être déconnecté
+ * depuis l'administration.
+ */
+export interface PortableOwnership {
+  get(): { pending: boolean; nodeId: string | null };
+  set(value: { pending: boolean; nodeId: string | null }): void;
+}
+
+/** Table de PortableOwnership (rejouable). */
+export const portableOwnershipMigration = `CREATE TABLE IF NOT EXISTS portable_ownership (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  pending INTEGER NOT NULL DEFAULT 0 CHECK (pending IN (0, 1)),
+  node_id TEXT
+) STRICT;
+INSERT OR IGNORE INTO portable_ownership (id) VALUES (1);`;
+
+export function portableOwnershipStore(db: DatabaseSync): PortableOwnership {
+  return {
+    get() {
+      const row = db.prepare('SELECT pending, node_id FROM portable_ownership WHERE id = 1').get();
+      return { pending: row?.pending === 1, nodeId: (row?.node_id as string | null) ?? null };
+    },
+    set({ pending, nodeId }) {
+      db.prepare('UPDATE portable_ownership SET pending = ?, node_id = ? WHERE id = 1').run(
+        pending ? 1 : 0,
+        nodeId,
+      );
+    },
+  };
+}
+
+/** En mémoire : pour les tests, ou sans base. */
+export function memoryOwnership(): PortableOwnership {
+  let value = { pending: false, nodeId: null as string | null };
+  return { get: () => value, set: (next) => (value = next) };
+}
+
 export class TailscalePortable {
   /** Noms acceptés en plus des noms de la machine : celui du réseau privé, une fois connu. */
   private knownName: string | null = null;
@@ -32,6 +72,7 @@ export class TailscalePortable {
     /** Où Tailscale relaie les requêtes : « https+insecure://cornelius:3443 ». */
     private readonly target: string,
     private readonly timeoutMs = 5000,
+    private readonly ownership: PortableOwnership = memoryOwnership(),
   ) {}
 
   get configured(): boolean {
@@ -140,6 +181,10 @@ export class TailscalePortable {
       }
     }
     this.knownName = state === 'running' && dnsName ? dnsName : null;
+    // Connexion demandée par Cornelius, maintenant faite : ce nœud est le sien.
+    const owned = this.ownership.get();
+    if (state === 'running' && owned.pending && status.Self?.ID)
+      this.ownership.set({ pending: false, nodeId: String(status.Self.ID) });
     const peers = Object.values((status.Peer ?? {}) as Record<string, Json>);
     return {
       ...empty,
@@ -173,6 +218,9 @@ export class TailscalePortable {
 
   /** Relie ce serveur au compte : Tailscale fournit un lien de connexion, lu ensuite par `status`. */
   async connect(): Promise<void> {
+    // Un démon déjà relié à un compte n'est pas celui de Cornelius : rien n'est retenu.
+    const status = await this.json('GET', 'status');
+    if (status.BackendState !== 'Running') this.ownership.set({ pending: true, nodeId: null });
     await this.json('PATCH', 'prefs', { WantRunning: true, WantRunningSet: true });
     const reply = await this.call('POST', 'login-interactive');
     if (reply.status >= 300) throw new Error(`Connexion refusée par Tailscale (${reply.status}).`);
@@ -213,12 +261,21 @@ export class TailscalePortable {
       TCP: { ...(config.TCP ?? {}) },
       Web: { ...(config.Web ?? {}) },
     };
+    // Jamais sur Internet : une publication publique (« funnel ») de ce nom, restée d'avant,
+    // ouvrirait Cornelius à tous. Elle est retirée, à l'ouverture comme à la fermeture.
+    const funnel = !!config.AllowFunnel?.[key];
+    if (funnel) {
+      const allow: Json = { ...config.AllowFunnel };
+      delete allow[key];
+      if (Object.keys(allow).length) next.AllowFunnel = allow;
+      else delete next.AllowFunnel;
+    }
     if (on) {
-      if (ours) {
+      if (ours && !funnel) {
         this.knownName = dnsName;
         return;
       }
-      if (config.TCP?.['443'] || config.Web?.[key])
+      if (!ours && (config.TCP?.['443'] || config.Web?.[key]))
         throw new Error(
           'Le port 443 de ce Tailscale publie déjà autre chose : Cornelius ne le remplace pas. Utilisez un Tailscale dédié à Cornelius.',
         );
@@ -236,8 +293,6 @@ export class TailscalePortable {
         delete next.TCP['443'];
       }
     }
-    // Jamais sur Internet : la publication publique (« funnel ») n'est pas touchée ici et reste
-    // désactivée.
     const reply = await this.call('POST', 'serve-config', next, etag ? { 'If-Match': etag } : {});
     if (reply.status >= 300)
       throw new Error(
@@ -248,11 +303,17 @@ export class TailscalePortable {
 
   /**
    * Déconnecte ce serveur du compte : l'adresse privée disparaît. Refusé si ce `tailscaled`
-   * publie autre chose que Cornelius : il n'est pas dédié à Cornelius, et le déconnecter
-   * couperait aussi ces services.
+   * n'a pas été relié au compte par Cornelius (le Tailscale de la machine hôte, par exemple :
+   * le déconnecter sortirait toute la machine du réseau), ou s'il publie autre chose que
+   * Cornelius.
    */
   async logout(): Promise<void> {
     const status = await this.json('GET', 'status');
+    const owned = this.ownership.get().nodeId;
+    if (!owned || String(status.Self?.ID ?? '') !== owned)
+      throw new Error(
+        'Ce Tailscale n’a pas été connecté par Cornelius : le déconnecter couperait aussi la machine qui l’héberge. Déconnectez-le depuis son hôte.',
+      );
     const dnsName = status.Self?.DNSName ? noDot(String(status.Self.DNSName)) : null;
     if (dnsName && this.others((await this.serveConfig()).config, dnsName))
       throw new Error(
@@ -267,5 +328,6 @@ export class TailscalePortable {
     if (reply.status >= 300)
       throw new Error(`Déconnexion refusée par Tailscale (${reply.status}).`);
     this.knownName = null;
+    this.ownership.set({ pending: false, nodeId: null });
   }
 }

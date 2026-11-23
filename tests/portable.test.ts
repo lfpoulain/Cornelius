@@ -36,6 +36,7 @@ async function fakeTailscaled(t: TestContext) {
           CertDomains: state.backend === 'Running' ? ['cornelius.exemple.ts.net'] : null,
           CurrentTailnet: { Name: 'exemple@example.com', MagicDNSSuffix: 'exemple.ts.net' },
           Self: {
+            ID: 'nCornelius',
             DNSName: state.backend === 'Running' ? 'cornelius.exemple.ts.net.' : '',
             TailscaleIPs: ['100.64.0.10'],
           },
@@ -278,10 +279,11 @@ test('réseau local fermé : Cornelius portable reste ouvert, relayé en HTTP', 
   const app = await appWithPortable(t, { lan: false });
   const health = (remoteAddress: string, host = ts) =>
     app.inject({ url: '/api/health', remoteAddress, headers: { host } });
-  // Depuis la boucle locale (même réseau que tailscaled) ou son conteneur (adresse privée).
-  for (const remoteAddress of ['127.0.0.1', '172.18.0.5'])
-    assert.equal((await health(remoteAddress)).statusCode, 200, remoteAddress);
-  // Une adresse publique reste refusée, même avec le nom privé ; le réseau local reste fermé.
+  // Depuis la boucle locale : tailscaled partage le réseau de Cornelius, seul port ouvert.
+  assert.equal((await health('127.0.0.1')).statusCode, 200);
+  // Une adresse privée (un conteneur voisin) ou publique reste refusée, même avec le nom
+  // privé : le serveur n'écoute que sur la boucle locale ; le réseau local reste fermé.
+  assert.equal((await health('172.18.0.5')).statusCode, 403);
   assert.equal((await health('203.0.113.9')).statusCode, 403);
   assert.equal((await health('192.168.1.30', '192.168.1.20:3443')).statusCode, 403);
   // Le navigateur parle HTTPS à tailscaled, qui relaie en HTTP : son origine est acceptée, et la
@@ -294,4 +296,63 @@ test('réseau local fermé : Cornelius portable reste ouvert, relayé en HTTP', 
   });
   assert.equal(login.statusCode, 200, login.body);
   assert.ok(login.cookies.every((cookie) => cookie.secure));
+});
+
+test('relayé avec un Host choisi par le client (« localhost ») : jamais la machine', async (t) => {
+  for (const lan of [true, false]) {
+    const app = await appWithPortable(t, { lan, adminPassword: 'cornelius' });
+    // tailscale serve choisit la publication d'après le SNI, relaie le Host du client tel quel
+    // et pose toujours X-Forwarded-For.
+    const relay = { host: 'localhost', 'x-forwarded-for': '100.64.0.20' };
+    assert.equal(
+      (await app.inject({ url: '/api/state', headers: relay })).statusCode,
+      401,
+      `lan=${lan}`,
+    );
+    assert.equal(
+      (await app.inject({ url: '/api/auth?role=kiosk', headers: relay })).json().role,
+      null,
+    );
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/login',
+      headers: { ...relay, origin: 'http://localhost' },
+      payload: { password: 'cornelius' },
+    });
+    assert.equal(login.statusCode, 403, `lan=${lan}`);
+    for (const url of ['/perception', '/image-generation'])
+      assert.equal((await app.inject({ url, headers: relay })).statusCode, 403, url);
+    // Le même nom privé mis dans CORNELIUS_ALLOWED_HOSTS ne vaut pas mieux.
+    const named = { host: 'autre.exemple.ts.net', 'x-forwarded-for': '100.64.0.20' };
+    const allowed = await appWithPortable(t, { lan, allowedHosts: ['autre.exemple.ts.net'] });
+    assert.notEqual(
+      (await allowed.inject({ url: '/api/state', headers: named })).statusCode,
+      200,
+      `lan=${lan}`,
+    );
+  }
+});
+
+test('une publication publique (funnel) restée sur ce nom est retirée', async (t) => {
+  const { state, socket } = await fakeTailscaled(t);
+  state.backend = 'Running';
+  state.serve = { AllowFunnel: { 'cornelius.exemple.ts.net:443': true } };
+  const portable = new TailscalePortable(socket, target);
+  await portable.setServing(true);
+  assert.equal(state.serve.AllowFunnel, undefined);
+  assert.deepEqual(state.serve.TCP, { '443': { HTTPS: true } });
+  // Déjà publié, mais funnel rajouté entre-temps : retiré aussi.
+  state.serve.AllowFunnel = { 'cornelius.exemple.ts.net:443': true, 'autre:443': true };
+  await portable.setServing(true);
+  assert.deepEqual(state.serve.AllowFunnel, { 'autre:443': true });
+});
+
+test('un Tailscale que Cornelius n’a pas connecté n’est jamais déconnecté', async (t) => {
+  const { state, socket } = await fakeTailscaled(t);
+  // Déjà relié à un compte (le Tailscale de la machine hôte) : pas de connexion par Cornelius.
+  state.backend = 'Running';
+  const portable = new TailscalePortable(socket, target);
+  await portable.status();
+  await assert.rejects(portable.logout(), /pas été connecté par Cornelius/u);
+  assert.ok(!state.calls.includes('POST /localapi/v0/logout'));
 });

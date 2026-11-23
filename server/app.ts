@@ -13,7 +13,7 @@ import { isOrbScale, ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
 import { AdminPassword, equalSecret, newPasswordError } from './admin-password.js';
 import { SecretStore, secretValueError } from './secrets.js';
 import { TrustedDevices } from './trusted-devices.js';
-import { TailscalePortable } from './tailscale.js';
+import { portableOwnershipStore, TailscalePortable } from './tailscale.js';
 import { allowedHostname, isLoopback, isPrivateAddress, localAddresses } from './network.js';
 import { isOpening } from '../shared/opening.js';
 import { duplicateNameMessage } from '../shared/profile-names.js';
@@ -235,6 +235,8 @@ export async function createApp(
       (config.lan
         ? `https+insecure://127.0.0.1:${config.httpsPort ?? 3443}`
         : `http://127.0.0.1:${config.port ?? 3000}`),
+    5000,
+    portableOwnershipStore(db),
   );
   const adminPassword = new AdminPassword(db, config.adminPassword, DEFAULT_ADMIN_PASSWORD, now);
   const defaultPassword = () => adminPassword.isDefault();
@@ -791,7 +793,7 @@ export async function createApp(
    * elle est injectée dans le processus (tests, WebSocket simulés).
    */
   function fromLoopback(request: FastifyRequest): boolean {
-    if (viaPortable(request)) return false;
+    if (viaPortable(request) || forwarded(request)) return false;
     const socket = request.raw.socket as { remoteAddress?: string } | undefined;
     return !socket || isLoopback(socket.remoteAddress);
   }
@@ -801,6 +803,14 @@ export async function createApp(
    * elle vient pourtant d'un téléphone. Elle n'est donc jamais traitée comme venant de la
    * machine, et passe par l'autorisation d'un appareil, comme un appareil du réseau local.
    */
+  /**
+   * La requête a été relayée par un mandataire (`tailscale serve` pose toujours
+   * X-Forwarded-For) : elle vient d'ailleurs, quel que soit son `Host`, que le client choisit
+   * librement. Un processus local qui ajouterait cet en-tête ne ferait que perdre des droits.
+   */
+  function forwarded(request: FastifyRequest): boolean {
+    return request.headers['x-forwarded-for'] !== undefined;
+  }
   function viaPortable(request: FastifyRequest): boolean {
     const host = request.hostname.toLowerCase();
     return portable.hostnames().some((name) => name.toLowerCase() === host);
@@ -843,12 +853,21 @@ export async function createApp(
     // Clients : la machine elle-même, et le réseau local quand il est ouvert. Une adresse
     // publique (port redirigé par un routeur) est toujours refusée.
     const lan = config.lan === true;
-    // Cornelius portable : relayé par tailscaled, depuis la boucle locale ou son conteneur
-    // (adresse privée), même quand le réseau local est fermé (CORNELIUS_LAN=0). Son nom vient de
-    // tailscaled : il est accepté sans CORNELIUS_ALLOWED_HOSTS.
+    // Cornelius portable : relayé par tailscaled depuis la boucle locale, même quand le réseau
+    // local est fermé (CORNELIUS_LAN=0), ou depuis son conteneur (adresse privée) quand il est
+    // ouvert. Son nom vient de tailscaled : il est accepté sans CORNELIUS_ALLOWED_HOSTS. Une
+    // requête relayée depuis la boucle locale avec un autre nom passe aussi, mais comme un
+    // appareil distant : elle demande une autorisation (voir forwarded).
     const remote = request.raw.socket?.remoteAddress;
-    const portableRelay = viaPortable(request) && (isLoopback(remote) || isPrivateAddress(remote));
-    if (!portableRelay && !fromLoopback(request) && !(lan && isPrivateAddress(remote)))
+    const relayedLocally = isLoopback(remote) && forwarded(request);
+    const portableRelay =
+      viaPortable(request) && (isLoopback(remote) || (lan && isPrivateAddress(remote)));
+    if (
+      !portableRelay &&
+      !relayedLocally &&
+      !fromLoopback(request) &&
+      !(lan && isPrivateAddress(remote))
+    )
       return reply.code(403).send({ error: 'Accès réservé au réseau local.' });
     if (!portableRelay && !allowedHostname(request.hostname, lan, config.allowedHosts ?? []))
       return reply.code(403).send({ error: 'Hôte non autorisé.' });

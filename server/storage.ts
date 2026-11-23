@@ -48,6 +48,7 @@ import { secretsMigration } from './secrets.js';
 import { mailMigration, mailRecipientsMigration } from './mail-store.js';
 import { alarmsMigration } from './alarms-store.js';
 import { trustedDevicesMigration } from './trusted-devices.js';
+import { portableOwnershipMigration } from './tailscale.js';
 import { satellitesMigration } from './satellites-store.js';
 import {
   screensaverChoicesMigration,
@@ -466,6 +467,8 @@ ${googlePhotosMigration}`,
     enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1))
   ) STRICT;
   INSERT OR IGNORE INTO home_assistant_climate (id) VALUES (1);`,
+  // Cornelius portable : le tailscaled que Cornelius a lui-même relié au compte.
+  portableOwnershipMigration,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */
