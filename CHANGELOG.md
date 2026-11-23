@@ -8,6 +8,15 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 Rien pour l’instant.
 
+## 0.4.1 · 2026-11-23
+
+### 2026-11-23 : la voix Mistral enfin audible, miroir honnête
+
+**Corrigé**
+
+- **Voix Mistral** : la dépendance `@livekit/rtc-node` manquait. Le SDK de Mistral l’exige pour toute session vocale Node et la refuse avant même d’appeler l’API : chaque conversation Mistral échouait en silence, quelle que soit la clé. Elle s’installe maintenant avec Cornelius.
+- **Miroir** : avec une clé Mistral et aucune clé OpenAI, le miroir annonçait à tort « Cornelius n’est pas encore configuré ». Il suit désormais la clé du fournisseur vocal choisi, comme la liste de préparation et l’administration, et un serveur qui ne diffuse pas encore sa configuration ne bloque pas non plus.
+
 ## 0.4.0 · 2026-11-20
 
 Cornelius s’enrichit depuis l’administration : un catalogue de modules à installer d’un clic, et la mise à jour de Cornelius lui-même. Home Assistant commande les modes, ventilateurs, scripts et scènes, et règle la consigne des thermostats. Les modules gagnent les icônes dans les cartes et la lecture binaire, un module sans source ne prend plus la place d’un module réglé, et la mémoire devient utilisable avec un modèle local. L’administration est réorganisée, et un audit complet du code apporte de nombreuses corrections.
