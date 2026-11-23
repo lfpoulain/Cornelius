@@ -1275,7 +1275,10 @@ export async function createApp(
         label: secret.label.replace(/^(un|une)\s+/u, '').replace(/^./u, (c) => c.toUpperCase()),
         usedBy: secret.addon.sourceLabel,
         url: secret.url ?? null,
-        note: secret.note ?? null,
+        // Jeton facultatif : le module fonctionne sans, le dire à côté de la précision du module.
+        note: secret.optional
+          ? ['Facultatif', secret.note].filter(Boolean).join(' · ')
+          : (secret.note ?? null),
       })),
     ];
   }

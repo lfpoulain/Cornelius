@@ -6,7 +6,15 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
-Rien pour l’instant.
+### 2026-11-23 : jetons facultatifs, lignes lisibles sur le miroir
+
+**Ajouté**
+
+- **Modules : jeton facultatif.** Un jeton déclaré dans `secrets` peut porter `optional: true` quand le module fonctionne sans, avec moins de fonctions (par exemple l’horaire sans le temps réel). Absent, il est proposé dans la carte du module (« Ce module peut utiliser… ») sans badge « Jeton manquant » ni blocage de « Ajouter une source », et **Clés et jetons** le marque « Facultatif ». Voir la [référence](docs/modules/reference.md#les-secrets) ([lfpoulain/cornelius-modules#34](https://github.com/lfpoulain/cornelius-modules/pull/34)).
+
+**Corrigé**
+
+- **Miroir : une étiquette longue ne coupe plus la valeur.** Sur les lignes de l’affichage permanent et des cartes, la valeur (un prix, une heure) garde sa largeur ; seule l’étiquette se replie sur deux lignes, puis se termine par « … ». Les pense-bêtes du jour gardent l’heure entière et replient leur texte ([#59](https://github.com/lfpoulain/Cornelius/issues/59), signalé par [LucQuebec](https://github.com/LucQuebec)).
 
 ## 0.4.0 · 2026-11-20
 

@@ -306,6 +306,8 @@ Le cœur vérifie ce contenu ([schemas/ambient-presentation.schema.json](../../s
 
 Sur le miroir ([web/components/AmbientModules.tsx](../../web/components/AmbientModules.tsx)), l’en-tête est le « Nom affiché » de la source, plus précis que le titre du module : `title` est obligatoire mais n’est pas affiché. Viennent ensuite `value`, `subtitle`, les lignes `items`, puis « Relevé » avec la date et l’heure de la collecte (sauf avec `showCollectedAt: false`). Un relevé en repli affiche à la place « Dernière donnée connue » et son ancienneté.
 
+Sur une ligne, la valeur garde sa largeur et n’est jamais coupée ; c’est l’étiquette qui se replie sur deux lignes au plus, puis se termine par « … ». Gardez la valeur courte (un prix, une heure, une température) et mettez le nom ou l’adresse dans l’étiquette ou dans `subtitle`. Les lignes des cartes du miroir suivent la même règle.
+
 L’option « Afficher en permanence sur le miroir » n’est proposée que pour un module qui déclare `ambient`, et le serveur refuse de l’activer sinon. Le choix appartient à la source (désactivé par défaut), hors des réglages du module. Les règles de visibilité sont décrites dans [Les modules](README.md#laffichage-permanent).
 
 Une présentation permanente est recalculée à chaque nouvelle collecte, et à l’instant `refreshAt` qu’elle donne, **sans réseau** : la minute suivante pour une horloge ou un compte à rebours, 17 h pour « ce soir, on sort les poubelles », la fin d’un rendez-vous, minuit pour « demain ». Sans `refreshAt`, un texte qui dépend de l’heure peut rester faux jusqu’à la collecte suivante.
@@ -418,12 +420,15 @@ Déclarez chaque jeton dans `secrets` :
 | `label` | Le jeton précédé de « un » ou « une », 80 caractères au plus |
 | `url` | Facultatif : page d’inscription, en http ou https |
 | `note` | Facultatif : précision courte (40 caractères au plus), par exemple « gratuit » |
+| `optional` | Facultatif, faux par défaut : vrai quand le module fonctionne sans ce jeton, avec moins de fonctions (temps réel, avis…) |
 
-L’administration affiche alors « Ce module a besoin d’… » tant que le jeton manque, et grise « Ajouter une source ». Elle ne voit jamais la valeur.
+L’administration affiche alors « Ce module a besoin d’… » tant que le jeton manque, marque le module « Jeton manquant » et grise « Ajouter une source ». Elle ne voit jamais la valeur.
+
+Un jeton `optional` absent est seulement proposé : « Ce module peut utiliser … Il fonctionne sans, avec moins de fonctions. », sans badge « Jeton manquant » ni blocage de l’ajout d’une source. **Clés et accès → Clés et jetons** le marque « Facultatif ». Un cœur antérieur à 0.4.1 ignore le champ et traite le jeton comme requis : déclarez `minCoreVersion: '0.4.1'` si une source doit pouvoir être créée sans lui, sinon dites dans la fiche qu’il faut saisir le jeton sur un cœur plus ancien.
 
 La déclaration suffit à brancher le jeton : il se saisit dans la carte du module ou dans **Clés et accès → Clés et jetons**, et sinon se lit dans la variable `env` du fichier `.env`. Il est masqué dans le journal dès qu’il est saisi. Les variables réservées au cœur (`OPENAI_API_KEY`, `CORNELIUS_ADMIN_PASSWORD`, `CORNELIUS_PERCEPTION_TOKEN`, `CORNELIUS_IMAGE_GENERATION_TOKEN`) sont ignorées. Documentez la variable, sans valeur, dans [.env.example](../../.env.example) et dans la fiche du module, et testez avec un jeton fictif : absent, refusé, accepté.
 
-Dans le module, un jeton absent DOIT lever `config_invalid`. La syntaxe `${secret:NOM}` et les variables `CORNELIUS_SECRET_<NOM>` sont réservées aux commandes HTTP : `context.secret()` ne les lit pas.
+Dans le module, un jeton requis absent DOIT lever `config_invalid`. Sans un jeton `optional`, le module DOIT répondre quand même avec ce qu’il sait faire, et DEVRAIT dire ce qui manque (« Horaire seulement : sans clé, ni avis ni temps réel. ») ; ses tests couvrent le jeton absent, refusé et accepté. La syntaxe `${secret:NOM}` et les variables `CORNELIUS_SECRET_<NOM>` sont réservées aux commandes HTTP : `context.secret()` ne les lit pas.
 
 ## La recherche assistée
 
@@ -484,6 +489,7 @@ Les mêmes exports qu’avant restent disponibles : `validateAddonDefinition`, `
 
 | Cornelius | Ajouts compatibles v1 |
 | --- | --- |
+| 0.4.1 | `optional` d’un jeton déclaré dans `secrets` : le module fonctionne sans, l’administration ne bloque plus l’ajout d’une source |
 | 0.4.0 | Icônes des cartes et de l’affichage permanent : `icon` sur la valeur et sur les lignes, liste `cardIcons` ; client HTTP : `bytes()`, corps brut d’une réponse (format binaire) ; `createTestModule` accepte une réponse en `Uint8Array` |
 | 0.2.0 | `display` ; `arguments` des outils et `context.args` ; `context.timeZone` ; `refreshAt` de l’affichage permanent ; présentation d’un relevé vide ; fraîcheur jusqu’à 24 heures ; client HTTP : redirections, encodage, `truncated`, `url`, User-Agent, `cacheMs` ; formulaire : listes déroulantes et listes répétées ; `clearLabel` ; `createTestModule` |
 | 0.1.0 | Contrat v1, outil à la demande (`query`), secrets, recherche assistée, affichage permanent, `minCoreVersion` |

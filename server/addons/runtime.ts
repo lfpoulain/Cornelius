@@ -397,6 +397,7 @@ export class AddonRuntime {
         label: secret.label,
         url: secret.url ?? null,
         note: secret.note ?? null,
+        optional: secret.optional === true,
         configured: this.secret(secret.name) !== undefined,
       })),
     }));

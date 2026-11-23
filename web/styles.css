@@ -264,6 +264,43 @@ body {
 .ambient-items > div:nth-child(n + 4) {
   display: none;
 }
+/*
+ * Une ligne : l’étiquette (un nom, une adresse) cède la place, la valeur (un prix, une heure)
+ * garde sa largeur et n’est jamais coupée. L’étiquette se replie sur deux lignes au plus, puis
+ * se termine par « … ».
+ */
+.ambient-items dt,
+.card-items dt {
+  flex: 1 1 0;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.ambient-items dd,
+.card-items dd,
+.ambient-reminders dt {
+  flex: 0 0 auto;
+  /* Garde-fou : une valeur exceptionnellement longue ne déborde pas de la tuile. */
+  max-width: 75%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Pense-bêtes : l’heure, courte, à gauche, entière ; le texte se replie en entier. */
+.ambient-reminders dt {
+  display: block;
+}
+.ambient-reminders dd {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .ambient-items dt {
   color: #93a699;
 }
@@ -273,9 +310,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .ambient-value,
-.ambient-subtitle,
-.ambient-items dt,
-.ambient-items dd {
+.ambient-subtitle {
   overflow-wrap: anywhere;
 }
 .mirror-page .ambient-status {

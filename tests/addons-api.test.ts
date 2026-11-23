@@ -64,6 +64,7 @@ interface SecretView {
   label: string;
   url: string | null;
   note: string | null;
+  optional: boolean;
   configured: boolean;
 }
 
@@ -79,6 +80,7 @@ test('le catalogue dit quels jetons manquent, sans jamais renvoyer leur valeur',
       label: 'un jeton Météo Concept',
       url: 'https://api.meteo-concept.com/',
       note: 'gratuit',
+      optional: false,
       configured: false,
     },
   ]);

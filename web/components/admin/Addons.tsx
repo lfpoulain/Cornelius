@@ -517,7 +517,9 @@ function AddonCard({
   const [adding, setAdding] = useState(false);
   const display = moduleDisplay(definition);
   const missingSecrets = (definition.secrets ?? []).filter((secret) => !secret.configured);
-  const status = moduleStatus(instances, missingSecrets.length);
+  // Un jeton facultatif absent est proposé, sans bloquer l’ajout d’une source.
+  const missingRequired = missingSecrets.filter((secret) => !secret.optional);
+  const status = moduleStatus(instances, missingRequired.length);
   const blockedId = `module-${definition.id}-blocked`;
   return (
     <ModulePanel
@@ -581,14 +583,14 @@ function AddonCard({
           <Button
             variant="outline"
             size="sm"
-            disabled={missingSecrets.length > 0}
-            aria-describedby={missingSecrets.length > 0 ? blockedId : undefined}
+            disabled={missingRequired.length > 0}
+            aria-describedby={missingRequired.length > 0 ? blockedId : undefined}
             onClick={() => setAdding(true)}
           >
             <Plus />
             Ajouter une source
           </Button>
-          {missingSecrets.length > 0 && (
+          {missingRequired.length > 0 && (
             <span id={blockedId} className="text-xs text-muted-foreground">
               Disponible une fois le jeton ajouté et Cornelius redémarré.
             </span>
@@ -628,9 +630,13 @@ function MissingSecret({
       <KeyRound aria-hidden="true" />
       <AlertDescription className="gap-2 text-foreground">
         <p>
-          Ce module a besoin {elide(secret.label)}
-          {secret.note ? ` (${secret.note})` : ''}. Collez-le ici : il est pris en compte tout de
-          suite (ou ajoutez <code className="break-all">{secret.env}</code> dans le fichier .env).
+          {secret.optional
+            ? `Ce module peut utiliser ${secret.label}`
+            : `Ce module a besoin ${elide(secret.label)}`}
+          {secret.note ? ` (${secret.note})` : ''}.
+          {secret.optional ? ' Il fonctionne sans, avec moins de fonctions.' : ''} Collez-le ici :
+          il est pris en compte tout de suite (ou ajoutez{' '}
+          <code className="break-all">{secret.env}</code> dans le fichier .env).
         </p>
         <SecretField
           inline

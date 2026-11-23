@@ -400,6 +400,12 @@ export interface AddonSecretRequirement {
   url?: string;
   /** Précision courte affichée entre parenthèses, par exemple « gratuit ». */
   note?: string;
+  /**
+   * Le module fonctionne sans ce jeton, avec moins de fonctions (temps réel, avis…). Absent,
+   * il est proposé sans bloquer « Ajouter une source » ; `context.secret()` rend `undefined`.
+   * Un cœur antérieur à 0.4.1 ignore ce champ et traite le jeton comme requis.
+   */
+  optional?: boolean;
 }
 
 export interface AddonDefinition<
