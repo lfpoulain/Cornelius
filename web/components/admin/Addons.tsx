@@ -373,6 +373,26 @@ export function Addons({
       <p className="text-sm text-muted-foreground">
         Les modules marqués d’une étoile passent en tête de leur groupe.
       </p>
+      {state.player && (
+        // Ce qu’un module fait jouer sur le miroir, arrêtable d’ici (téléphone, autre pièce).
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3"
+          role="status"
+          aria-label="Lecture sur le miroir"
+        >
+          <p className="text-sm">
+            En cours sur le miroir : <strong>{state.player.title}</strong>
+            {state.player.subtitle ? ` · ${state.player.subtitle}` : ''}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void run('Lecture arrêtée.', () => api.stopPlayer())}
+          >
+            Arrêter
+          </Button>
+        </div>
+      )}
       {loadError && (
         <Alert variant="destructive">
           <AlertDescription>{loadError}</AlertDescription>

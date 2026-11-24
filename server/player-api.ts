@@ -1,0 +1,146 @@
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { AddonHttpClient } from '../shared/addons.js';
+import { compile } from '../shared/validation.js';
+import type { DiagnosticLog } from './logs.js';
+import type { Player } from './player.js';
+import { hostOf } from './player.js';
+import { forwardedHeaders, openStream, PlayerStreamError, type Connect } from './player-stream.js';
+
+const imageTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
+const IMAGE_MAX_BYTES = 512 * 1024;
+
+const statusSchema = compile<{
+  id: string;
+  status: 'playing' | 'error' | 'ended';
+  reason?: string;
+}>({
+  type: 'object',
+  additionalProperties: false,
+  required: ['id', 'status'],
+  properties: {
+    id: { type: 'string', minLength: 1, maxLength: 64 },
+    status: { enum: ['playing', 'error', 'ended'] },
+    reason: { type: 'string', maxLength: 300 },
+  },
+});
+
+/**
+ * Routes du lecteur. Le flux et le logo sont relayés par le serveur, sous `/api/` : réservés
+ * au miroir et à l'administration sur le réseau local, comme le reste de l'état.
+ */
+export function registerPlayer(
+  app: FastifyInstance,
+  services: {
+    player: Player;
+    http: AddonHttpClient;
+    logs?: DiagnosticLog;
+    /** Onglet courant du miroir (409 sinon). */
+    kiosk(request: FastifyRequest, reply: FastifyReply): Promise<void>;
+    requireAdmin(request: FastifyRequest, reply: FastifyReply): Promise<void>;
+    /** Remplacé en test : ouverture d'une adresse https. */
+    connect?: Connect;
+  },
+) {
+  const { player } = services;
+
+  app.get<{ Params: { id: string } }>(
+    '/api/player/:id/stream',
+    { preHandler: services.kiosk },
+    async (request, reply) => {
+      const playing = player.playing(request.params.id);
+      if (!playing) return reply.code(404).send({ error: 'Rien ne joue sous ce nom.' });
+      const abort = new AbortController();
+      // Le miroir coupe (arrêt, nouvelle lecture, page fermée) : le flux amont aussi.
+      request.raw.on('close', () => abort.abort());
+      const range = request.headers.range;
+      try {
+        const { response, type } = await openStream(playing.url, {
+          range: typeof range === 'string' ? range : undefined,
+          signal: abort.signal,
+          connect: services.connect,
+        });
+        // Une lecture arrêtée pendant l'ouverture ne part pas vers le miroir.
+        const stopped = () => !player.playing(request.params.id);
+        const unsubscribe = player.onChange(() => {
+          if (stopped()) abort.abort();
+        });
+        response.body.on('close', unsubscribe);
+        abort.signal.addEventListener('abort', () => response.body.destroy(), { once: true });
+        response.body.on('error', () => {});
+        if (stopped()) {
+          response.body.destroy();
+          return reply.code(404).send({ error: 'Lecture arrêtée.' });
+        }
+        reply
+          .code(response.status)
+          .headers({ ...forwardedHeaders(response), 'Content-Type': type })
+          .header('Cache-Control', 'no-store');
+        return reply.send(response.body);
+      } catch (error) {
+        const failure =
+          error instanceof PlayerStreamError
+            ? error
+            : new PlayerStreamError('Le flux est injoignable.');
+        if (!abort.signal.aborted)
+          services.logs?.write('warn', 'player', 'Flux refusé ou injoignable', {
+            addonId: playing.addonId,
+            host: hostOf(playing.url),
+            reason: failure.message,
+          });
+        return reply.code(failure.status).send({ error: failure.message });
+      }
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    '/api/player/:id/image',
+    { preHandler: services.kiosk },
+    async (request, reply) => {
+      const playing = player.playing(request.params.id);
+      if (!playing?.imageUrl) return reply.code(404).send({ error: 'Aucun logo.' });
+      try {
+        // Le client des modules : https seulement ici (contrôlé à la demande), taille bornée.
+        const response = await services.http.fetch({
+          url: playing.imageUrl,
+          maxBytes: IMAGE_MAX_BYTES,
+          timeoutMs: 6_000,
+          cacheMs: 10 * 60_000,
+        });
+        const type = String(
+          Object.entries(response.headers).find(
+            ([name]) => name.toLowerCase() === 'content-type',
+          )?.[1] ?? '',
+        )
+          .split(';')[0]!
+          .trim()
+          .toLowerCase();
+        if (response.status !== 200 || response.truncated || !imageTypes.includes(type))
+          return reply.code(404).send({ error: 'Logo illisible.' });
+        return reply
+          .header('Content-Type', type)
+          .header('Content-Security-Policy', "default-src 'none'")
+          .send(Buffer.from(response.bytes()));
+      } catch {
+        return reply.code(404).send({ error: 'Logo injoignable.' });
+      }
+    },
+  );
+
+  app.post('/api/player/status', { preHandler: services.kiosk }, async (request, reply) => {
+    if (!statusSchema(request.body)) return reply.code(400).send({ error: 'État invalide.' });
+    const { id, status, reason } = request.body;
+    return { ok: player.report(id, status, reason) };
+  });
+
+  app.post('/api/player/stop', { preHandler: services.kiosk }, async () => ({
+    ok: player.stop('miroir'),
+  }));
+
+  app.post('/api/admin/player/stop', { preHandler: services.requireAdmin }, async () => ({
+    ok: player.stop('administration'),
+  }));
+
+  app.get('/api/admin/player', { preHandler: services.requireAdmin }, async () => ({
+    player: player.mirrorView(),
+  }));
+}

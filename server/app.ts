@@ -89,6 +89,8 @@ import { setSatelliteVolume } from './satellite-volume.js';
 import { VoiceUsage, voiceUsageMeasure } from './voice-usage.js';
 import { registerAlarms } from './alarms-api.js';
 import { AlarmsRepository } from './alarms-store.js';
+import { Player } from './player.js';
+import { registerPlayer } from './player-api.js';
 import { MAIL_PASSWORD_SECRET } from '../shared/mail.js';
 import { HomeAssistant } from './home-assistant.js';
 import { HomeAssistantRepository } from './home-assistant-store.js';
@@ -385,6 +387,8 @@ export async function createApp(
   );
   const alarms = new Alarms(new AlarmsRepository(db, now), timeZone, logs, now);
   const alarmTools = new AlarmTools(alarms, now);
+  // Lecteur audio du miroir : la page doit être là pour jouer (contrôleur créé plus bas).
+  const player = new Player({ logs, now, mirrorConnected: () => controller.isBrowserConnected() });
   const agents = new Agents(new AgentRepository(db, now), new HermesClient(http, now), now);
   const initialKey = openaiKey();
   const selectedVoiceKey = () =>
@@ -463,6 +467,7 @@ export async function createApp(
       imageGeneration,
       mail: mailer,
       alarms: alarmTools,
+      player,
       personality: (id) => personality.get(id),
       delegationModel,
     },
@@ -528,6 +533,8 @@ export async function createApp(
   controller.setAmbientProjection((state) => ambient.view(state));
   controller.setAlarmsProjection((state) => alarms.mirrorView(state));
   alarms.onChange(() => controller.publish());
+  controller.setPlayerProjection(() => player.mirrorView());
+  player.onChange(() => controller.publish());
   controller.setBrowserAudioReady(false);
   live.attach(controller);
   agents.onCapabilitiesChanged = (profileId) => live.refreshAgentTools(profileId);
@@ -905,6 +912,20 @@ export async function createApp(
       .send(readFileSync(file));
   });
 
+  function currentKiosk(req: FastifyRequest): boolean {
+    return !!kiosk && !!req.cookies[kioskCookie] && kiosk.kioskId === req.cookies[kioskCookie];
+  }
+  registerPlayer(app, {
+    player,
+    http,
+    logs,
+    requireAdmin,
+    // Seul l’onglet courant du miroir lit le flux et accuse réception.
+    kiosk: async (req, reply) => {
+      if (!currentKiosk(req))
+        await reply.code(409).send({ error: 'Un autre onglet affiche déjà le miroir.' });
+    },
+  });
   registerHardware(app, {
     logs,
     live,
@@ -915,8 +936,7 @@ export async function createApp(
     downloads,
     requireAdmin,
     devices,
-    currentKiosk: (req) =>
-      !!kiosk && !!req.cookies[kioskCookie] && kiosk.kioskId === req.cookies[kioskCookie],
+    currentKiosk,
     workerAuthorized: (req) =>
       !!config.perceptionToken &&
       equalSecret(String(req.headers.authorization ?? ''), 'Bearer ' + config.perceptionToken),
@@ -2051,5 +2071,5 @@ export async function createApp(
     perception.dispose();
     db.close();
   });
-  return { app, controller, live, profiles, logs, memory, agents, alarms };
+  return { app, controller, live, profiles, logs, memory, agents, alarms, player };
 }

@@ -15,6 +15,7 @@ const sourceLabels: Record<string, string> = {
   http: 'Requêtes au serveur',
   perception: 'Périphériques',
   addon: 'Modules',
+  player: 'Lecteur audio',
   action: 'Commandes',
   'home-assistant': 'Home Assistant',
   image: 'Images',
