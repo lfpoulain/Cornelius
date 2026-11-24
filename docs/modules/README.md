@@ -155,6 +155,10 @@ Ce qui le retire :
 
 Les données se renouvellent seules, à la fin de leur durée de validité, tant que la source est visible. Ce qui dépend de l’heure suit l’heure sans attendre : l’horloge change à chaque minute, le compte à rebours des bus aussi, la météo passe au jour suivant à minuit, « Ce soir » apparaît à 17 h pour les poubelles. Les heures sont celles du foyer (`CORNELIUS_TIMEZONE`, Europe/Paris par défaut). Personne devant le miroir : aucune collecte. En cas de souci, le miroir indique « Actualisation… », « Aucune donnée disponible », « Source indisponible » ou « Dernière donnée connue » avec son ancienneté. Après une panne, les nouvelles tentatives s’espacent : 30 secondes, puis 1, 2 et 4 minutes, enfin 5 minutes au plus.
 
+## Écouter une radio ou un podcast
+
+Un module peut aussi faire écouter quelque chose sur le miroir : une radio (« mets France Inter »), un podcast, un son. Cornelius ne connaît aucune radio de lui-même : il faut un module qui le propose, installé depuis **Installer des modules**. « Arrête la musique », « remets la radio » et « plus fort » marchent ensuite pour tous ces modules, et la lecture en cours s’arrête aussi depuis **Modules**. Voir [Le lecteur audio](../fonctionnalites/lecteur-audio.md).
+
 ## Les commandes HTTP
 
 Une commande appelle une adresse que vous enregistrez : la page d’une box domotique, un portail, un service maison. Cornelius la déclenche à la voix par son nom ; il ne choisit jamais l’adresse lui-même.
@@ -200,6 +204,7 @@ Le secret n’est jamais enregistré dans la base. Tant qu’il manque, la comma
 - [cornelius-modules](https://github.com/lfpoulain/cornelius-modules) : modules externes, [tutoriel](https://github.com/lfpoulain/cornelius-modules/blob/main/docs/creer-un-module.md) et gabarit
 - [L’administration](../utilisation/administration.md)
 - [Le miroir](../utilisation/miroir.md)
+- [Le lecteur audio](../fonctionnalites/lecteur-audio.md)
 - [Home Assistant](../fonctionnalites/home-assistant.md)
 - [Configuration](../reference/configuration.md)
 - [Confidentialité](../reference/confidentialite.md)
