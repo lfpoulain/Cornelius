@@ -73,6 +73,8 @@ Le nom privé de Cornelius est accepté automatiquement : inutile de l’ajouter
 
 Cornelius portable fonctionne aussi avec `CORNELIUS_LAN=0` : seul le réseau local est fermé. Cornelius n’écoute alors qu’en HTTP sur la boucle locale (`PORT`, 3000 par défaut), et Tailscale doit partager son réseau : installation native sur la même machine, ou conteneur Tailscale en `network_mode: service:cornelius`. La cible par défaut devient `http://127.0.0.1:3000` ; le téléphone, lui, parle toujours HTTPS avec le certificat de Tailscale. Le montage de l’exemple ci-dessus, avec deux conteneurs sur un réseau Docker, demande le réseau local ouvert (port HTTPS sur toutes les interfaces).
 
+Avec Tailscale en espace utilisateur (`--tun=userspace-networking`, le conteneur en `network_mode: service:cornelius`), une connexion directe d’un pair à l’adresse Tailscale du serveur (`http://100.x.y.z:3000`) arrive par la boucle locale. Cornelius le détecte (état de `tailscaled`, lu au démarrage) et ne traite alors plus la boucle locale comme la machine : tout client, même sur la machine, passe par l’autorisation d’un appareil. Pour garder un miroir sur la même machine sans autorisation, utilisez Tailscale avec l’interface réseau du système (installation native habituelle, TUN du noyau) : une connexion directe y garde l’adresse du pair et ne touche pas la boucle locale.
+
 ## Voir aussi
 
 - [Accès depuis le réseau local](../utilisation/reseau-local.md)

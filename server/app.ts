@@ -238,6 +238,9 @@ export async function createApp(
     5000,
     portableOwnershipStore(db),
   );
+  // Le mode réseau de tailscaled (TUN ou espace utilisateur) décide de la confiance dans la boucle
+  // locale quand le réseau local est fermé : il est lu avant de servir la première requête.
+  if (portable.configured) await portable.status().catch(() => {});
   const adminPassword = new AdminPassword(db, config.adminPassword, DEFAULT_ADMIN_PASSWORD, now);
   const defaultPassword = () => adminPassword.isDefault();
   if (defaultPassword())
@@ -793,7 +796,7 @@ export async function createApp(
    * elle est injectée dans le processus (tests, WebSocket simulés).
    */
   function fromLoopback(request: FastifyRequest): boolean {
-    if (viaPortable(request) || forwarded(request)) return false;
+    if (viaPortable(request) || forwarded(request) || loopbackShared()) return false;
     const socket = request.raw.socket as { remoteAddress?: string } | undefined;
     return !socket || isLoopback(socket.remoteAddress);
   }
@@ -810,6 +813,16 @@ export async function createApp(
    */
   function forwarded(request: FastifyRequest): boolean {
     return request.headers['x-forwarded-for'] !== undefined;
+  }
+  /**
+   * Réseau local fermé et Tailscale en espace utilisateur dans le même réseau que Cornelius
+   * (`network_mode: service:cornelius`) : une connexion directe d'un pair à l'adresse Tailscale
+   * du nœud (`http://100.x.y.z:3000`) arrive depuis la boucle locale, sans X-Forwarded-For. La
+   * boucle locale n'est alors plus la machine : tout client passe par l'autorisation d'un
+   * appareil. Avec un TUN du noyau, une connexion directe garde l'adresse 100.x du pair.
+   */
+  function loopbackShared(): boolean {
+    return portable.configured && config.lan !== true && portable.userspace();
   }
   function viaPortable(request: FastifyRequest): boolean {
     const host = request.hostname.toLowerCase();

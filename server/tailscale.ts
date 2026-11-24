@@ -66,6 +66,12 @@ export function memoryOwnership(): PortableOwnership {
 export class TailscalePortable {
   /** Noms acceptés en plus des noms de la machine : celui du réseau privé, une fois connu. */
   private knownName: string | null = null;
+  /**
+   * Le démon utilise-t-il une vraie interface réseau (TUN du noyau) ? Faux : réseau en espace
+   * utilisateur, où une connexion directe à l'adresse Tailscale du nœud est redirigée vers la
+   * boucle locale. Inconnu tant que le démon n'a pas répondu.
+   */
+  private tun: boolean | null = null;
 
   constructor(
     private readonly socket: string | null,
@@ -77,6 +83,11 @@ export class TailscalePortable {
 
   get configured(): boolean {
     return !!this.socket;
+  }
+
+  /** Vrai si le démon tourne en espace utilisateur (voir `tun`). */
+  userspace(): boolean {
+    return this.tun === false;
   }
 
   /** Noms d'hôte que Cornelius doit accepter (contrôle contre le « DNS rebinding »). */
@@ -181,6 +192,7 @@ export class TailscalePortable {
       }
     }
     this.knownName = state === 'running' && dnsName ? dnsName : null;
+    if (typeof status.TUN === 'boolean') this.tun = status.TUN;
     // Connexion demandée par Cornelius, maintenant faite : ce nœud est le sien.
     const owned = this.ownership.get();
     if (state === 'running' && owned.pending && status.Self?.ID)
@@ -218,9 +230,10 @@ export class TailscalePortable {
 
   /** Relie ce serveur au compte : Tailscale fournit un lien de connexion, lu ensuite par `status`. */
   async connect(): Promise<void> {
-    // Un démon déjà relié à un compte n'est pas celui de Cornelius : rien n'est retenu.
+    // Seul un démon jamais relié à un compte (NeedsLogin) devient celui de Cornelius : un démon
+    // déjà relié, même arrêté (Stopped, « tailscale down »), est celui de l'hôte.
     const status = await this.json('GET', 'status');
-    if (status.BackendState !== 'Running') this.ownership.set({ pending: true, nodeId: null });
+    if (status.BackendState === 'NeedsLogin') this.ownership.set({ pending: true, nodeId: null });
     await this.json('PATCH', 'prefs', { WantRunning: true, WantRunningSet: true });
     const reply = await this.call('POST', 'login-interactive');
     if (reply.status >= 300) throw new Error(`Connexion refusée par Tailscale (${reply.status}).`);

@@ -12,6 +12,7 @@ import { TailscalePortable } from '../server/tailscale.js';
 async function fakeTailscaled(t: TestContext) {
   const state = {
     backend: 'NeedsLogin',
+    tun: true,
     authUrl: '' as string,
     prefs: {} as Record<string, unknown>,
     serve: {} as Record<string, any>,
@@ -32,6 +33,7 @@ async function fakeTailscaled(t: TestContext) {
       if (req.url === '/localapi/v0/status')
         return send(200, {
           BackendState: state.backend,
+          TUN: state.tun,
           AuthURL: state.authUrl,
           CertDomains: state.backend === 'Running' ? ['cornelius.exemple.ts.net'] : null,
           CurrentTailnet: { Name: 'exemple@example.com', MagicDNSSuffix: 'exemple.ts.net' },
@@ -204,9 +206,14 @@ test('un port 443 déjà publié par autre chose n’est jamais remplacé ni ret
 });
 
 /** Cornelius avec un tailscaled voisin, relié au compte : son nom privé est connu. */
-async function appWithPortable(t: TestContext, overrides: Partial<AppConfig> = {}) {
+async function appWithPortable(
+  t: TestContext,
+  overrides: Partial<AppConfig> = {},
+  { tun = true }: { tun?: boolean } = {},
+) {
   const { state, socket } = await fakeTailscaled(t);
   state.backend = 'Running';
+  state.tun = tun;
   const imageRoot = mkdtempSync(join(tmpdir(), 'cornelius-portable-images-'));
   const services = await createApp(
     {
@@ -229,20 +236,7 @@ async function appWithPortable(t: TestContext, overrides: Partial<AppConfig> = {
     await app.close();
     rmSync(imageRoot, { recursive: true, force: true });
   });
-  // L'administration, sur la machine, lit l'état : le nom privé est alors connu.
-  const login = await app.inject({
-    method: 'POST',
-    url: '/api/login',
-    headers: { host: 'localhost', origin: 'http://localhost' },
-    payload: { password: overrides.adminPassword ?? 'mot-de-passe-portable' },
-  });
-  assert.equal(login.statusCode, 200, login.body);
-  const cookie = login.cookies.map((c) => `${c.name}=${c.value}`).join('; ');
-  const status = await app.inject({
-    url: '/api/admin/portable',
-    headers: { host: 'localhost', cookie },
-  });
-  assert.equal(status.json().dnsName, 'cornelius.exemple.ts.net');
+  // Cornelius lit l'état de tailscaled dès le démarrage : le nom privé est déjà connu.
   return app;
 }
 
@@ -352,6 +346,41 @@ test('un Tailscale que Cornelius n’a pas connecté n’est jamais déconnecté
   // Déjà relié à un compte (le Tailscale de la machine hôte) : pas de connexion par Cornelius.
   state.backend = 'Running';
   const portable = new TailscalePortable(socket, target);
+  await portable.status();
+  await assert.rejects(portable.logout(), /pas été connecté par Cornelius/u);
+  assert.ok(!state.calls.includes('POST /localapi/v0/logout'));
+});
+
+test('réseau local fermé, Tailscale en espace utilisateur : la boucle locale n’est plus la machine', async (t) => {
+  // network_mode: service:cornelius et --tun=userspace-networking : un pair qui ouvre
+  // http://100.x.y.z:3000 est redirigé vers 127.0.0.1:3000, sans X-Forwarded-For.
+  const app = await appWithPortable(t, { lan: false, adminPassword: 'cornelius' }, { tun: false });
+  const direct = { host: 'localhost' };
+  assert.notEqual((await app.inject({ url: '/api/state', headers: direct })).statusCode, 200);
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/login',
+    headers: { ...direct, origin: 'http://localhost' },
+    payload: { password: 'cornelius' },
+  });
+  assert.notEqual(login.statusCode, 200);
+  // Les téléphones relayés par tailscale serve passent toujours, comme appareils autorisables.
+  assert.equal((await app.inject({ url: '/api/health', headers: { host: ts } })).statusCode, 200);
+  // Avec un TUN du noyau, une connexion directe garde l'adresse 100.x du pair : la machine reste
+  // la machine.
+  const noyau = await appWithPortable(t, { lan: false }, { tun: true });
+  assert.equal(
+    (await noyau.inject({ url: '/api/state', headers: { host: 'localhost' } })).statusCode,
+    200,
+  );
+});
+
+test('un Tailscale déjà relié mais arrêté (Stopped) ne devient pas celui de Cornelius', async (t) => {
+  const { state, socket } = await fakeTailscaled(t);
+  state.backend = 'Stopped';
+  const portable = new TailscalePortable(socket, target);
+  await portable.connect();
+  state.backend = 'Running';
   await portable.status();
   await assert.rejects(portable.logout(), /pas été connecté par Cornelius/u);
   assert.ok(!state.calls.includes('POST /localapi/v0/logout'));
