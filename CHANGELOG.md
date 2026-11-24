@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-24 : informations permanentes adaptées au contenu
+
+**Corrigé**
+
+- **Miroir : une information permanente ne déborde plus sur ses voisines.** Une ligne à valeur longue (un titre d’actualité) élargissait sa tuile jusqu’à passer par-dessus les modules suivants. Le miroir adapte maintenant la mise en page au contenu : la valeur principale réduit sa taille pour tenir sur une ligne (« SP95-E10 1,807 € »), une ligne dont la valeur est une phrase se replie sur deux lignes dans une tuile plus large, et les lignes des cartes suivent la même règle. Aucun changement à faire dans les modules. Voir la [référence](docs/modules/reference.md#laffichage-permanent).
+
 ### 2026-11-24 : lecteur audio du miroir
 
 **Ajouté**

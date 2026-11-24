@@ -7,6 +7,7 @@ import { BrowserCamera } from '../camera/BrowserCamera';
 import { Orb } from './Orb';
 import { AmbientModules } from './AmbientModules';
 import { CardIconView } from './card-icons';
+import { rowKind } from './fit';
 import { AlarmRinging } from './AlarmRinging';
 import { AlarmBand } from './AlarmBand';
 import { NowPlaying } from './NowPlaying';
@@ -632,7 +633,7 @@ export const Card = memo(function Card({
           {content.items.length > 0 && (
             <dl className="card-items">
               {content.items.map((item, index) => (
-                <div key={`${item.label}-${index}`}>
+                <div key={`${item.label}-${index}`} data-row={rowKind(item)}>
                   <dt>
                     {'icon' in item && item.icon && <CardIconView name={item.icon} />}
                     {item.label}

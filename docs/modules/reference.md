@@ -308,7 +308,13 @@ Le cœur vérifie ce contenu ([schemas/ambient-presentation.schema.json](../../s
 
 Sur le miroir ([web/components/AmbientModules.tsx](../../web/components/AmbientModules.tsx)), l’en-tête est le « Nom affiché » de la source, plus précis que le titre du module : `title` est obligatoire mais n’est pas affiché. Viennent ensuite `value`, `subtitle`, les lignes `items`, puis « Relevé » avec la date et l’heure de la collecte (sauf avec `showCollectedAt: false`). Un relevé en repli affiche à la place « Dernière donnée connue » et son ancienneté.
 
-Sur une ligne, la valeur garde sa largeur et n’est jamais coupée ; c’est l’étiquette qui se replie sur deux lignes au plus, puis se termine par « … ». Gardez la valeur courte (un prix, une heure, une température) et mettez le nom ou l’adresse dans l’étiquette ou dans `subtitle`. Les lignes des cartes du miroir suivent la même règle.
+Le miroir adapte la mise en page au contenu ([web/components/fit.ts](../../web/components/fit.ts)), sans rien demander au module :
+
+- **`value`** s’affiche en grand tant qu’elle tient sur la largeur de la tuile ; plus longue (« SP95-E10 1,807 € »), sa taille diminue pour rester sur une ligne. Au-delà de 24 caractères, c’est une phrase : petite, sur deux lignes au plus.
+- **Une ligne à valeur courte** (20 caractères au plus : un prix, une heure, une température) garde sa valeur entière à droite ; c’est l’étiquette qui se replie sur deux lignes au plus, puis se termine par « … ».
+- **Une ligne à valeur longue** (un titre d’actualité, un message) devient une ligne de texte : l’étiquette, courte, reste à gauche et la valeur se replie sur deux lignes. La tuile est alors plus large.
+
+Rien ne sort de la tuile ni ne recouvre la voisine. Le plus lisible reste une valeur courte, avec le nom ou l’adresse dans l’étiquette ou dans `subtitle`. Les lignes des cartes du miroir suivent les mêmes règles.
 
 L’option « Afficher en permanence sur le miroir » n’est proposée que pour un module qui déclare `ambient`, et le serveur refuse de l’activer sinon. Le choix appartient à la source (désactivé par défaut), hors des réglages du module. Les règles de visibilité sont décrites dans [Les modules](README.md#laffichage-permanent).
 
