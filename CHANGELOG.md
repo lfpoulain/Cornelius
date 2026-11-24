@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-24 : voix et délégation selon le serveur Live
+
+**Modifié**
+
+- **Voix et modèles : l’administration suit le serveur Live.** Avec OpenAI, la délégation garde ses trois modes, sans liste de modèles. Avec Localive, reconnu à sa liste de modèles, la voix devient « Voix féminine » ou « Voix masculine » (Localive parle avec ses propres voix) et la délégation affiche son cerveau, réglé dans Localive. Avec un autre serveur compatible, seule la liste de ses modèles de délégation reste, sans `gpt-live-1`. La liste se lit d’elle-même ; un modèle choisi pour un serveur personnalisé n’est plus envoyé à OpenAI.
+
 ### 2026-11-23 : jetons facultatifs, lignes lisibles sur le miroir
 
 **Ajouté**

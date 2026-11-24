@@ -405,7 +405,7 @@ export async function createApp(
         : createLiveGateway(key, logs, liveEndpoint().effectiveBaseUrl);
   };
   /** Serveur Live : l’administration passe avant .env, qui passe avant OpenAI. */
-  const liveEndpoint = (): Omit<LiveEndpointView, 'models'> => {
+  const liveEndpoint = (): Omit<LiveEndpointView, 'models' | 'kind'> => {
     const baseUrl = preferences.getLiveBaseUrl();
     const envBaseUrl = config.liveBaseUrl ?? '';
     return {
@@ -416,6 +416,11 @@ export async function createApp(
     };
   };
   let liveModels: string[] = [];
+  /** Le serveur Live s’est annoncé comme Localive à la dernière lecture de ses modèles. */
+  let liveIsLocalive = false;
+  /** Un modèle de délégation imposé ne vaut que pour un serveur Live personnalisé. */
+  const delegationModel = () =>
+    liveEndpoint().source === 'default' ? '' : controller.getDelegationModel();
   if (liveEndpoint().source !== 'default')
     logs.write('info', 'openai', 'API Live remplacée par un serveur compatible', {
       baseUrl: liveEndpoint().effectiveBaseUrl,
@@ -459,6 +464,7 @@ export async function createApp(
       mail: mailer,
       alarms: alarmTools,
       personality: (id) => personality.get(id),
+      delegationModel,
     },
     now,
   );
@@ -1441,7 +1447,7 @@ export async function createApp(
     const features = {
       webSearch: controller.isWebSearchEnabled(),
       voice: controller.getSpeechVoice(),
-      delegationModel: controller.getDelegationModel(),
+      delegationModel: delegationModel(),
     };
     const base = liveConfiguration(tools, undefined, delegationMode, features);
     const effective = liveConfiguration(tools, preferences, delegationMode, features);
@@ -1733,7 +1739,14 @@ export async function createApp(
     },
   );
   // Serveur Live compatible : remplace OpenAI pour la conversation (miroir et satellites).
-  const liveEndpointView = (): LiveEndpointView => ({ ...liveEndpoint(), models: liveModels });
+  const liveEndpointView = (): LiveEndpointView => {
+    const endpoint = liveEndpoint();
+    return {
+      ...endpoint,
+      models: liveModels,
+      kind: endpoint.source === 'default' ? 'openai' : liveIsLocalive ? 'localive' : 'compatible',
+    };
+  };
   app.get('/api/admin/live-endpoint', { preHandler: requireAdmin }, async () => liveEndpointView());
   app.patch<{ Body: { baseUrl?: unknown } }>(
     '/api/admin/live-endpoint',
@@ -1751,6 +1764,7 @@ export async function createApp(
       const after = liveEndpoint().effectiveBaseUrl;
       if (after !== before) {
         liveModels = [];
+        liveIsLocalive = false;
         live.setGateway(voiceGateway());
         logs.write('info', 'openai', 'Serveur Live modifié', { baseUrl: after });
       }
@@ -1771,7 +1785,10 @@ export async function createApp(
           .send({ error: 'Ajoutez d’abord la clé OpenAI dans Clés et accès → Clés et jetons.' });
       const { effectiveBaseUrl } = liveEndpoint();
       try {
-        liveModels = await listLiveModels(key, effectiveBaseUrl);
+        ({ models: liveModels, localive: liveIsLocalive } = await listLiveModels(
+          key,
+          effectiveBaseUrl,
+        ));
       } catch (error) {
         logs.write('warn', 'openai', 'Liste des modèles Live illisible', {
           baseUrl: effectiveBaseUrl,
@@ -2034,5 +2051,5 @@ export async function createApp(
     perception.dispose();
     db.close();
   });
-  return { app, controller, profiles, logs, memory, agents, alarms };
+  return { app, controller, live, profiles, logs, memory, agents, alarms };
 }

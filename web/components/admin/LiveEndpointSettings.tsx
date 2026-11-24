@@ -1,3 +1,4 @@
+import { LoaderCircle } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import {
   DEFAULT_LIVE_BASE_URL,
@@ -6,39 +7,50 @@ import {
 } from '../../../shared/live-endpoint';
 import { api } from '../../api';
 import type { RunAction } from './types';
-import { Field, ResourceState } from './shared';
-import { useAdminResource } from './useAdminResource';
+import { Field, LoadError } from './shared';
+import { reloadLiveEndpoint, setLiveEndpoint, useLiveEndpoint } from './liveEndpointStore';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 
+/** Nom du serveur Live, tel que l’administration le montre. */
+export function liveServerLabel(view: LiveEndpointView): string {
+  if (view.kind === 'openai') return 'OpenAI';
+  if (view.kind === 'localive') return 'Localive';
+  return 'Serveur compatible';
+}
+
 function sourceLabel(view: LiveEndpointView): string {
-  if (view.source === 'admin') return 'Réglé ici';
-  if (view.source === 'env') return 'Fichier .env (CORNELIUS_LIVE_BASE_URL)';
-  return 'OpenAI (par défaut)';
+  if (view.source === 'admin') return 'réglé ici';
+  if (view.source === 'env') return 'fichier .env';
+  return 'par défaut';
 }
 
-/** Serveur Live : OpenAI par défaut, ou un serveur compatible tenu à la maison. */
+/** Serveur Live : OpenAI par défaut, ou un serveur compatible tenu à la maison (Localive…). */
 export function LiveEndpointSettings({ run }: { run: RunAction }) {
-  const resource = useAdminResource(api.liveEndpoint);
-  return (
-    <ResourceState resource={resource} loadingLabel="Lecture du serveur Live…">
-      {(initial) => <LiveEndpointForm initial={initial} run={run} />}
-    </ResourceState>
-  );
+  const { view, error } = useLiveEndpoint();
+  if (!view)
+    return error ? (
+      <LoadError error={error} onRetry={reloadLiveEndpoint} />
+    ) : (
+      <div className="admin-loading" data-admin-loading="" aria-busy="true">
+        <LoaderCircle className="size-4 shrink-0 animate-spin text-primary" aria-hidden="true" />
+        <p role="status">Lecture du serveur Live…</p>
+      </div>
+    );
+  return <LiveEndpointForm key={view.effectiveBaseUrl} view={view} run={run} />;
 }
 
-function LiveEndpointForm({ initial, run }: { initial: LiveEndpointView; run: RunAction }) {
-  const [view, setView] = useState(initial);
-  const [value, setValue] = useState(initial.baseUrl);
+function LiveEndpointForm({ view, run }: { view: LiveEndpointView; run: RunAction }) {
+  const [value, setValue] = useState(view.baseUrl);
   const error = value.trim() ? liveBaseUrlError(value) : null;
   const save = (baseUrl: string) =>
     run(
       baseUrl ? 'Serveur Live enregistré.' : 'Serveur Live par défaut rétabli.',
       async () => {
         const saved = await api.saveLiveEndpoint(baseUrl);
-        setView(saved);
         setValue(saved.baseUrl);
+        setLiveEndpoint(saved);
       },
       { key: 'live-endpoint' },
     );
@@ -54,9 +66,9 @@ function LiveEndpointForm({ initial, run }: { initial: LiveEndpointView; run: Ru
         error={error}
         help={
           <>
-            Adresse de base d’un serveur compatible avec l’API Live d’OpenAI, avec /v1. Vide :{' '}
-            {view.envBaseUrl ? `celle du fichier .env (${view.envBaseUrl})` : 'OpenAI'}. La clé
-            OpenAI lui est envoyée. S’applique à la prochaine conversation.
+            Vide : {view.envBaseUrl ? `celui du fichier .env (${view.envBaseUrl})` : 'OpenAI'}. Pour
+            Localive ou un autre serveur compatible, son adresse avec /v1. La clé OpenAI lui est
+            envoyée. S’applique à la prochaine conversation.
           </>
         }
       >
@@ -80,8 +92,8 @@ function LiveEndpointForm({ initial, run }: { initial: LiveEndpointView; run: Ru
             Revenir à {view.envBaseUrl ? '.env' : 'OpenAI'}
           </Button>
         )}
-        <Badge variant={view.source === 'default' ? 'outline' : 'secondary'}>
-          {sourceLabel(view)}
+        <Badge variant={view.kind === 'openai' ? 'outline' : 'secondary'}>
+          {liveServerLabel(view)} · {sourceLabel(view)}
         </Badge>
         <code className="break-all text-xs text-muted-foreground">{view.effectiveBaseUrl}</code>
       </div>

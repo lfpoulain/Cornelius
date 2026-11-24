@@ -4,20 +4,23 @@ import {
   DEFAULT_LIVE_VOICE,
   FRENCH_VOICES,
   LIVE_VOICES,
+  LOCALIVE_VOICE_BY_GENDER,
   isLiveVoice,
+  localiveGender,
   voiceLabel,
+  type LiveVoice,
 } from '../../../shared/voices';
 import { api } from '../../api';
 import type { RunAction } from './types';
 import { Field } from './shared';
 import { LiveEndpointSettings } from './LiveEndpointSettings';
+import { useLiveEndpoint } from './liveEndpointStore';
 import { NativeSelect, NativeSelectOption } from '../ui/native-select';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card';
 
 /** Voix de Cornelius : les deux voix conseillées pour le français d’abord. */
 export function VoiceSettings({ state, run }: { state: MirrorState; run: RunAction }) {
   const voice = isLiveVoice(state.speechVoice) ? state.speechVoice : DEFAULT_LIVE_VOICE;
-  const others = LIVE_VOICES.filter((item) => !FRENCH_VOICES.includes(item));
   return (
     <Card>
       <CardHeader>
@@ -57,54 +60,93 @@ export function VoiceSettings({ state, run }: { state: MirrorState; run: RunActi
           </p>
         ) : (
           <>
-            <Field
-              className="max-w-sm"
-              id="speech-voice"
-              label="Voix"
-              help={
-                FRENCH_VOICES.includes(voice)
-                  ? 'Conseillée pour le français : sans accent étranger marqué.'
-                  : 'Cette voix peut garder un léger accent anglais en français. Cedar et Marin sont conseillées.'
-              }
-            >
-              <NativeSelect
-                id="speech-voice"
-                wrapperClassName="w-full"
-                className="w-full"
-                value={voice}
-                onChange={(event) => {
-                  const next = event.target.value;
-                  void run(
-                    `Voix : ${voiceLabel(next as typeof voice)}.`,
-                    () => api.speechVoice(next),
-                    {
-                      key: 'speech-voice',
-                      payload: next,
-                    },
-                  );
-                }}
-              >
-                <optgroup label="Conseillées pour le français">
-                  {FRENCH_VOICES.map((item) => (
-                    <NativeSelectOption key={item} value={item}>
-                      {voiceLabel(item)}
-                      {item === DEFAULT_LIVE_VOICE ? ' (par défaut)' : ''}
-                    </NativeSelectOption>
-                  ))}
-                </optgroup>
-                <optgroup label="Autres voix">
-                  {others.map((item) => (
-                    <NativeSelectOption key={item} value={item}>
-                      {voiceLabel(item)}
-                    </NativeSelectOption>
-                  ))}
-                </optgroup>
-              </NativeSelect>
-            </Field>
             <LiveEndpointSettings run={run} />
+            <SpeechVoiceField voice={voice} run={run} />
           </>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+const others = LIVE_VOICES.filter((item) => !FRENCH_VOICES.includes(item));
+
+/**
+ * Voix demandée au serveur Live. OpenAI parle avec la voix choisie ; Localive avec ses propres
+ * voix (Phonon), dont il ne retient que le genre : on ne propose alors que ce choix.
+ */
+function SpeechVoiceField({ voice, run }: { voice: LiveVoice; run: RunAction }) {
+  const { view } = useLiveEndpoint();
+  const choose = (next: LiveVoice, label: string) =>
+    void run(label, () => api.speechVoice(next), { key: 'speech-voice', payload: next });
+  if (view?.kind === 'localive') {
+    const gender = localiveGender(voice);
+    return (
+      <Field
+        className="max-w-sm"
+        id="speech-voice"
+        label="Voix de Localive"
+        help="Localive parle avec ses propres voix : choisissez-les dans son administration (Voix). Cornelius lui demande seulement la voix féminine ou masculine."
+      >
+        <NativeSelect
+          id="speech-voice"
+          wrapperClassName="w-full"
+          className="w-full"
+          value={gender}
+          onChange={(event) => {
+            const next = event.target.value === 'male' ? 'male' : 'female';
+            choose(
+              LOCALIVE_VOICE_BY_GENDER[next],
+              next === 'male' ? 'Voix masculine de Localive.' : 'Voix féminine de Localive.',
+            );
+          }}
+        >
+          <NativeSelectOption value="female">Voix féminine</NativeSelectOption>
+          <NativeSelectOption value="male">Voix masculine</NativeSelectOption>
+        </NativeSelect>
+      </Field>
+    );
+  }
+  const compatible = view?.kind === 'compatible';
+  return (
+    <Field
+      className="max-w-sm"
+      id="speech-voice"
+      label="Voix"
+      help={
+        compatible
+          ? 'Voix d’OpenAI : un serveur compatible peut la remplacer par la sienne.'
+          : FRENCH_VOICES.includes(voice)
+            ? 'Conseillée pour le français : sans accent étranger marqué.'
+            : 'Cette voix peut garder un léger accent anglais en français. Cedar et Marin sont conseillées.'
+      }
+    >
+      <NativeSelect
+        id="speech-voice"
+        wrapperClassName="w-full"
+        className="w-full"
+        value={voice}
+        onChange={(event) => {
+          const next = event.target.value as LiveVoice;
+          choose(next, `Voix : ${voiceLabel(next)}.`);
+        }}
+      >
+        <optgroup label="Conseillées pour le français">
+          {FRENCH_VOICES.map((item) => (
+            <NativeSelectOption key={item} value={item}>
+              {voiceLabel(item)}
+              {item === DEFAULT_LIVE_VOICE ? ' (par défaut)' : ''}
+            </NativeSelectOption>
+          ))}
+        </optgroup>
+        <optgroup label="Autres voix">
+          {others.map((item) => (
+            <NativeSelectOption key={item} value={item}>
+              {voiceLabel(item)}
+            </NativeSelectOption>
+          ))}
+        </optgroup>
+      </NativeSelect>
+    </Field>
   );
 }

@@ -289,6 +289,8 @@ export class LiveTransport implements SessionTransport {
       mail?: MailToolBridge;
       alarms?: AlarmsToolBridge;
       personality?: (profileId: string | null) => PersonalityPreferences;
+      /** Modèle de délégation à envoyer (vide : celui du mode) ; sinon celui du contrôleur. */
+      delegationModel?: () => string;
     } = {},
     private readonly now: () => number = Date.now,
   ) {}
@@ -524,7 +526,8 @@ export class LiveTransport implements SessionTransport {
         webSearch: this.controller.isWebSearchEnabled(),
         voice: this.controller.getSpeechVoice(),
         voiceOnly,
-        delegationModel: this.controller.getDelegationModel(),
+        delegationModel:
+          this.integrations.delegationModel?.() ?? this.controller.getDelegationModel(),
       },
     );
   }
