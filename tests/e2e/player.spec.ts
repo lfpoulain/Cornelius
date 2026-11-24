@@ -211,6 +211,111 @@ test('lecteur : une lecture qui échoue est signalée au serveur', async ({ page
   expect(reports.find((report) => report.status === 'error')?.reason).toBeTruthy();
 });
 
+test('lecteur : un fichier demandé pendant la conversation est accusé, en pause, puis joue', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const initial = (await (await page.request.get('/api/state')).json()) as StateEvent;
+  const session = {
+    ...initial.state.session,
+    phase: 'ready' as const,
+    interactionId: 'conversation-fichier',
+    satellite: null,
+  };
+  let sequence = 1;
+  const event = (patch: Partial<MirrorState>): StateEvent => ({
+    ...initial,
+    bootId: 'player-file-fixture',
+    sequence: sequence++,
+    sentAt: Date.now(),
+    state: {
+      ...initial.state,
+      openaiBlocked: true,
+      browserConnected: true,
+      cards: [],
+      ambientDisplays: [],
+      screensaver: undefined,
+      ...patch,
+    },
+  });
+  // Rien ne joue encore : aucun élément audio existant à réutiliser.
+  const start = event({
+    player: null,
+    session,
+    voice: { phase: 'listening', startedAt: Date.now(), endsAt: null },
+  });
+  const reports: { id: string; status: string }[] = [];
+  let socket: WebSocketRoute | null = null;
+  await page.route('**/api/player/episode/stream', (route) =>
+    route.fulfill({ status: 200, contentType: 'audio/wav', body: tone() }),
+  );
+  await page.route('**/api/player/status', async (route) => {
+    reports.push(route.request().postDataJSON());
+    await route.fulfill({ json: { ok: true } });
+  });
+  await page.route('**/api/state', (route) => route.fulfill({ json: start }));
+  await page.routeWebSocket('**/events?role=kiosk', (route) => {
+    socket = route;
+    route.send(JSON.stringify(start));
+  });
+  await page.goto('/');
+  await page.mouse.click(10, 10);
+  await expect.poll(() => socket !== null).toBe(true);
+  const episode: MirrorState['player'] = {
+    id: 'episode',
+    title: 'Épisode 12',
+    subtitle: null,
+    image: false,
+    kind: 'file',
+    status: 'loading',
+    volume: 6,
+  };
+  // Le modèle vient d'appeler l'outil : Cornelius réfléchit, la conversation est ouverte.
+  socket!.send(
+    JSON.stringify(
+      event({
+        player: episode,
+        session,
+        voice: { phase: 'thinking', startedAt: Date.now(), endsAt: null },
+      }),
+    ),
+  );
+  // Accusé sans attendre la fin de la conversation : l'outil répond aussitôt.
+  await expect
+    .poll(() => reports, { timeout: 3_000 })
+    .toContainEqual({ id: 'episode', status: 'playing' });
+  const audio = page.locator('audio.mirror-player-audio');
+  expect(await audio.evaluate((element: HTMLAudioElement) => element.paused)).toBe(true);
+  // Le serveur, accusé reçu, passe la lecture à « playing » : le bandeau dit la pause.
+  socket!.send(
+    JSON.stringify(
+      event({
+        player: { ...episode, status: 'playing' },
+        session,
+        voice: { phase: 'speaking', startedAt: Date.now(), endsAt: null },
+      }),
+    ),
+  );
+  await expect(page.getByRole('complementary', { name: 'En cours de lecture' })).toContainText(
+    'En pause',
+  );
+  // Fin de la conversation : le fichier part.
+  socket!.send(
+    JSON.stringify(
+      event({ player: { ...episode, status: 'playing' }, session: initial.state.session }),
+    ),
+  );
+  await expect
+    .poll(() => audio.evaluate((element: HTMLAudioElement) => element.paused))
+    .toBe(false);
+  await expect
+    .poll(() => audio.evaluate((element: HTMLAudioElement) => element.volume))
+    .toBeCloseTo(0.6, 2);
+  expect(reports.filter((report) => report.status === 'playing')).toHaveLength(1);
+  expect(errors).toEqual([]);
+});
+
 async function routeMirror(page: Page, fixture: StateEvent) {
   await page.route('**/api/state', (route) => route.fulfill({ json: fixture }));
   await page.routeWebSocket('**/events?role=kiosk', (route) => {

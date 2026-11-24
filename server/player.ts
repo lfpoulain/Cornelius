@@ -34,7 +34,7 @@ export interface PlayRequest extends AddonPlayback {
 
 /** Pourquoi une lecture s'arrête, tel que le journal le dit. */
 export type StopCause =
-  'voix' | 'miroir' | 'administration' | 'nouvelle lecture' | 'fin' | 'erreur';
+  'voix' | 'miroir' | 'déconnexion' | 'administration' | 'nouvelle lecture' | 'fin' | 'erreur';
 
 interface Current {
   id: string;
@@ -52,6 +52,11 @@ export interface PlayerOptions {
   mirrorConnected: () => boolean;
   /** Délai d'attente de l'accusé du miroir (8 secondes). */
   ackTimeoutMs?: number;
+  /**
+   * Le module et la source d'une lecture passée sont-ils toujours actifs ? Lu avant de la
+   * reprendre ; absent : toujours vrai.
+   */
+  available?: (request: PlayRequest) => boolean;
 }
 
 /** Hôte seul : l'adresse complète d'un flux peut porter un jeton, elle ne va pas au journal. */
@@ -241,6 +246,14 @@ export class Player {
           result: { volume: this.volume },
         });
       if (!this.last) return toolFailure('Rien à reprendre : aucune lecture récente.', 'not_found');
+      // Une source désactivée ou supprimée depuis ne rejoue pas son dernier flux.
+      if (this.options.available && !this.options.available(this.last)) {
+        this.last = null;
+        return toolFailure(
+          'Rien à reprendre : la source de la dernière lecture n’est plus active.',
+          'not_found',
+        );
+      }
       return this.play(this.last, signal);
     }
     if (action === 'volume') {

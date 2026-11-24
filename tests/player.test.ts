@@ -52,6 +52,22 @@ test('contrat : une demande de lecture https sans identifiants est conforme', ()
   assert.match(playbackProblem({ ...playback, title: '' })!, /title/u);
   assert.match(playbackProblem({ ...playback, kind: 'video' })!, /kind/u);
   assert.match(playbackProblem({ ...playback, imageUrl: 'data:image/png;base64,AA' })!, /image/u);
+  // Le réseau local est refusé dès la demande, flux comme logo.
+  for (const local of [
+    'https://127.0.0.1:8443/logo.png',
+    'https://localhost/logo.png',
+    'https://radio.localhost/logo.png',
+    'https://[::1]/logo.png',
+    'https://192.168.1.2/logo.png',
+  ])
+    assert.match(
+      playbackProblem({ ...playback, imageUrl: local })!,
+      /imageUrl adresse du réseau local/u,
+    );
+  assert.match(
+    playbackProblem({ ...playback, url: 'https://10.0.0.5/flux.mp3' })!,
+    /url adresse du réseau local/u,
+  );
   assert.equal(playbackProblem({ ...playback, imageUrl: 'https://radio.example/logo.png' }), null);
 });
 
@@ -260,7 +276,61 @@ test('lecteur : commandes communes arrêter, reprendre, volume ; fin d’un fich
   assert.equal(f.player.mirrorView(), null);
 });
 
+test('lecteur : reprise refusée quand la source n’est plus active', async () => {
+  let active = true;
+  const player = new Player({
+    mirrorConnected: () => true,
+    ackTimeoutMs: 20,
+    available: () => active,
+  });
+  void player.play(station);
+  player.stop('voix');
+  active = false;
+  const resumed = await player.control({ action: 'resume' });
+  assert.equal(resumed.status, 'failed');
+  assert.match(resumed.summary, /plus active/u);
+  assert.equal(player.mirrorView(), null);
+  active = true;
+  assert.equal((await player.control({ action: 'resume' })).status, 'failed', 'oubliée');
+});
+
 // --- Volume du miroir ------------------------------------------------------------------
+
+test('logo : même voie gardée que le flux, SVG et redirection locale refusés', async (t) => {
+  const player = new Player({ mirrorConnected: () => true, ackTimeoutMs: 20 });
+  const app = Fastify();
+  t.after(() => app.close());
+  const png = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+  const replies: Record<string, UpstreamResponse> = {};
+  const seen: string[] = [];
+  const connect: Connect = async (url) => {
+    seen.push(url.href);
+    return replies[url.pathname] ?? upstream(404);
+  };
+  registerPlayer(app, {
+    player,
+    connect,
+    kiosk: async () => {},
+    requireAdmin: async () => {},
+  });
+  const show = async (imageUrl: string) => {
+    void player.play({ ...station, imageUrl });
+    return app.inject(`/api/player/${player.mirrorView()!.id}/image`);
+  };
+  replies['/logo.png'] = upstream(200, { 'content-type': 'image/png' }, png as never);
+  const ok = await show('https://radio.example/logo.png');
+  assert.equal(ok.statusCode, 200);
+  assert.equal(ok.headers['content-type'], 'image/png');
+  assert.equal(ok.headers['content-security-policy'], "default-src 'none'");
+  replies['/logo.svg'] = upstream(200, { 'content-type': 'image/svg+xml' }, '<svg/>');
+  assert.equal((await show('https://radio.example/logo.svg')).statusCode, 404);
+  replies['/detour.png'] = upstream(302, { location: 'https://192.168.1.10/logo.png' });
+  const count = seen.length;
+  assert.equal((await show('https://radio.example/detour.png')).statusCode, 404);
+  assert.equal(seen.length, count + 1, 'la redirection vers le réseau local n’est pas suivie');
+  replies['/lourd.png'] = upstream(200, { 'content-type': 'image/png' }, 'x'.repeat(600_000));
+  assert.equal((await show('https://radio.example/lourd.png')).statusCode, 404);
+});
 
 test('miroir : le son baisse quand Cornelius écoute, se coupe quand il parle', () => {
   const idle = { conversation: false, speaking: false, alarm: false };
@@ -299,6 +369,23 @@ test('relais : adresses du réseau local et non routables refusées', () => {
   assert.equal(blockedAddress('::ffff:192.168.1.2'), true);
   assert.equal(blockedAddress('93.184.216.34'), false);
   assert.equal(blockedAddress('2606:4700::1111'), false);
+  // IPv4 réservées et IPv6 qui portent une IPv4 locale.
+  for (const address of [
+    '192.0.0.5',
+    '198.19.0.1',
+    '::7f00:1',
+    '::127.0.0.1',
+    '::ffff:7f00:1',
+    '64:ff9b::a00:1',
+    '64:ff9b::192.168.0.1',
+    '2002:c0a8:101::1',
+    'fec0::1',
+    '2001:db8::1',
+    '[::1]',
+  ])
+    assert.equal(blockedAddress(address), true, address);
+  for (const address of ['64:ff9b::808:808', '2002:808:808::1', '8.8.8.8'])
+    assert.equal(blockedAddress(address), false, address);
 });
 
 test('relais : un nom qui résout vers le réseau local est refusé', async () => {
@@ -386,17 +473,6 @@ test('routes : seule la lecture courante est relayée, au miroir courant', async
     });
   registerPlayer(app, {
     player,
-    http: {
-      async fetch() {
-        return {
-          status: 200,
-          headers: { 'Content-Type': 'image/svg+xml' },
-          text: () => '<svg/>',
-          json: () => null,
-          bytes: () => new Uint8Array([60]),
-        };
-      },
-    },
     connect,
     kiosk: async (_request, reply) => {
       if (!kiosk) await reply.code(409).send({ error: 'autre onglet' });
@@ -411,7 +487,7 @@ test('routes : seule la lecture courante est relayée, au miroir courant', async
   assert.equal(streamed.headers['content-type'], 'audio/mpeg');
   assert.equal(streamed.headers['content-range'], 'bytes 0-2/3');
   assert.equal(streamed.body, 'ID3');
-  // Un SVG n'est pas un logo accepté.
+  // Un logo qui n'est pas une image (ici, de l'audio) n'est pas servi.
   assert.equal((await app.inject(`/api/player/${id}/image`)).statusCode, 404);
   kiosk = false;
   assert.equal((await app.inject(`/api/player/${id}/stream`)).statusCode, 409);

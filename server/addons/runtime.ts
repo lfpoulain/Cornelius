@@ -21,6 +21,7 @@ import { compile, validators } from '../../shared/validation.js';
 import type { DiagnosticLog } from '../logs.js';
 import type { AddonRepository } from '../storage.js';
 import { configFieldErrors, type ConfigFieldError } from './config-errors.js';
+import { blockedHost } from '../player-stream.js';
 
 /** Un calendrier change rarement : un relevé peut rester valable une journée. */
 const maxFreshMs = 24 * 60 * 60_000;
@@ -151,7 +152,7 @@ function instanceKey(instance: AddonInstance): string {
 
 /**
  * Écart d'une demande de lecture au contrat, ou null : schéma, puis adresses https sans
- * identifiants (un schéma ne voit pas `https://moi:secret@…`).
+ * identifiants (un schéma ne voit pas `https://moi:secret@…`), hors du réseau local.
  */
 export function playbackProblem(playback: unknown): string | null {
   if (!validators.addonPlayback(playback))
@@ -172,6 +173,8 @@ export function playbackProblem(playback: unknown): string | null {
     }
     if (url.protocol !== 'https:') return `/${field} https attendu`;
     if (url.username || url.password) return `/${field} identifiants interdits`;
+    // Le relais le refuserait de toute façon : dit dès la demande, avec le champ en cause.
+    if (blockedHost(url.hostname)) return `/${field} adresse du réseau local`;
   }
   return null;
 }

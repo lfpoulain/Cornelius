@@ -55,6 +55,9 @@ export function usePlayer(state: MirrorState | null) {
   const fade = useRef<ReturnType<typeof setInterval> | null>(null);
   const context = playerContext(state);
   const output = player ? playerOutput(player.kind, player.volume, context) : null;
+  // Lu par l'accusé : un fichier demandé pendant une conversation attend en pause.
+  const held = useRef(true);
+  held.current = output?.paused ?? true;
 
   // Nouvelle lecture : nouvel élément, accusé au serveur une seule fois.
   useEffect(() => {
@@ -73,12 +76,18 @@ export function usePlayer(state: MirrorState | null) {
       acknowledged = true;
       report(id, 'playing');
     };
+    // Un fichier tenu en pause (conversation, alarme) ne joue pas encore : qu'il soit lisible
+    // suffit à l'accusé, sinon l'outil attendrait la fin de la conversation.
+    const onCanPlay = () => {
+      if (held.current) onPlaying();
+    };
     const onError = () => {
       reportDiagnostic('warn', 'lecteur audio', new Error(failureReason(element)));
       report(id, 'error', failureReason(element));
     };
     const onEnded = () => report(id, 'ended');
     element.addEventListener('playing', onPlaying);
+    element.addEventListener('canplay', onCanPlay);
     element.addEventListener('error', onError);
     element.addEventListener('ended', onEnded);
     const { speaker } = audioPreferences();
@@ -88,6 +97,7 @@ export function usePlayer(state: MirrorState | null) {
     element.src = `/api/player/${encodeURIComponent(id)}/stream`;
     return () => {
       element.removeEventListener('playing', onPlaying);
+      element.removeEventListener('canplay', onCanPlay);
       element.removeEventListener('error', onError);
       element.removeEventListener('ended', onEnded);
       element.pause();

@@ -2,7 +2,7 @@
  * Module de démonstration du lecteur audio (contrat 0.4.1) : il exerce un outil `play` sans
  * fournisseur réel. Ses stations sont des adresses réglées dans la source ; il ne fait aucun
  * appel réseau, le flux est ouvert par le cœur. Chargé par les parcours navigateur et l'aperçu
- * (CORNELIUS_MODULES_DIR=tests/e2e/modules), testé par tests/player-demo.test.ts.
+ * (CORNELIUS_MODULES_DIR=tests/e2e/modules), testé par tests/player.test.ts.
  */
 import { AddonCollectError, type AddonDefinition } from '#cornelius/addons';
 

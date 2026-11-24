@@ -388,7 +388,22 @@ export async function createApp(
   const alarms = new Alarms(new AlarmsRepository(db, now), timeZone, logs, now);
   const alarmTools = new AlarmTools(alarms, now);
   // Lecteur audio du miroir : la page doit être là pour jouer (contrôleur créé plus bas).
-  const player = new Player({ logs, now, mirrorConnected: () => controller.isBrowserConnected() });
+  const player = new Player({
+    logs,
+    now,
+    mirrorConnected: () => controller.isBrowserConnected(),
+    // Reprendre : le module est encore chargé et sa source encore active.
+    available: (request) =>
+      !!addonRuntime.get(request.addonId) &&
+      addonInstances
+        .listInstances()
+        .some(
+          (instance) =>
+            instance.enabled &&
+            instance.addonId === request.addonId &&
+            instance.ref === request.instanceRef,
+        ),
+  });
   const agents = new Agents(new AgentRepository(db, now), new HermesClient(http, now), now);
   const initialKey = openaiKey();
   const selectedVoiceKey = () =>
@@ -917,7 +932,6 @@ export async function createApp(
   }
   registerPlayer(app, {
     player,
-    http,
     logs,
     requireAdmin,
     // Seul l’onglet courant du miroir lit le flux et accuse réception.
@@ -1958,6 +1972,12 @@ export async function createApp(
           // resynchronisation garde la conversation, et le délai navigateur (5 s) la ferme
           // si la page ne revient pas. Une fermeture voulue par la page la libère aussitôt.
           if (![1006, 1011, 1013].includes(code)) controller.setBrowserAudioReady(false);
+          // Plus de miroir, plus de son : la lecture s’arrête, sauf si la page revient vite
+          // (coupure réseau brève) ou si un autre onglet a déjà pris le relais.
+          const grace = [1006, 1011, 1013].includes(code) ? 10_000 : 0;
+          setTimeout(() => {
+            if (!kiosk) player.stop('déconnexion');
+          }, grace).unref();
         }
       });
       socket.send(JSON.stringify(controller.snapshot()));

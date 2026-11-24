@@ -1,13 +1,15 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import type { AddonHttpClient } from '../shared/addons.js';
 import { compile } from '../shared/validation.js';
 import type { DiagnosticLog } from './logs.js';
 import type { Player } from './player.js';
 import { hostOf } from './player.js';
-import { forwardedHeaders, openStream, PlayerStreamError, type Connect } from './player-stream.js';
-
-const imageTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
-const IMAGE_MAX_BYTES = 512 * 1024;
+import {
+  fetchImage,
+  forwardedHeaders,
+  openStream,
+  PlayerStreamError,
+  type Connect,
+} from './player-stream.js';
 
 const statusSchema = compile<{
   id: string;
@@ -32,7 +34,6 @@ export function registerPlayer(
   app: FastifyInstance,
   services: {
     player: Player;
-    http: AddonHttpClient;
     logs?: DiagnosticLog;
     /** Onglet courant du miroir (409 sinon). */
     kiosk(request: FastifyRequest, reply: FastifyReply): Promise<void>;
@@ -99,29 +100,23 @@ export function registerPlayer(
       const playing = player.playing(request.params.id);
       if (!playing?.imageUrl) return reply.code(404).send({ error: 'Aucun logo.' });
       try {
-        // Le client des modules : https seulement ici (contrôlé à la demande), taille bornée.
-        const response = await services.http.fetch({
-          url: playing.imageUrl,
-          maxBytes: IMAGE_MAX_BYTES,
-          timeoutMs: 6_000,
-          cacheMs: 10 * 60_000,
+        // Même voie gardée que le flux : https, jamais le réseau local, même après redirection.
+        const image = await fetchImage(playing.imageUrl, {
+          signal: AbortSignal.timeout(6_000),
+          connect: services.connect,
         });
-        const type = String(
-          Object.entries(response.headers).find(
-            ([name]) => name.toLowerCase() === 'content-type',
-          )?.[1] ?? '',
-        )
-          .split(';')[0]!
-          .trim()
-          .toLowerCase();
-        if (response.status !== 200 || response.truncated || !imageTypes.includes(type))
-          return reply.code(404).send({ error: 'Logo illisible.' });
         return reply
-          .header('Content-Type', type)
+          .header('Content-Type', image.type)
           .header('Content-Security-Policy', "default-src 'none'")
-          .send(Buffer.from(response.bytes()));
-      } catch {
-        return reply.code(404).send({ error: 'Logo injoignable.' });
+          .send(image.body);
+      } catch (error) {
+        const reason = error instanceof PlayerStreamError ? error.message : 'Logo injoignable.';
+        services.logs?.write('warn', 'player', 'Logo refusé ou injoignable', {
+          addonId: playing.addonId,
+          host: hostOf(playing.imageUrl),
+          reason,
+        });
+        return reply.code(404).send({ error: reason });
       }
     },
   );
