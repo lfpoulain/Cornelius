@@ -12,6 +12,10 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 - **Miroir : une information permanente ne déborde plus sur ses voisines.** Une ligne à valeur longue (un titre d’actualité) élargissait sa tuile jusqu’à passer par-dessus les modules suivants. Le miroir adapte maintenant la mise en page au contenu : la valeur principale réduit sa taille pour tenir sur une ligne (« SP95-E10 1,807 € »), une ligne dont la valeur est une phrase se replie sur deux lignes dans une tuile plus large, et les lignes des cartes suivent la même règle. Aucun changement à faire dans les modules. Voir la [référence](docs/modules/reference.md#laffichage-permanent).
 
+**Modifié**
+
+- **Miroir : cartes retouchées.** La teinte de la famille (météo, transports, web…) revient dans le libellé, en trait sous le titre, en lueur derrière la valeur et à l’amorce des séparateurs. Le contenu se dépose ligne après ligne à l’arrivée de la carte (sans effet en mouvement réduit). Sur un écran vertical (1080 x 1920 et au-delà), les lignes de la carte principale, jusque-là masquées, s’affichent dans sa moitié droite.
+
 ### 2026-11-24 : lecteur audio du miroir
 
 **Ajouté**

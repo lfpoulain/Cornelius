@@ -1295,6 +1295,119 @@ body {
   font-size: 20px;
 }
 
+/*
+ * Signature des cartes : la teinte de la famille (pastille de l’en-tête) revient dans le libellé,
+ * en trait sous le titre, en lueur derrière la valeur et à l’amorce des séparateurs.
+ */
+.card-kicker {
+  color: color-mix(in srgb, var(--card-tint) 30%, #9db1a6);
+}
+.display-card-main .card-heading::after {
+  content: '';
+  display: block;
+  width: calc(32 * var(--mirror-scale));
+  height: 2px;
+  margin-top: calc(12 * var(--mirror-scale));
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--card-tint), transparent);
+  box-shadow: 0 0 calc(12 * var(--mirror-scale))
+    color-mix(in srgb, var(--card-tint) 55%, transparent);
+}
+/* Un titre seul n’a rien à séparer. */
+.display-card-main .card-heading:has(+ .card-body:empty)::after {
+  display: none;
+}
+/* Portrait sans hauteur à perdre (téléphone, tablette) et paysage peu haut : pas de trait, la
+   place va au texte. */
+@media (orientation: portrait) and (max-height: 1499px),
+  (orientation: landscape) and (max-height: 560px) {
+  .display-card-main .card-heading::after {
+    display: none;
+  }
+}
+.mirror-page .card-value {
+  text-shadow: 0 0 calc(28 * var(--mirror-scale))
+    color-mix(in srgb, var(--card-tint) 40%, transparent);
+}
+.card-items > div {
+  border-image: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--card-tint) 50%, transparent),
+      #d4efdf14 35%,
+      #d4efdf14
+    )
+    1;
+}
+/*
+ * Le contenu se dépose ligne après ligne, une fois le verre étiré : titre, valeur, textes,
+ * lignes, source. Sans effet en mouvement réduit (règle générale plus bas).
+ */
+.card-heading,
+.card-body > :not(.card-items),
+.card-items > div,
+.card-source {
+  animation: card-line-arrive 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: calc(0.3s + var(--card-line, 0) * 80ms);
+}
+.card-body > :nth-child(1) {
+  --card-line: 1;
+}
+.card-body > :nth-child(2) {
+  --card-line: 2;
+}
+.card-body > :nth-child(3) {
+  --card-line: 3;
+}
+.card-items > div:nth-child(1) {
+  --card-line: 4;
+}
+.card-items > div:nth-child(2) {
+  --card-line: 5;
+}
+.card-items > div:nth-child(3) {
+  --card-line: 6;
+}
+.card-source {
+  --card-line: 7;
+}
+@keyframes card-line-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(calc(10 * var(--mirror-scale)));
+  }
+}
+
+/*
+ * Portrait large et haut (écran vertical) : la carte principale occupe toute la largeur. Ses
+ * lignes, masquées ailleurs en portrait faute de hauteur, prennent la moitié droite au lieu de
+ * la laisser vide.
+ */
+@media (orientation: portrait) and (min-width: 700px) and (min-height: 1500px) {
+  .display-card-main .card-items {
+    display: block;
+  }
+  .display-card-main .card-body:has(> .card-items):has(> :not(.card-items)) {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    column-gap: calc(32 * var(--mirror-scale));
+    align-items: start;
+  }
+  .display-card-main .card-body:has(> :not(.card-items)) > :not(.card-items) {
+    grid-column: 1;
+  }
+  .display-card-main .card-body:has(> :not(.card-items)) > .card-items {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    align-self: center;
+    margin: 0;
+    padding-left: calc(32 * var(--mirror-scale));
+    border-left: 1px solid #d4efdf17;
+  }
+  .display-card-main .card-body:has(> :not(.card-items)) > .card-items > div:first-child {
+    border-top: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
