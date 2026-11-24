@@ -20,6 +20,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 | ajouter la météo, les transports ou une commande | [Les modules](modules/README.md) |
 | recevoir une image du miroir sur mon téléphone | [L’envoi par e-mail](fonctionnalites/envoi-par-e-mail.md) |
 | régler un réveil, un minuteur ou un rappel | [Les alarmes et les rappels](fonctionnalites/alarmes-et-rappels.md) |
+| écouter la radio ou un podcast sur le miroir | [Le lecteur audio](fonctionnalites/lecteur-audio.md) |
 | écrire mon propre module | [Créer un module](https://github.com/lfpoulain/cornelius-modules/blob/main/docs/creer-un-module.md), dans le dépôt cornelius-modules |
 | comprendre pourquoi rien ne se passe | [Dépannage](utilisation/depannage.md) |
 | converser avec Mistral plutôt qu’OpenAI | [Le fournisseur vocal](fonctionnalites/fournisseur-vocal.md) |
@@ -54,6 +55,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 - [La génération d’images](fonctionnalites/generation-d-images.md) : dessiner une image à la voix, sur l’ordinateur.
 - [L’envoi par e-mail](fonctionnalites/envoi-par-e-mail.md) : envoyer une image ou un message sur le téléphone d’une personne du foyer.
 - [Les alarmes et les rappels](fonctionnalites/alarmes-et-rappels.md) : réveils, minuteurs et pense-bêtes, qui sonnent sur le miroir et sont dits à la bonne personne.
+- [Le lecteur audio](fonctionnalites/lecteur-audio.md) : écouter une radio, un podcast ou un son sur le miroir, et ce que fait le son pendant une conversation.
 - [Home Assistant](fonctionnalites/home-assistant.md) : lumières, prises et capteurs de la maison.
 - [Les agents Hermes](fonctionnalites/agents-hermes.md) : confier des demandes longues à un agent personnel.
 - [Le fournisseur vocal](fonctionnalites/fournisseur-vocal.md) : converser avec OpenAI (par défaut) ou Mistral, coût et limites.
@@ -70,6 +72,7 @@ Cette page est l’index de la documentation. Elle indique par où commencer, pu
 - [Développer Cornelius](developpement/README.md) : environnement, scripts, organisation du dépôt, conventions.
 - [Architecture](developpement/architecture.md) : comment les parties du système fonctionnent ensemble.
 - [Tests et recette](developpement/tests-et-recette.md) : tests automatiques et vérification sur le miroir réel.
+- [Mot d’appel et musique](developpement/mesure-mot-appel-musique.md) : le mot « Cornelius » pendant que le miroir joue, banc d’essai hors ligne et protocole dans la pièce.
 - [Le protocole des satellites](developpement/satellites-protocole.md) : le dialogue entre Cornelius et un satellite audio, pour écrire ou modifier son firmware.
 - [Les prompts](developpement/prompts.md) : où vivent les consignes données aux modèles.
 - [Feuille de route](developpement/feuille-de-route.md) : ce qui reste à valider et à construire.

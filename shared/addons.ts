@@ -141,8 +141,37 @@ export interface AddonCollectContext<
    * seulement quand le modèle en donne au moins un : la lecture est alors à la demande.
    */
   args?: Record<string, AddonArgumentValue>;
+  /**
+   * Présent (`true`) quand l'outil appelé déclare `play` : la lecture doit rendre une demande
+   * de lecture (`playback`). Absent pour **Tester**, l'affichage et les autres outils.
+   */
+  play?: true;
   /** Fuseau horaire du foyer (IANA, par exemple « Europe/Paris »). */
   timeZone: string;
+}
+
+/**
+ * Demande de lecture rendue par la collecte d'un outil `play` (Cornelius 0.4.1) : le cœur la
+ * contrôle, relaie le flux et le joue sur le miroir. Arrêt, reprise et volume appartiennent
+ * au cœur (outil `player__control`), pas au module.
+ */
+export interface AddonPlayback {
+  /**
+   * Flux audio direct en https (MP3, AAC, Ogg, Opus), 2 000 caractères au plus, sans
+   * identifiants. Ni liste de lecture (m3u, pls) ni HLS : le module la résout lui-même.
+   */
+  url: string;
+  /** Ce qui joue, 1 à 80 caractères (« France Inter »). */
+  title: string;
+  /** Précision, `null` ou 1 à 120 caractères (« En direct », titre d'un épisode). */
+  subtitle: string | null;
+  /** Logo https (PNG, JPEG, WebP ou GIF, 512 Kio au plus), ou `null`. */
+  imageUrl: string | null;
+  /**
+   * `live` : flux sans fin (radio), baissé pendant une conversation puis rétabli.
+   * `file` : fichier qui se termine (podcast, son), mis en pause puis repris.
+   */
+  kind: 'live' | 'file';
 }
 
 export interface AddonCollection<TData extends Record<string, unknown> = Record<string, unknown>> {
@@ -158,6 +187,8 @@ export interface AddonCollection<TData extends Record<string, unknown> = Record<
   /** Fraîcheur propre au module, bornée par le cœur (5 secondes à 24 heures). */
   freshMs?: number;
   cacheKey?: string;
+  /** Demande de lecture : lue seulement pour un outil `play`, ignorée sinon. */
+  playback?: AddonPlayback;
 }
 
 export interface AddonPresentContext {
@@ -227,6 +258,12 @@ export interface AddonToolDefinition {
    * argument est une lecture à la demande : ni cache, ni repli, ni enregistrement.
    */
   arguments?: Record<string, AddonToolArgument>;
+  /**
+   * Extension compatible v1 (Cornelius 0.4.1) : outil de lecture (« mets France Inter »).
+   * Lecture à la demande ; `collect` reçoit `context.play` et peut rendre `playback`, que le
+   * cœur joue sur le miroir à la place de la carte du module.
+   */
+  play?: true;
 }
 
 export type AddonArgumentValue = string | number | boolean;

@@ -253,7 +253,9 @@ export function validateAddonDefinition(addon: unknown, core = coreVersion): str
         (!tool.query ||
           !Number.isInteger(tool.query.maxLength) ||
           tool.query.maxLength < 1 ||
-          tool.query.maxLength > 2000))
+          tool.query.maxLength > 2000)) ||
+      // Outil de lecture : `true` seulement, pour qu'une faute de frappe ne passe pas inaperçue.
+      (tool.play !== undefined && tool.play !== true)
     )
       return 'définition d’outil invalide.';
     if (toolNames.has(tool.name)) return 'nom d’outil dupliqué.';

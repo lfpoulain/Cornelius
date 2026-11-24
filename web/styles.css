@@ -203,6 +203,54 @@ body {
   display: none;
 }
 
+/* Ce qui joue (lecteur des modules) : logo, état, titre, et un bouton pour arrêter. */
+.mirror-player {
+  flex: 0 0 auto;
+}
+.mirror-player-module {
+  flex: 0 1 calc(420 * var(--ambient-scale));
+  display: flex;
+  align-items: center;
+  gap: calc(14 * var(--ambient-scale));
+}
+.mirror-player-logo {
+  flex: 0 0 auto;
+  width: calc(56 * var(--ambient-scale));
+  height: calc(56 * var(--ambient-scale));
+  border-radius: calc(10 * var(--ambient-scale));
+  object-fit: cover;
+}
+.mirror-player-text {
+  flex: 1 1 auto;
+  /* Un nom de station se lit en entier : il passe sur deux lignes plutôt que d’être coupé. */
+  min-width: calc(150 * var(--ambient-scale));
+}
+.mirror-page .mirror-player-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: calc(26 * var(--ambient-scale));
+}
+.mirror-player-stop {
+  /* Le haut du miroir laisse passer les touchers ; ce bouton, lui, les reçoit. */
+  pointer-events: auto;
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: calc(6 * var(--ambient-scale)) calc(16 * var(--ambient-scale));
+  border: 1px solid #54675b;
+  border-radius: 999px;
+  background: transparent;
+  color: #dce9df;
+  font: inherit;
+  cursor: pointer;
+}
+.mirror-player-stop:focus-visible {
+  outline: 2px solid #a0c8ad;
+  outline-offset: 4px;
+}
+
 /*
  * Informations permanentes : typographie sur le reflet, sans surface de carte. Un quart plus
  * petites que le reste du miroir sur grand écran (1920 x 1080 et au-delà), jamais sous la taille

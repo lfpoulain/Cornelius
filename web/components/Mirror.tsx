@@ -9,6 +9,8 @@ import { AmbientModules } from './AmbientModules';
 import { CardIconView } from './card-icons';
 import { AlarmRinging } from './AlarmRinging';
 import { AlarmBand } from './AlarmBand';
+import { NowPlaying } from './NowPlaying';
+import { usePlayer } from '../audio/player';
 import { Screensaver, type ScreensaverScene } from './Screensaver';
 import { screensaverWoken } from './screensaver-wake';
 import { useVoice } from '../audio/useVoice';
@@ -269,6 +271,8 @@ export function Mirror({ connection }: { connection: MirrorConnection }) {
   }, [preparation.ready, preparation.busy]);
   const { readAudio, audioLocked } = useVoice(state, fresh);
   useMeasures(state, fresh, readAudio);
+  // Le son joue même sous l’écran de veille : le lecteur ne dépend pas de l’affichage.
+  const { player, context: playerContext } = usePlayer(state);
   // Une conversation tenue par un satellite : le miroir reste au repos et dit seulement où.
   const satelliteName =
     fresh &&
@@ -394,6 +398,7 @@ export function Mirror({ connection }: { connection: MirrorConnection }) {
           // Minuteurs, réveil et rappels au-dessus des informations permanentes.
           <div className="mirror-top-info">
             <AlarmBand alarms={state.alarms} now={now} />
+            <NowPlaying player={player} context={playerContext} />
             <AmbientModules state={state} now={now} />
           </div>
         )}

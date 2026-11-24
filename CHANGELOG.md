@@ -6,6 +6,14 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-24 : lecteur audio du miroir
+
+**Ajouté**
+
+- **Lecteur audio du miroir.** Un module peut faire écouter une radio, un podcast ou un son sur le miroir (« mets France Inter ») : un bandeau montre le logo, le titre et un bouton **Arrêter**. Le son baisse quand Cornelius écoute, se coupe quand il parle (un podcast se met en pause), et revient après. « Arrête la musique », « remets la radio » et « plus fort » sont des commandes communes à tous les modules. Le serveur relaie le flux : la page du miroir ne contacte aucun service extérieur et sa politique de sécurité ne change pas. Le miroir seulement pour l’instant. Voir [Le lecteur audio](docs/fonctionnalites/lecteur-audio.md) ([#62](https://github.com/lfpoulain/Cornelius/issues/62), proposé par [LucQuebec](https://github.com/LucQuebec)).
+- **Modules : outil de lecture.** Un outil déclare `play: true` ; `collect` reçoit `context.play` et rend une demande `playback` (flux https direct, titre, précision, logo, `live` ou `file`), que le cœur contrôle et joue. Ajout compatible `apiVersion: 1`, `minCoreVersion: '0.4.1'`. Voir la [référence](docs/modules/reference.md#loutil-de-lecture) ; un module de démonstration est dans `tests/e2e/modules/lecteur_demo`.
+- **Mot d’appel et musique** : un banc d’essai hors ligne (`perception/wake_music_bench.py`) et un protocole d’essai dans la pièce. Voir [Mot d’appel et musique](docs/developpement/mesure-mot-appel-musique.md).
+
 ### 2026-11-24 : voix et délégation selon le serveur Live
 
 **Modifié**

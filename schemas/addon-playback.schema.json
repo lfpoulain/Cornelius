@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Cornelius AddonPlayback v1",
+  "description": "Demande de lecture rendue par la collecte d'un outil play. Le coeur verifie aussi l'adresse (https, sans identifiants) avant de relayer le flux vers le miroir.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["url", "title", "subtitle", "imageUrl", "kind"],
+  "properties": {
+    "url": { "type": "string", "pattern": "^https://", "minLength": 9, "maxLength": 2000 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "subtitle": { "type": ["string", "null"], "minLength": 1, "maxLength": 120 },
+    "imageUrl": {
+      "type": ["string", "null"],
+      "pattern": "^https://",
+      "minLength": 9,
+      "maxLength": 2000
+    },
+    "kind": { "enum": ["live", "file"] }
+  }
+}
