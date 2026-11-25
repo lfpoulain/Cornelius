@@ -40,13 +40,11 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 - **Miroir : une étiquette longue ne coupe plus la valeur.** Sur les lignes de l’affichage permanent et des cartes, la valeur (un prix, une heure) garde sa largeur ; seule l’étiquette se replie sur deux lignes, puis se termine par « … ». Les pense-bêtes du jour gardent l’heure entière et replient leur texte ([#59](https://github.com/lfpoulain/Cornelius/issues/59), signalé par [LucQuebec](https://github.com/LucQuebec)).
 
-## 0.4.1 · 2026-11-23
-
 ### 2026-11-23 : la voix Mistral enfin audible, miroir honnête
 
 **Corrigé**
 
-- **Voix Mistral** : la dépendance `@livekit/rtc-node` manquait. Le SDK de Mistral l’exige pour toute session vocale Node et la refuse avant même d’appeler l’API : chaque conversation Mistral échouait en silence, quelle que soit la clé. Elle s’installe maintenant avec Cornelius.
+- **Voix Mistral** : la dépendance `@livekit/rtc-node` manquait. Le SDK de Mistral l’exige pour toute session vocale Node et la refuse avant même d’appeler l’API : chaque conversation Mistral échouait en silence, quelle que soit la clé. Elle s’installe maintenant avec Cornelius ([#61](https://github.com/lfpoulain/Cornelius/pull/61), par [gedar52](https://github.com/gedar52)).
 - **Miroir** : avec une clé Mistral et aucune clé OpenAI, le miroir annonçait à tort « Cornelius n’est pas encore configuré ». Il suit désormais la clé du fournisseur vocal choisi, comme la liste de préparation et l’administration, et un serveur qui ne diffuse pas encore sa configuration ne bloque pas non plus.
 
 ## 0.4.0 · 2026-11-20
