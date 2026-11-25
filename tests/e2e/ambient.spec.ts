@@ -213,3 +213,118 @@ test('les informations restent affichées sans conversation et suivent la reconn
     clearInterval(heartbeat);
   }
 });
+
+test('un contenu long reste dans sa tuile : titres d’actualité, valeur étendue', async ({
+  page,
+}) => {
+  const initial = (await (await page.request.get('/api/state')).json()) as StateEvent;
+  const display = (instanceId: string, label: string, content: object) => ({
+    instanceId,
+    addonId: instanceId,
+    profileId: null,
+    label,
+    status: 'ready' as const,
+    fetchedAt: new Date().toISOString(),
+    validUntil: new Date(Date.now() + 60_000).toISOString(),
+    content: { title: label, value: null, subtitle: null, items: [], ...content },
+  });
+  const snapshot = {
+    ...initial,
+    bootId: 'ambient-long-fixture',
+    sequence: 1,
+    sentAt: Date.now(),
+    state: {
+      ...initial.state,
+      openaiBlocked: true,
+      browserConnected: true,
+      privacyMode: false,
+      presence: {
+        state: 'present',
+        health: 'ok',
+        peopleCount: 1,
+        engagementId: null,
+        observedAt: Date.now(),
+        people: [{ trackId: 'one', profileId: null, engaged: false }],
+      },
+      ambientDisplays: [
+        display('actu', 'En une', {
+          layout: 'list',
+          items: [
+            {
+              label: '1',
+              value:
+                'Le conseil municipal adopte après six heures de débat le nouveau plan de circulation du centre-ville, notamment la piétonnisation des quais',
+            },
+            { label: '2', value: 'La ligne de tramway rouvre lundi après trois mois de travaux' },
+            { label: '3', value: 'Météo : un week-end doux et ensoleillé sur tout le pays' },
+          ],
+        }),
+        display('carburants', 'Station atelier', {
+          layout: 'metric',
+          value: 'SP95-E10 1,807 €',
+          subtitle: 'Villebon-sur-Yvette',
+          items: [{ label: 'Gazole', value: '1,990 €' }],
+        }),
+        display('clock', 'Paris', {
+          layout: 'metric',
+          value: '15:04',
+          subtitle: 'mardi 24 novembre',
+          showCollectedAt: false,
+        }),
+      ],
+      cards: [],
+    },
+  } as unknown as StateEvent;
+  await page.route('**/api/state', (route) => route.fulfill({ json: snapshot }));
+  await page.routeWebSocket('**/events?role=kiosk', (route) => {
+    route.send(JSON.stringify(snapshot));
+  });
+  for (const [width, height] of [
+    [1235, 644],
+    [1920, 1080],
+    [390, 844],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await page.goto('/');
+    await expect(page.locator('.ambient-module').first()).toBeVisible();
+    const report = await page.evaluate(() => {
+      const visible = (element: Element) => element.getClientRects().length > 0;
+      const tiles = [...document.querySelectorAll('.ambient-module')].filter(visible);
+      const boxes = tiles.map((tile) => tile.getBoundingClientRect());
+      return {
+        // Aucun texte ne sort de sa tuile, aucune tuile n’en recouvre une autre.
+        spills: tiles.flatMap((tile, index) =>
+          [...tile.querySelectorAll('*')]
+            .filter(visible)
+            .filter((element) => {
+              const box = element.getBoundingClientRect();
+              return box.right > boxes[index]!.right + 1 || box.left < boxes[index]!.left - 1;
+            })
+            .map((element) => element.textContent),
+        ),
+        overlaps: boxes.filter((box, index) =>
+          boxes.some(
+            (other, at) =>
+              at > index &&
+              box.left < other.right - 1 &&
+              other.left < box.right - 1 &&
+              box.top < other.bottom - 1 &&
+              other.top < box.bottom - 1,
+          ),
+        ).length,
+        valueLines: [...document.querySelectorAll('.ambient-value')]
+          .filter(visible)
+          .map((value) =>
+            Math.round(
+              value.getBoundingClientRect().height / parseFloat(getComputedStyle(value).lineHeight),
+            ),
+          ),
+      };
+    });
+    await page.screenshot({ path: `${screenshots}/ambient-long-${width}x${height}.png` });
+    expect(report.spills, `${width}x${height}`).toEqual([]);
+    expect(report.overlaps, `${width}x${height}`).toBe(0);
+    // « SP95-E10 1,807 € » tient sur une ligne : la taille suit la longueur.
+    expect(Math.max(...report.valueLines), `${width}x${height}`).toBe(1);
+  }
+});

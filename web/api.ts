@@ -447,6 +447,7 @@ export const api = {
     post<AlarmsView>('/api/admin/alarms', input),
   stopAlarm: (id: string) =>
     post<AlarmsView>(`/api/admin/alarms/${encodeURIComponent(id)}/stop`, {}),
+  stopPlayer: () => post<{ ok: boolean }>('/api/admin/player/stop', {}),
   deleteAlarm: (id: string) =>
     request<AlarmsView>(`/api/admin/alarms/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   mail: () => request<MailView>('/api/admin/mail'),

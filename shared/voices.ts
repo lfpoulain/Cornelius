@@ -41,3 +41,26 @@ export function isLiveVoice(value: unknown): value is LiveVoice {
 export function voiceLabel(voice: LiveVoice): string {
   return voice.charAt(0).toUpperCase() + voice.slice(1);
 }
+
+/**
+ * Localive parle avec ses propres voix (Phonon) : il ne retient du nom envoyé que le genre.
+ * Ces noms donnent sa voix masculine (réglage voice.male_names de Localive, par défaut),
+ * les autres sa voix féminine.
+ */
+export const LOCALIVE_MALE_VOICES: readonly LiveVoice[] = [
+  'ash',
+  'ballad',
+  'cedar',
+  'echo',
+  'verse',
+];
+
+/** Nom envoyé à Localive pour chaque genre : celui des voix conseillées en français. */
+export const LOCALIVE_VOICE_BY_GENDER = {
+  male: 'cedar',
+  female: 'marin',
+} as const satisfies Record<'male' | 'female', LiveVoice>;
+
+export function localiveGender(voice: LiveVoice): 'male' | 'female' {
+  return LOCALIVE_MALE_VOICES.includes(voice) ? 'male' : 'female';
+}

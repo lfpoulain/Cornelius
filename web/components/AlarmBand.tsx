@@ -67,7 +67,7 @@ export function AlarmBand({ alarms, now }: { alarms: AlarmsMirrorState | undefin
       {today.length > 0 && (
         <section className="ambient-module" data-layout="list" aria-label="Pense-bêtes du jour">
           <h2 className="ambient-heading">Aujourd’hui</h2>
-          <dl className="ambient-items">
+          <dl className="ambient-items ambient-reminders">
             {today.slice(0, 3).map((reminder) => (
               <div key={reminder.id}>
                 <dt>{reminder.time}</dt>

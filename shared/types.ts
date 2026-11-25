@@ -9,6 +9,7 @@ import type { AddonIcon, AmbientDisplay, ModuleCard } from './addons.js';
 import type { Opening } from './opening.js';
 import type { ScreensaverState } from './screensaver.js';
 import type { AlarmsMirrorState } from './alarms.js';
+import type { PlayerMirrorState } from './player.js';
 
 export type { ModuleCard };
 
@@ -164,6 +165,8 @@ export interface MirrorState {
   ambientDisplays: AmbientDisplay[];
   /** Réveils, minuteurs et rappels qui sonnent ; absent des anciens serveurs : rien. */
   alarms?: AlarmsMirrorState;
+  /** Ce qui joue sur le miroir (radio, podcast d’un module) ; absent des anciens serveurs. */
+  player?: PlayerMirrorState | null;
   voice: VoiceActivity;
   /** Recherche web hébergée en cours pour la conversation Live active. */
   webSearchActive?: boolean;

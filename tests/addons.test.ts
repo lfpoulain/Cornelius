@@ -730,7 +730,12 @@ test('les jetons déclarés par un module sont facultatifs et contrôlés au cha
     validateAddonDefinition({ ...clock, secrets: [{ name: 'demoToken', env: 'X', label: 'x' }] }),
     null,
   );
+  // Jeton facultatif : un booléen, rien d'autre.
+  for (const optional of [true, false])
+    assert.equal(validateAddonDefinition({ ...clock, secrets: [{ ...secret, optional }] }), null);
   for (const secrets of [
+    [{ ...secret, optional: 'oui' }],
+    [{ ...secret, optional: 1 }],
     'CORNELIUS_DEMO_TOKEN',
     [{ ...secret, env: 'cornelius_demo' }],
     [{ ...secret, name: 'nom invalide' }],

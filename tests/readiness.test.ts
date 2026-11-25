@@ -208,6 +208,19 @@ test('sans état des périphériques, la liste lit la configuration diffusée au
   assert.match(item('camera').detail, /en cours/u);
 });
 
+test('clé du fournisseur vocal (Mistral) sans clé OpenAI : le miroir n’est pas bloqué', () => {
+  const state = mirror(gaze, {
+    setup: { openaiKey: false, voiceKey: true, perception: true },
+    voiceProvider: 'mistral',
+  });
+  // La clé Mistral suffit : ni bandeau « pas encore configuré », ni blocage administrateur.
+  assert.equal(mirrorBlocker(state, { fresh: true }), null);
+  assert.deepEqual(adminBlockers(state, null), []);
+  const { statuses, item } = checklist({ state, devices: null });
+  assert.equal(statuses['openai-key'], 'done');
+  assert.match(item('openai-key').title, /Clé Mistral/u);
+});
+
 test('« Cornelius » pour tout le monde sans caméra : caméra facultative, perception exigée', () => {
   const ready = mirror(voiceAlone);
   const off = devices({ vision: 'off', selectedId: null, available: [] });

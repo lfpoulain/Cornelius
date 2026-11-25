@@ -146,7 +146,9 @@ test('carte du miroir : sans icône, le rendu d’avant ; avec icône, décorati
     /<dt><svg[^>]*aria-hidden="true"[^>]*data-icon="cloud-snow"[^>]*>.*<\/svg>Ce soir<\/dt><dd>Neige faible<\/dd>/u,
   );
   // Sans les icônes, il reste exactement le texte de la carte sans icône.
-  assert.equal(avec.replace(/<svg.*?<\/svg>/gu, ''), sans);
+  // Seule différence hors icône : la longueur comptée pour la taille de la valeur (fit.ts).
+  const sansTaille = (html: string) => html.replace(/ style="--value-chars:\d+"/u, '');
+  assert.equal(sansTaille(avec.replace(/<svg.*?<\/svg>/gu, '')), sansTaille(sans));
 });
 
 test('affichage permanent : sans icône, le rendu d’avant ; avec icône, décorative', () => {
@@ -177,16 +179,18 @@ test('affichage permanent : sans icône, le rendu d’avant ; avec icône, déco
       ],
     }) as unknown as MirrorState;
   const sans = renderToStaticMarkup(createElement(AmbientModules, { state: etat({}), now: 0 }));
-  assert.match(sans, /<p class="ambient-value">2 °C<\/p>/u);
+  assert.match(sans, /<p class="ambient-value"[^>]*>2 °C<\/p>/u);
   assert.doesNotMatch(sans, /<svg/u);
   const avec = renderToStaticMarkup(
     createElement(AmbientModules, { state: etat({ icon: 'snowflake' }), now: 0 }),
   );
   assert.match(
     avec,
-    /<p class="ambient-value"><svg[^>]*aria-hidden="true"[^>]*>.*<\/svg>2 °C<\/p>/u,
+    /<p class="ambient-value"[^>]*><svg[^>]*aria-hidden="true"[^>]*>.*<\/svg>2 °C<\/p>/u,
   );
-  assert.equal(avec.replace(/<svg.*?<\/svg>/gu, ''), sans);
+  // Seule différence hors icône : la longueur comptée pour la taille de la valeur (fit.ts).
+  const sansTaille = (html: string) => html.replace(/ style="--value-chars:\d+"/u, '');
+  assert.equal(sansTaille(avec.replace(/<svg.*?<\/svg>/gu, '')), sansTaille(sans));
 });
 
 test('une icône hors liste rend la carte du module non conforme', async (t) => {

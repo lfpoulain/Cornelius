@@ -106,7 +106,8 @@ function validateSecrets(secrets: unknown): string | null {
       typeof secret.label !== 'string' ||
       !secret.label.trim() ||
       secret.label.length > 80 ||
-      (secret.note !== undefined && (typeof secret.note !== 'string' || secret.note.length > 40))
+      (secret.note !== undefined && (typeof secret.note !== 'string' || secret.note.length > 40)) ||
+      (secret.optional !== undefined && typeof secret.optional !== 'boolean')
     )
       return 'jeton déclaré invalide.';
     if (secret.url !== undefined) {
@@ -252,7 +253,9 @@ export function validateAddonDefinition(addon: unknown, core = coreVersion): str
         (!tool.query ||
           !Number.isInteger(tool.query.maxLength) ||
           tool.query.maxLength < 1 ||
-          tool.query.maxLength > 2000))
+          tool.query.maxLength > 2000)) ||
+      // Outil de lecture : `true` seulement, pour qu'une faute de frappe ne passe pas inaperçue.
+      (tool.play !== undefined && tool.play !== true)
     )
       return 'définition d’outil invalide.';
     if (toolNames.has(tool.name)) return 'nom d’outil dupliqué.';

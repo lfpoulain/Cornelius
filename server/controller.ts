@@ -181,6 +181,11 @@ export class SessionController {
   setAlarmsProjection(project: (state: MirrorState) => MirrorState['alarms']): void {
     this.alarmsProjection = project;
   }
+  private playerProjection: (() => MirrorState['player']) | null = null;
+  /** Ce qui joue sur le miroir, diffusé avec l’état (lecteur audio des modules). */
+  setPlayerProjection(project: () => MirrorState['player']): void {
+    this.playerProjection = project;
+  }
   private voice: VoiceActivity = { phase: 'idle', startedAt: 0, endsAt: null };
   private setup: MirrorSetup = { openaiKey: false, perception: false };
 
@@ -554,6 +559,7 @@ export class SessionController {
     state.ambientDisplays = this.ambientProjection?.(state) ?? [];
     const alarms = this.alarmsProjection?.(state);
     if (alarms) state.alarms = alarms;
+    if (this.playerProjection) state.player = this.playerProjection() ?? null;
     return structuredClone({
       schemaVersion: 1,
       type: 'state',
