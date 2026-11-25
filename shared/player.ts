@@ -1,7 +1,8 @@
 /**
  * Lecteur audio du miroir : ce qui joue, tel que le serveur le diffuse, et le volume que le
  * miroir en tire selon la conversation. Le flux lui-même passe par le serveur
- * (`/api/player/<id>/stream`) : le miroir ne contacte jamais l'hôte d'un module.
+ * (`/api/player/<id>/stream`, ou `/api/player/<id>/hls` pour un flux HLS) : le miroir ne
+ * contacte jamais l'hôte d'un module.
  */
 
 export const PLAYER_VOLUME_MAX = 10;
@@ -19,6 +20,11 @@ export interface PlayerMirrorState {
   /** Logo disponible à `/api/player/<id>/image`. */
   image: boolean;
   kind: 'live' | 'file';
+  /**
+   * `direct` : flux lu par `/api/player/<id>/stream`. `hls` : liste HLS (`.m3u8`) lue par
+   * hls.js sous `/api/player/<id>/hls`, chaque adresse réécrite par le serveur.
+   */
+  format: 'direct' | 'hls';
   /** `loading` jusqu'à ce que le miroir entende le flux. */
   status: 'loading' | 'playing';
   /** Volume réglé, de 0 à 10. */

@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-25 : lecteur audio, flux HLS
+
+**Ajouté**
+
+- **Lecteur audio : flux HLS.** Un outil de lecture peut rendre une liste HLS (`.m3u8`) telle quelle, avec `kind: 'live'` : beaucoup de radios publiques (ICI Musique, FIP) ne diffusent qu’ainsi. Le serveur lit la liste et réécrit chaque adresse qu’elle contient en un jeton opaque `/api/player/<id>/hls/<jeton>`, valable pour la lecture en cours seulement ; chaque liste et chaque morceau passe par la voie gardée du relais (https, jamais le réseau local, redirections comprises). Le miroir lit avec hls.js 1.5.17, servi par Cornelius et chargé seulement pour un flux HLS, sans travailleur ; la CSP gagne `media-src 'self' blob:`. Refusés : les flux chiffrés (`EXT-X-KEY`), les listes de plus de 512 Kio et les morceaux de plus de 8 Mio ; retirés : variantes vidéo, images, sous-titres et balises de faible latence. Le titre en cours porté par le flux (ID3) s’affiche dans le bandeau. Rien ne change pour un flux direct ; les listes m3u et pls restent refusées. Voir [Les flux HLS](docs/modules/reference.md#les-flux-hls) ([#62](https://github.com/lfpoulain/Cornelius/issues/62)).
+
 ### 2026-11-25 : jetons par source
 
 **Ajouté**

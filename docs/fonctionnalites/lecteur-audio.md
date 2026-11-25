@@ -21,7 +21,7 @@ Une nouvelle demande remplace ce qui joue : il n’y a qu’une lecture à la fo
 
 ## Sur le miroir
 
-En haut à gauche, un bandeau montre ce qui joue : le logo s’il y en a un, l’état (« En direct », « Lecture », « Connexion… »), le titre et sa précision, et un bouton **Arrêter** pour un miroir tactile. Le son continue sous l’écran de veille.
+En haut à gauche, un bandeau montre ce qui joue : le logo s’il y en a un, l’état (« En direct », « Lecture », « Connexion… »), le titre et sa précision (pour une radio en HLS qui l’annonce, le morceau en cours : « Debussy – Clair de lune »), et un bouton **Arrêter** pour un miroir tactile. Le son continue sous l’écran de veille.
 
 ## Pendant une conversation
 
@@ -39,7 +39,7 @@ Une conversation tenue par un **satellite** dans une autre pièce ne change rien
 ## Ce qui n’est pas encore possible
 
 - Écouter sur un **satellite** : la lecture se fait seulement sur le miroir. Demandée à un satellite, Cornelius le dit.
-- Les listes de lecture (m3u, pls) et le format HLS : le module doit fournir un flux direct.
+- Les listes de lecture m3u et pls : le module doit fournir le flux qu’elles contiennent. Les flux HLS (`.m3u8`, par exemple ICI Musique ou FIP) sont lus, sauf s’ils sont chiffrés.
 - Plusieurs lectures en même temps.
 
 ## Si rien ne joue
@@ -49,13 +49,14 @@ Une conversation tenue par un **satellite** dans une autre pièce ne change rien
 | « Son bloqué par le navigateur » | Touchez le miroir ou utilisez **Activer la voix**, puis redemandez |
 | « Flux introuvable », « Le flux est injoignable » | Le service du module ne répond pas ; réessayez plus tard ou signalez-le à l’auteur du module |
 | « Liste de lecture non prise en charge » | Le module fournit une liste au lieu d’un flux : à corriger dans le module |
+| « Flux chiffré (EXT-X-KEY) non pris en charge » | Ce service protège sa diffusion HLS : le miroir ne peut pas la lire |
 | « Le miroir n’est pas connecté » | Ouvrez la page du miroir |
 
 Chaque lecture laisse une trace dans **Journal**, origine « Lecteur audio » : la demande, le début, l’échec éventuel et l’arrêt, avec le nom du service seulement.
 
 ## Confidentialité
 
-Le serveur ouvre le flux et le transmet au miroir : le navigateur du miroir ne contacte jamais le service de la radio. Le service voit l’adresse de votre connexion à Internet, comme pour tout module. Rien de ce que vous écoutez n’est envoyé au modèle de langage, en dehors du titre rendu par l’outil.
+Le serveur ouvre le flux et le transmet au miroir : le navigateur du miroir ne contacte jamais le service de la radio. Pour un flux HLS, le serveur lit aussi la liste et chacun de ses morceaux ; le miroir ne voit que des adresses du serveur. Le service voit l’adresse de votre connexion à Internet, comme pour tout module. Rien de ce que vous écoutez n’est envoyé au modèle de langage, en dehors du titre rendu par l’outil.
 
 ## Voir aussi
 

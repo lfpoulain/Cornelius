@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type Hls from 'hls.js';
 import { playerOutput, type PlayerContext } from '../../shared/player';
 import type { MirrorState } from '../../shared/types';
 import { request } from '../api';
 import { reportDiagnostic } from '../diagnostics';
+import { id3Title } from './id3';
 import { audioPreferences } from './preferences';
 
 /** Durée des fondus de volume : ni claquement à la baisse, ni retour brutal. */
@@ -29,6 +31,66 @@ function failureReason(audio: HTMLAudioElement): string {
   }
 }
 
+/** Raison d'un échec fatal de hls.js : celle du serveur s'il l'a dite, sinon le genre d'échec. */
+function hlsFailureReason(data: { type: string; networkDetails?: unknown }): string {
+  const xhr = data.networkDetails as { responseText?: string } | undefined;
+  try {
+    const error = (JSON.parse(xhr?.responseText ?? '') as { error?: unknown }).error;
+    if (typeof error === 'string' && error) return error;
+  } catch {
+    // Pas de réponse lisible du serveur.
+  }
+  return data.type === 'mediaError'
+    ? 'Format audio illisible par le miroir.'
+    : 'Le flux s’est interrompu.';
+}
+
+/**
+ * Lecture HLS : hls.js, chargé seulement pour un flux HLS, lit la liste réécrite par le
+ * serveur (`/api/player/<id>/hls`) ; chaque adresse qu'elle nomme est un jeton du serveur.
+ * Sans travailleur (la CSP n'ouvre pas `worker-src blob:`), sans faible latence. Les titres
+ * ID3 portés par les morceaux sont remontés avec leur instant de lecture.
+ */
+async function attachHls(
+  element: HTMLAudioElement,
+  source: string,
+  handlers: { fatal(reason: string): void; title(pts: number, text: string): void },
+): Promise<Hls | null> {
+  const { default: HlsPlayer } = await import('hls.js');
+  if (!HlsPlayer.isSupported()) {
+    // Safari et iOS lisent le HLS eux-mêmes, sur la même liste réécrite.
+    if (element.canPlayType('application/vnd.apple.mpegurl')) element.src = source;
+    else handlers.fatal('Ce navigateur ne lit pas les flux HLS.');
+    return null;
+  }
+  const hls = new HlsPlayer({
+    enableWorker: false,
+    lowLatencyMode: false,
+    enableID3MetadataCues: false,
+    backBufferLength: 30,
+  });
+  let recovered = false;
+  hls.on(HlsPlayer.Events.ERROR, (_event, data) => {
+    if (!data.fatal) return;
+    // Une erreur de décodage se rattrape une fois, comme le recommande hls.js.
+    if (data.type === HlsPlayer.ErrorTypes.MEDIA_ERROR && !recovered) {
+      recovered = true;
+      hls.recoverMediaError();
+      return;
+    }
+    handlers.fatal(hlsFailureReason(data));
+  });
+  hls.on(HlsPlayer.Events.FRAG_PARSING_METADATA, (_event, data) => {
+    for (const sample of data.samples) {
+      const text = id3Title(sample.data);
+      if (text) handlers.title(Number.isFinite(sample.pts) ? sample.pts : 0, text);
+    }
+  });
+  hls.loadSource(source);
+  hls.attachMedia(element);
+  return hls;
+}
+
 /** Ce qui coupe ou baisse le son, lu dans l'état diffusé. */
 export function playerContext(state: MirrorState | null): PlayerContext {
   const session = state?.session;
@@ -43,7 +105,8 @@ export function playerContext(state: MirrorState | null): PlayerContext {
 }
 
 /**
- * Lecteur du miroir : un élément audio sur le flux relayé par le serveur (même origine),
+ * Lecteur du miroir : un élément audio sur le flux relayé par le serveur (même origine, flux
+ * direct, ou HLS lu par hls.js),
  * dans la sortie choisie pour la voix. Le volume suit la conversation : baissé quand
  * Cornelius écoute, coupé quand il parle ; un fichier se met en pause. Monté avec le miroir,
  * indépendamment de ce qui est affiché (écran de veille compris).
@@ -51,6 +114,9 @@ export function playerContext(state: MirrorState | null): PlayerContext {
 export function usePlayer(state: MirrorState | null) {
   const player = state?.player ?? null;
   const id = player?.id ?? null;
+  const format = player?.format ?? 'direct';
+  // Titre en cours lu dans le flux (ID3 d'un flux HLS), pour la lecture `id` seulement.
+  const [nowTitle, setNowTitle] = useState<{ id: string; text: string } | null>(null);
   const audio = useRef<HTMLAudioElement | null>(null);
   const fade = useRef<ReturnType<typeof setInterval> | null>(null);
   const context = playerContext(state);
@@ -94,8 +160,44 @@ export function usePlayer(state: MirrorState | null) {
     const sink = element as HTMLAudioElement & { setSinkId?: (id: string) => Promise<void> };
     // La sortie se change aussi en cours de lecture : la source part tout de suite.
     if (speaker && sink.setSinkId) void sink.setSinkId(speaker).catch(() => {});
-    element.src = `/api/player/${encodeURIComponent(id)}/stream`;
+    const base = `/api/player/${encodeURIComponent(id)}`;
+    let hls: Hls | null = null;
+    let closed = false;
+    // Titres ID3 en attente : chacun s'affiche quand la lecture atteint son instant.
+    const titles: { pts: number; text: string }[] = [];
+    const onTimeUpdate = () => {
+      let latest: string | null = null;
+      while (titles.length && titles[0]!.pts <= element.currentTime + 0.25)
+        latest = titles.shift()!.text;
+      if (latest !== null) setNowTitle({ id, text: latest });
+    };
+    if (format === 'hls') {
+      element.addEventListener('timeupdate', onTimeUpdate);
+      void attachHls(element, `${base}/hls`, {
+        fatal(reason) {
+          if (closed) return;
+          reportDiagnostic('warn', 'lecteur audio', new Error(reason));
+          report(id, 'error', reason);
+        },
+        title(pts, text) {
+          titles.push({ pts, text });
+          titles.sort((a, b) => a.pts - b.pts);
+          if (titles.length > 20) titles.splice(0, titles.length - 20);
+          onTimeUpdate();
+        },
+      })
+        .then((instance) => {
+          if (closed) instance?.destroy();
+          else hls = instance;
+        })
+        .catch(() => {
+          if (!closed) report(id, 'error', 'Le lecteur HLS n’a pas pu se charger.');
+        });
+    } else element.src = `${base}/stream`;
     return () => {
+      closed = true;
+      hls?.destroy();
+      element.removeEventListener('timeupdate', onTimeUpdate);
       element.removeEventListener('playing', onPlaying);
       element.removeEventListener('canplay', onCanPlay);
       element.removeEventListener('error', onError);
@@ -106,7 +208,7 @@ export function usePlayer(state: MirrorState | null) {
       element.remove();
       if (audio.current === element) audio.current = null;
     };
-  }, [id]);
+  }, [id, format]);
 
   const gain = output?.gain ?? 0;
   const paused = output?.paused ?? true;
@@ -145,7 +247,7 @@ export function usePlayer(state: MirrorState | null) {
     // L'élément change avec `id` : les deux effets se suivent dans l'ordre.
   }, [id, gain, paused]);
 
-  return { player, context };
+  return { player, context, nowTitle: nowTitle && nowTitle.id === id ? nowTitle.text : null };
 }
 
 /** Bouton « Arrêter » du miroir. */

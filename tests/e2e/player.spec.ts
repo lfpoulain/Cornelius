@@ -39,7 +39,9 @@ test('lecteur : bandeau, flux relayé, son baissé puis coupé pendant la conver
   const home = await page.request.get('/');
   const csp = home.headers()['content-security-policy'] ?? '';
   expect(csp).toContain("default-src 'self'");
-  expect(csp).not.toContain('media-src');
+  // `blob:` pour la source MSE de hls.js ; ni hôte de flux, ni travailleur.
+  expect(csp).toContain("media-src 'self' blob:;");
+  expect(csp).not.toContain('worker-src');
   expect(csp).not.toMatch(/https:(?!\/\/)/u);
 
   const initial = (await (await page.request.get('/api/state')).json()) as StateEvent;
@@ -65,6 +67,7 @@ test('lecteur : bandeau, flux relayé, son baissé puis coupé pendant la conver
     subtitle: 'Station de démonstration',
     image: true,
     kind: 'live',
+    format: 'direct',
     status: 'playing',
     volume: 6,
   };
@@ -189,6 +192,7 @@ test('lecteur : une lecture qui échoue est signalée au serveur', async ({ page
         subtitle: null,
         image: false,
         kind: 'live',
+        format: 'direct',
         status: 'loading',
         volume: 6,
       },
@@ -268,6 +272,7 @@ test('lecteur : un fichier demandé pendant la conversation est accusé, en paus
     subtitle: null,
     image: false,
     kind: 'file',
+    format: 'direct',
     status: 'loading',
     volume: 6,
   };
@@ -316,6 +321,128 @@ test('lecteur : un fichier demandé pendant la conversation est accusé, en paus
   expect(errors).toEqual([]);
 });
 
+/** Étiquette ID3 v2.3 avec des cadres texte UTF-8. */
+function id3(frames: [string, string][]): Buffer {
+  const body = Buffer.concat(
+    frames.map(([id, text]) => {
+      const value = Buffer.concat([Buffer.from([3]), Buffer.from(text, 'utf8')]);
+      const header = Buffer.alloc(10);
+      header.write(id, 0, 'latin1');
+      header.writeUInt32BE(value.length, 4);
+      return Buffer.concat([header, value]);
+    }),
+  );
+  const size = body.length;
+  const head = Buffer.from([0x49, 0x44, 0x33, 3, 0, 0, 0, 0, 0, 0]);
+  head[6] = (size >> 21) & 0x7f;
+  head[7] = (size >> 14) & 0x7f;
+  head[8] = (size >> 7) & 0x7f;
+  head[9] = size & 0x7f;
+  return Buffer.concat([head, body]);
+}
+
+/**
+ * Morceau HLS d'audio AAC « empaqueté » : une étiquette ID3 puis `seconds` secondes de
+ * trames ADTS silencieuses (AAC-LC, 44,1 kHz, mono ; la trame muette de hls.js).
+ */
+function silentAac(seconds: number, frames: [string, string][]): Buffer {
+  const payload = Buffer.from([0x00, 0xc8, 0x00, 0x80, 0x23, 0x80]);
+  const length = 7 + payload.length;
+  const header = Buffer.from([
+    0xff,
+    0xf1,
+    0x50,
+    0x40 | (length >> 11),
+    (length >> 3) & 0xff,
+    ((length & 7) << 5) | 0x1f,
+    0xfc,
+  ]);
+  const count = Math.ceil((seconds * 44_100) / 1024);
+  const frame = Buffer.concat([header, payload]);
+  return Buffer.concat([id3(frames), ...Array.from({ length: count }, () => frame)]);
+}
+
+test('lecteur : un flux HLS se lit par hls.js, liste et morceaux relayés, titre ID3 affiché', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const initial = (await (await page.request.get('/api/state')).json()) as StateEvent;
+  const id = 'lecture-hls';
+  const fixture: StateEvent = {
+    ...initial,
+    bootId: 'player-hls-fixture',
+    sequence: 1,
+    sentAt: Date.now(),
+    state: {
+      ...initial.state,
+      openaiBlocked: true,
+      browserConnected: true,
+      cards: [],
+      ambientDisplays: [],
+      screensaver: undefined,
+      player: {
+        id,
+        title: 'Radio HLS',
+        subtitle: 'En direct',
+        image: false,
+        kind: 'live',
+        format: 'hls',
+        status: 'loading',
+        volume: 6,
+      },
+    },
+  };
+  const reports: { id: string; status: string; reason?: string }[] = [];
+  const requested: string[] = [];
+  await page.route('**/api/player/status', async (route) => {
+    reports.push(route.request().postDataJSON());
+    await route.fulfill({ json: { ok: true } });
+  });
+  // La liste et les morceaux, tels que le serveur les sert : des jetons sous la même origine.
+  await page.route(`**/api/player/${id}/hls**`, (route) => {
+    const path = new URL(route.request().url()).pathname;
+    requested.push(path);
+    if (path === `/api/player/${id}/hls`)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.apple.mpegurl',
+        body: [
+          '#EXTM3U',
+          '#EXT-X-VERSION:3',
+          '#EXT-X-TARGETDURATION:4',
+          '#EXT-X-MEDIA-SEQUENCE:1',
+          ...[1, 2, 3].flatMap((n) => ['#EXTINF:4.0,', `/api/player/${id}/hls/jeton-${n}`]),
+          '#EXT-X-ENDLIST',
+          '',
+        ].join('\n'),
+      });
+    return route.fulfill({
+      status: 200,
+      contentType: 'audio/aac',
+      body: silentAac(4, [
+        ['TPE1', 'Debussy'],
+        ['TIT2', 'Clair de lune'],
+      ]),
+    });
+  });
+  await routeMirror(page, fixture);
+  await page.goto('/');
+  await page.mouse.click(10, 10);
+
+  const band = page.getByRole('complementary', { name: 'En cours de lecture' });
+  await expect(band).toContainText('Radio HLS');
+  await expect.poll(() => reports).toContainEqual({ id, status: 'playing' });
+  await expect(band).toContainText('Debussy – Clair de lune');
+  // hls.js lit la liste puis les morceaux par leurs jetons, jamais le flux direct.
+  expect(requested[0]).toBe(`/api/player/${id}/hls`);
+  expect(requested).toContain(`/api/player/${id}/hls/jeton-1`);
+  const audio = page.locator('audio.mirror-player-audio');
+  expect(await audio.evaluate((element: HTMLAudioElement) => element.src)).toMatch(/^blob:/u);
+  expect(reports.filter((report) => report.status === 'error')).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
 async function routeMirror(page: Page, fixture: StateEvent) {
   await page.route('**/api/state', (route) => route.fulfill({ json: fixture }));
   await page.routeWebSocket('**/events?role=kiosk', (route) => {
@@ -330,6 +457,7 @@ test('administration : ce qui joue sur le miroir s’arrête depuis Modules', as
     subtitle: 'Station de démonstration',
     image: false,
     kind: 'live',
+    format: 'direct',
     status: 'playing',
     volume: 6,
   };

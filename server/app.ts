@@ -908,7 +908,7 @@ export async function createApp(
     reply.header('X-Frame-Options', 'DENY');
     reply.header(
       'Content-Security-Policy',
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
     );
     // Clients : la machine elle-même, et le réseau local quand il est ouvert. Une adresse
     // publique (port redirigé par un routeur) est toujours refusée.
