@@ -11,6 +11,7 @@ import { safeUrl } from './addons/http.js';
 import type { AddonRuntime } from './addons/runtime.js';
 import type { ActionExecutor } from './actions.js';
 import type { DiagnosticLog } from './logs.js';
+import { secretValueError, sourceSecretKey, type SecretStore } from './secrets.js';
 import type { ActionRepository, AddonRepository, ProfileRepository } from './storage.js';
 
 const refPattern = REF_PATTERN;
@@ -41,6 +42,12 @@ function headerProblem(body: unknown): string | null {
   return null;
 }
 
+const instanceSecretsSchema = {
+  type: 'object',
+  additionalProperties: { anyOf: [{ type: 'string', maxLength: 512 }, { type: 'null' }] },
+  maxProperties: 20,
+};
+
 const createInstance = compile<{
   addonId: string;
   enabled?: boolean;
@@ -49,6 +56,7 @@ const createInstance = compile<{
   ref: string | null;
   label: string;
   config: Record<string, unknown>;
+  secrets?: Record<string, string | null>;
 }>({
   type: 'object',
   additionalProperties: false,
@@ -61,6 +69,7 @@ const createInstance = compile<{
     ref: refSchema,
     label: labelSchema,
     config: { type: 'object' },
+    secrets: instanceSecretsSchema,
   },
 });
 
@@ -71,6 +80,7 @@ const patchInstance = compile<{
   enabled?: boolean;
   displayEnabled?: boolean;
   config?: Record<string, unknown>;
+  secrets?: Record<string, string | null>;
 }>({
   type: 'object',
   additionalProperties: false,
@@ -81,6 +91,7 @@ const patchInstance = compile<{
     enabled: { type: 'boolean' },
     displayEnabled: { type: 'boolean' },
     config: { type: 'object' },
+    secrets: instanceSecretsSchema,
   },
 });
 
@@ -172,6 +183,7 @@ export function registerAddons(
     actionRepository: ActionRepository;
     profiles: ProfileRepository;
     logs: DiagnosticLog;
+    secrets?: SecretStore;
     /** Dossiers de addons/ refusés au chargement, avec la raison détaillée. */
     rejectedAddons?: { name: string; reason: string }[];
     onChanged?(): void;
@@ -206,8 +218,83 @@ export function registerAddons(
     return refFromLabel(label, taken);
   }
 
+  function validateInstanceSecrets(
+    addonId: string,
+    incoming: Record<string, string | null> | undefined,
+    existingInstanceId: string | null,
+  ): string | null {
+    const addon = runtime.get(addonId);
+    const perSource = (addon?.secrets ?? []).filter((secret) => secret.perSource);
+    const byName = new Map(perSource.map((secret) => [secret.name, secret]));
+    if (incoming) {
+      for (const [name, value] of Object.entries(incoming)) {
+        if (!byName.has(name)) return `Jeton « ${name} » inconnu ou non configurable par source.`;
+        if (typeof value === 'string' && value.trim() !== '') {
+          const problem = secretValueError(value);
+          if (problem) return problem;
+        }
+      }
+    }
+    for (const secret of perSource) {
+      if (secret.optional) continue;
+      let hasSource = false;
+      if (incoming && secret.name in incoming) {
+        const value = incoming[secret.name];
+        hasSource = typeof value === 'string' && value.trim().length > 0;
+      } else if (existingInstanceId !== null) {
+        hasSource = Boolean(
+          services.secrets?.get(sourceSecretKey(existingInstanceId, secret.name)),
+        );
+      }
+      if (!hasSource && runtime.secret(secret.name) === undefined) {
+        const elided = /^[aeéèêiîoôuyh]/iu.test(secret.label)
+          ? `d’${secret.label}`
+          : `de ${secret.label}`;
+        return `Ce module a besoin ${elided} pour cette source (ou au niveau du module).`;
+      }
+    }
+    return null;
+  }
+
+  function applyInstanceSecrets(
+    instanceId: string,
+    incoming: Record<string, string | null> | undefined,
+  ): boolean {
+    if (!incoming || !services.secrets) return false;
+    let changed = false;
+    for (const [name, value] of Object.entries(incoming)) {
+      const key = sourceSecretKey(instanceId, name);
+      if (value === null || value.trim() === '') {
+        services.secrets.delete(key);
+        changed = true;
+      } else {
+        services.secrets.set(key, value);
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
   function instanceView(instance: AddonInstance) {
     const snapshot = instances.getSnapshot(instance);
+    const perSource = (runtime.get(instance.addonId)?.secrets ?? []).filter(
+      (secret) => secret.perSource,
+    );
+    const secrets =
+      perSource.length > 0
+        ? Object.fromEntries(
+            perSource.map((secret) => {
+              const key = sourceSecretKey(instance.id, secret.name);
+              return [
+                secret.name,
+                {
+                  configured: Boolean(services.secrets?.get(key)),
+                  hint: services.secrets?.hint(key) ?? null,
+                },
+              ];
+            }),
+          )
+        : undefined;
     return {
       ...instance,
       // Le formulaire part des réglages migrés : les champs d'une nouvelle configVersion y
@@ -216,6 +303,7 @@ export function registerAddons(
       snapshot,
       error: instances.getError(instance.id),
       preview: runtime.preview(instance),
+      ...(secrets ? { secrets } : {}),
     };
   }
 
@@ -275,6 +363,8 @@ export function registerAddons(
     const validated = runtime.validateConfig(body.addonId, body.config);
     if (!validated.ok)
       return reply.code(400).send({ error: validated.message, fields: validated.errors });
+    const secretError = validateInstanceSecrets(body.addonId, body.secrets, null);
+    if (secretError) return reply.code(400).send({ error: secretError });
     try {
       const instance = instances.createInstance({
         addonId: body.addonId,
@@ -286,6 +376,7 @@ export function registerAddons(
         config: body.config,
         configVersion: addon.configVersion,
       });
+      applyInstanceSecrets(instance.id, body.secrets);
       return reply.code(201).send(instanceView(instance));
     } catch {
       return reply.code(400).send({ error: 'Identifiant déjà utilisé pour ce module.' });
@@ -308,20 +399,29 @@ export function registerAddons(
         if (!validated.ok)
           return reply.code(400).send({ error: validated.message, fields: validated.errors });
       }
+      const secretError = validateInstanceSecrets(existing.addonId, patch.secrets, existing.id);
+      if (secretError) return reply.code(400).send({ error: secretError });
       const addon = runtime.get(existing.addonId);
       if (patch.displayEnabled && !addon?.ambient)
         return reply.code(400).send({ error: 'Ce module ne propose pas d’affichage permanent.' });
       try {
+        const { secrets: patchSecrets, ...instancePatch } = patch;
         const instance = instances.updateInstance(request.params.id, {
-          ...patch,
+          ...instancePatch,
           ref:
-            patch.ref === null
-              ? autoRef(existing.addonId, patch.label ?? existing.label, existing.id)
-              : patch.ref,
-          label: patch.label?.trim(),
-          configVersion: patch.config !== undefined ? addon?.configVersion : undefined,
+            instancePatch.ref === null
+              ? autoRef(existing.addonId, instancePatch.label ?? existing.label, existing.id)
+              : instancePatch.ref,
+          label: instancePatch.label?.trim(),
+          configVersion: instancePatch.config !== undefined ? addon?.configVersion : undefined,
         });
-        if (patch.config !== undefined || patch.profileId !== undefined || patch.ref !== undefined)
+        const secretsChanged = applyInstanceSecrets(instance.id, patchSecrets);
+        if (
+          instancePatch.config !== undefined ||
+          instancePatch.profileId !== undefined ||
+          instancePatch.ref !== undefined ||
+          secretsChanged
+        )
           instances.clearState(instance.id);
         return instanceView(instance);
       } catch {
@@ -336,6 +436,7 @@ export function registerAddons(
     async (request, reply) => {
       if (!instances.getInstance(request.params.id))
         return reply.code(404).send({ error: 'Instance introuvable.' });
+      services.secrets?.deleteForSource(request.params.id);
       instances.deleteInstance(request.params.id);
       return { ok: true };
     },

@@ -77,13 +77,22 @@ export interface AddonSearchResultView {
 
 /** Jeton déclaré par un module : sa présence seulement, jamais sa valeur. */
 export interface AddonSecretView {
+  /** Nom lu par `context.secret()`. Absent d'un serveur plus ancien. */
+  name?: string;
   env: string;
   label: string;
   url: string | null;
   note: string | null;
   /** Le module fonctionne sans : il est proposé sans bloquer l’ajout d’une source. */
   optional?: boolean;
+  /** Peut être saisi séparément pour chaque source (repli sur le module). */
+  perSource?: boolean;
   configured: boolean;
+}
+
+export interface AddonInstanceSecretView {
+  configured: boolean;
+  hint: string | null;
 }
 
 export interface AddonDefinitionView {
@@ -137,6 +146,8 @@ export interface AddonInstanceView {
   error: AddonErrorView | null;
   /** Aperçu du dernier relevé, tiré de la carte du module. Absent d'un serveur plus ancien. */
   preview?: string | null;
+  /** Jetons propres à cette source : présence et fin seulement, jamais la valeur. */
+  secrets?: Record<string, AddonInstanceSecretView>;
 }
 
 export interface AddonCatalog {
@@ -154,6 +165,7 @@ export interface AddonInstanceInput {
   ref: string | null;
   label: string;
   config: Record<string, unknown>;
+  secrets?: Record<string, string | null>;
 }
 
 export interface AddonInstancePatch {
@@ -163,6 +175,7 @@ export interface AddonInstancePatch {
   enabled?: boolean;
   displayEnabled?: boolean;
   config?: Record<string, unknown>;
+  secrets?: Record<string, string | null>;
 }
 
 export interface AddonTestResult {

@@ -443,6 +443,13 @@ export interface AddonSecretRequirement {
    * Un cœur antérieur à 0.4.1 ignore ce champ et traite le jeton comme requis.
    */
   optional?: boolean;
+  /**
+   * Jeton pouvant être saisi séparément pour chaque source (par exemple une clé API par profil).
+   * `context.secret(name)` lit d'abord le jeton de la source, puis se replie sur celui du module
+   * (administration, puis `.env`). Un cœur plus ancien ignore ce champ et traite le jeton comme
+   * celui du module.
+   */
+  perSource?: boolean;
 }
 
 export interface AddonDefinition<
