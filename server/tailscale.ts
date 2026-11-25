@@ -1,9 +1,69 @@
 import { request as httpRequest } from 'node:http';
+import { isIP } from 'node:net';
+import { hostname as systemHostname, networkInterfaces } from 'node:os';
 import type { DatabaseSync } from 'node:sqlite';
 import type { PortableState, PortableStatus } from '../shared/portable.js';
 import { isLoopback } from './network.js';
 
 export type { PortableDevice, PortableState, PortableStatus } from '../shared/portable.js';
+
+/** Ce qui désigne la machine elle-même : ses noms et les adresses de ses interfaces. */
+export interface MachineIdentity {
+  names: string[];
+  addresses: string[];
+}
+
+function machineIdentity(): MachineIdentity {
+  const name = systemHostname().toLowerCase().replace(/\.$/u, '');
+  const names = name ? [name, name.split('.')[0]!] : [];
+  const addresses: string[] = [];
+  for (const entries of Object.values(networkInterfaces()))
+    for (const entry of entries ?? []) addresses.push(entry.address.toLowerCase());
+  return { names: [...new Set(names)], addresses: [...new Set(addresses)] };
+}
+
+/** IPv4 portée par une adresse IPv6 mappée (`::ffff:7f00:1` ou `::ffff:127.0.0.1`), ou null. */
+function mappedV4(ip: string): string | null {
+  const dotted = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/u.exec(ip);
+  if (dotted) return dotted[1]!;
+  const hex = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/u.exec(ip);
+  if (!hex) return null;
+  const high = parseInt(hex[1]!, 16);
+  const low = parseInt(hex[2]!, 16);
+  return [high >> 8, high & 0xff, low >> 8, low & 0xff].join('.');
+}
+
+/**
+ * La cible de `tailscale serve` désigne-t-elle la machine de Cornelius ? Oui pour la boucle
+ * locale, `localhost`, une adresse « quelconque » (`0.0.0.0`, `::`), une adresse d'une interface
+ * de la machine, ou son nom (avec ou sans domaine). Une cible illisible compte aussi : c'est le cas
+ * sûr. Un autre nom (le service Cornelius vu d'un autre conteneur) n'est pas la machine.
+ */
+export function targetOnMachine(
+  target: string,
+  machine: MachineIdentity = machineIdentity(),
+): boolean {
+  let host: string;
+  try {
+    // Lu comme une adresse http : les formes abrégées d'IPv4 (« 127.1 », « 0 ») sont normalisées,
+    // ce que ne fait pas un schéma inconnu comme « https+insecure ».
+    const address = /^[a-z][a-z0-9+.-]*:\/\//iu.test(target)
+      ? target.replace(/^[a-z][a-z0-9+.-]*:\/\//iu, 'http://')
+      : `http://${target}`;
+    host = new URL(address).hostname
+      .toLowerCase()
+      .replace(/^\[|\]$/gu, '')
+      .replace(/\.$/u, '');
+  } catch {
+    return true;
+  }
+  if (!host || host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (isIP(host)) {
+    const ip = mappedV4(host) ?? host;
+    return isLoopback(ip) || ip === '0.0.0.0' || ip === '::' || machine.addresses.includes(ip);
+  }
+  return machine.names.includes(host) || machine.names.includes(host.split('.')[0]!);
+}
 
 /**
  * Cornelius portable : Cornelius pilote un `tailscaled` voisin par son interface locale
@@ -95,19 +155,12 @@ export class TailscalePortable {
   }
 
   /**
-   * La cible est sur la boucle locale de Cornelius : tailscaled partage alors son réseau
-   * (installation native, ou conteneur en network_mode: service). Une cible illisible compte
-   * comme la boucle locale : c'est le cas sûr.
+   * La cible est sur la machine de Cornelius : tailscaled partage alors son réseau (installation
+   * native, ou conteneur en network_mode: service). Une cible illisible compte comme la machine :
+   * c'est le cas sûr.
    */
   targetOnLoopback(): boolean {
-    let host: string;
-    try {
-      const target = this.target.includes('://') ? this.target : `http://${this.target}`;
-      host = new URL(target).hostname.toLowerCase().replace(/^\[|\]$/g, '');
-    } catch {
-      return true;
-    }
-    return !host || host === 'localhost' || host.endsWith('.localhost') || isLoopback(host);
+    return targetOnMachine(this.target);
   }
 
   /** Noms d'hôte que Cornelius doit accepter (contrôle contre le « DNS rebinding »). */

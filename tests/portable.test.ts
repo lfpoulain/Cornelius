@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test, { type TestContext } from 'node:test';
 import { createApp } from '../server/app.js';
 import type { AppConfig } from '../server/config.js';
-import { TailscalePortable } from '../server/tailscale.js';
+import { TailscalePortable, targetOnMachine } from '../server/tailscale.js';
 
 /** Un faux tailscaled : son interface locale sur un socket, avec l'état qu'il garde en mémoire. */
 async function fakeTailscaled(t: TestContext) {
@@ -429,4 +429,48 @@ test('un Tailscale déjà relié mais arrêté (Stopped) ne devient pas celui de
   await portable.status();
   await assert.rejects(portable.logout(), /pas été connecté par Cornelius/u);
   assert.ok(!state.calls.includes('POST /localapi/v0/logout'));
+});
+
+test('cible de Tailscale : la machine sous toutes ses formes, pas un autre conteneur', () => {
+  const machine = {
+    names: ['pc-salon.maison', 'pc-salon'],
+    addresses: ['192.168.1.20', 'fe80::1'],
+  };
+  for (const cible of [
+    'https+insecure://127.0.0.1:3443',
+    'http://localhost:3000',
+    'http://localhost.:3000',
+    'http://app.localhost:3000',
+    'https+insecure://[::1]:3443',
+    'https+insecure://0.0.0.0:3443',
+    'https+insecure://[::]:3443',
+    'https+insecure://127.1:3443',
+    'https+insecure://0:3443',
+    'https+insecure://[::ffff:127.0.0.1]:3443',
+    'https+insecure://192.168.1.20:3443',
+    'https+insecure://PC-Salon:3443',
+    'https+insecure://pc-salon.local:3443',
+    'https+insecure://pc-salon.maison.:3443',
+    '127.0.0.1:3443',
+    'pas une adresse ::',
+  ])
+    assert.equal(targetOnMachine(cible, machine), true, cible);
+  for (const cible of [
+    'https+insecure://cornelius-serveur:3443',
+    'https+insecure://172.18.0.5:3443',
+    'http://cornelius:3000',
+  ])
+    assert.equal(targetOnMachine(cible, machine), false, cible);
+});
+
+test('cible au nom de la machine, Tailscale en espace utilisateur : la boucle locale n’est pas la machine', async (t) => {
+  const app = await appWithPortable(
+    t,
+    { lan: true, tailscaleTarget: `https+insecure://${hostname()}:3443` },
+    { tun: false },
+  );
+  assert.notEqual(
+    (await app.inject({ url: '/api/state', headers: { host: 'localhost' } })).statusCode,
+    200,
+  );
 });
