@@ -140,9 +140,20 @@ function isVideoVariant(line: string): boolean {
   return VIDEO_CODECS.test(attrs.get('CODECS') ?? '') || attrs.has('RESOLUTION');
 }
 
+/**
+ * Adresse absolue d'une entrée de la liste. Une liste lue en https qui nomme une adresse http
+ * (CBC Music : variantes en http dans une maîtresse https) est lue en https, comme un
+ * navigateur le fait pour un média http dans une page https ; si l'hôte ne répond pas en
+ * https, la voie gardée échoue comme pour toute adresse.
+ */
 function resolve(address: string, base: URL): string {
   try {
-    return new URL(address.trim(), base).href;
+    const url = new URL(address.trim(), base);
+    if (url.protocol === 'http:' && base.protocol === 'https:') {
+      url.protocol = 'https:';
+      if (url.port === '80') url.port = '';
+    }
+    return url.href;
   } catch {
     throw new PlayerStreamError('Liste HLS illisible.', 415);
   }

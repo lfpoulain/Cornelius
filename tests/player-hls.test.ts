@@ -118,6 +118,31 @@ test('hls : liste maîtresse, variantes, EXT-X-MEDIA et EXT-X-MAP réécrits', (
   assert.match(fmp4, /#EXT-X-BYTERANGE:1000@720/u);
 });
 
+test('hls : une maîtresse https qui nomme des variantes http (CBC Music) les lit en https', () => {
+  links.length = 0;
+  // Liste maîtresse réelle de CBC Music Toronto (2026-11-25), variantes en http.
+  const out = rewritePlaylist(
+    [
+      '#EXTM3U',
+      '#EXT-X-VERSION:3',
+      '#EXT-X-STREAM-INF:BANDWIDTH=128119,CODECS="mp4a.40.2"',
+      'http://cbcradiolive.akamaized.net/hls/live/2041057/ES_R2ETR/adaptive_128/chunklist_ao.m3u8',
+      '#EXT-X-STREAM-INF:BANDWIDTH=96152,CODECS="mp4a.40.2"',
+      'http://cbcradiolive.akamaized.net:80/hls/live/2041057/ES_R2ETR/adaptive_96/chunklist_ao.m3u8',
+    ].join('\n'),
+    new URL('https://cbcradiolive.akamaized.net/hls/live/2041057/ES_R2ETR/playlist.m3u8'),
+    link,
+  );
+  assert.ok(!out.includes('akamaized'));
+  assert.deepEqual(
+    links.map((entry) => entry.url),
+    [
+      'https://cbcradiolive.akamaized.net/hls/live/2041057/ES_R2ETR/adaptive_128/chunklist_ao.m3u8',
+      'https://cbcradiolive.akamaized.net/hls/live/2041057/ES_R2ETR/adaptive_96/chunklist_ao.m3u8',
+    ],
+  );
+});
+
 test('hls : BANDWIDTH ajouté, variantes vidéo et images retirées', () => {
   links.length = 0;
   const out = rewritePlaylist(
@@ -396,7 +421,10 @@ test('routes hls : morceau sur le réseau local refusé, même après redirectio
   const redirected = await f.app.inject(detour!);
   assert.equal(redirected.statusCode, 403);
   assert.equal(f.seen.length, count + 1, 'la redirection vers le réseau local n’est pas suivie');
-  assert.equal((await f.app.inject(clear!)).statusCode, 400, 'http refusé');
+  // Un morceau nommé en http est demandé en https, jamais en clair.
+  await f.app.inject(clear!);
+  assert.equal(f.seen.at(-1), 'https://radio.example/clair.ts', 'http lu en https');
+  assert.ok(!f.seen.some((url) => url.startsWith('http:')));
   // Un seul échec de morceau au journal par lecture.
   const logged = f.logs
     .snapshot()

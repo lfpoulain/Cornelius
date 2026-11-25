@@ -443,6 +443,67 @@ test('lecteur : un flux HLS se lit par hls.js, liste et morceaux relayés, titre
   expect(errors).toEqual([]);
 });
 
+test('lecteur : un flux HLS dont les morceaux ne se décodent pas est signalé « Format audio illisible »', async ({
+  page,
+}) => {
+  const initial = (await (await page.request.get('/api/state')).json()) as StateEvent;
+  const id = 'lecture-hls-bruit';
+  const fixture: StateEvent = {
+    ...initial,
+    bootId: 'player-hls-noise-fixture',
+    sequence: 1,
+    sentAt: Date.now(),
+    state: {
+      ...initial.state,
+      openaiBlocked: true,
+      browserConnected: true,
+      cards: [],
+      ambientDisplays: [],
+      screensaver: undefined,
+      player: {
+        id,
+        title: 'Radio bruit',
+        subtitle: null,
+        image: false,
+        kind: 'live',
+        format: 'hls',
+        status: 'loading',
+        volume: 6,
+      },
+    },
+  };
+  const reports: { id: string; status: string; reason?: string }[] = [];
+  await page.route('**/api/player/status', async (route) => {
+    reports.push(route.request().postDataJSON());
+    await route.fulfill({ json: { ok: true } });
+  });
+  // Des octets au hasard annoncés comme du TS : le serveur les laisse passer, le décodeur non.
+  const noise = Buffer.alloc(60_000);
+  for (let index = 0; index < noise.length; index++) noise[index] = (index * 7919 + 13) % 251;
+  await page.route(`**/api/player/${id}/hls**`, (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === `/api/player/${id}/hls`)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/vnd.apple.mpegurl',
+        body: [
+          '#EXTM3U',
+          '#EXT-X-TARGETDURATION:6',
+          ...[1, 2, 3, 4].flatMap((n) => ['#EXTINF:6.0,', `/api/player/${id}/hls/bruit-${n}`]),
+          '',
+        ].join('\n'),
+      });
+    return route.fulfill({ status: 200, contentType: 'video/mp2t', body: noise });
+  });
+  await routeMirror(page, fixture);
+  await page.goto('/');
+  await page.mouse.click(10, 10);
+  await expect
+    .poll(() => reports.find((report) => report.status === 'error')?.reason)
+    .toBe('Format audio illisible par le miroir.');
+  expect(reports.some((report) => report.status === 'playing')).toBe(false);
+});
+
 async function routeMirror(page: Page, fixture: StateEvent) {
   await page.route('**/api/state', (route) => route.fulfill({ json: fixture }));
   await page.routeWebSocket('**/events?role=kiosk', (route) => {

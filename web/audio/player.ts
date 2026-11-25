@@ -33,9 +33,17 @@ function failureReason(audio: HTMLAudioElement): string {
 
 /** Raison d'un échec fatal de hls.js : celle du serveur s'il l'a dite, sinon le genre d'échec. */
 function hlsFailureReason(data: { type: string; networkDetails?: unknown }): string {
-  const xhr = data.networkDetails as { responseText?: string } | undefined;
+  const xhr = data.networkDetails as
+    { responseType?: string; responseText?: string; response?: unknown } | undefined;
   try {
-    const error = (JSON.parse(xhr?.responseText ?? '') as { error?: unknown }).error;
+    // Une liste se lit en texte ; un morceau en ArrayBuffer (responseText y est interdit).
+    const text =
+      xhr?.response instanceof ArrayBuffer
+        ? new TextDecoder().decode(xhr.response)
+        : !xhr?.responseType || xhr.responseType === 'text'
+          ? (xhr?.responseText ?? '')
+          : '';
+    const error = (JSON.parse(text) as { error?: unknown }).error;
     if (typeof error === 'string' && error) return error;
   } catch {
     // Pas de réponse lisible du serveur.
@@ -70,8 +78,19 @@ async function attachHls(
     backBufferLength: 30,
   });
   let recovered = false;
+  let started = false;
+  let unreadable = 0;
+  element.addEventListener('playing', () => (started = true), { once: true });
   hls.on(HlsPlayer.Events.ERROR, (_event, data) => {
-    if (!data.fatal) return;
+    if (!data.fatal) {
+      // Morceaux que le décodeur rejette l'un après l'autre (octets qui ne sont pas de
+      // l'audio) : hls.js les saute sans fin. Trois avant le premier son suffisent.
+      if (!started && data.type === HlsPlayer.ErrorTypes.MEDIA_ERROR && ++unreadable >= 3) {
+        hls.stopLoad();
+        handlers.fatal('Format audio illisible par le miroir.');
+      }
+      return;
+    }
     // Une erreur de décodage se rattrape une fois, comme le recommande hls.js.
     if (data.type === HlsPlayer.ErrorTypes.MEDIA_ERROR && !recovered) {
       recovered = true;
