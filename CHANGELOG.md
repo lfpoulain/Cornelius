@@ -12,6 +12,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 - **Attendre la réponse avant de réécouter** (Administration → Mise en route → Voix de Cornelius, avec Localive). Une fois la demande comprise, une voix dans la pièce ne peut plus l’interrompre ni la remplacer pendant la réflexion. Le micro se rouvre au début de la réponse, qu’on peut toujours couper. Une phrase d’attente de Localive laisse l’orbe sur « Je réfléchis ». Nécessite la version de Localive qui gère `localive.wait_for_reply`. Voir l’[administration](docs/utilisation/administration.md).
 
+### 2026-11-20 : Cornelius portable
+
+**Ajouté**
+
+- **Cornelius portable** : carte de l’administration (rubrique **Clés et accès**) qui met Cornelius sur les téléphones du foyer, partout, sans l’ouvrir à Internet. Elle pilote un `tailscaled` voisin par son interface locale (`CORNELIUS_TAILSCALE_SOCKET`) : lien de connexion au compte et son code QR, publication sur le réseau privé (`serve`, jamais `funnel`) avec un certificat reconnu par les navigateurs, ce qui permet d’installer Cornelius comme application, codes QR pour ajouter un téléphone, liste des appareils, déconnexion avec confirmation. Le nom privé de Cornelius est accepté sans `CORNELIUS_ALLOWED_HOSTS`, et une requête relayée (nom privé, ou `X-Forwarded-For` posé par `tailscale serve`, quel que soit le `Host` choisi par le client) n’est jamais traitée comme venant de la machine : le téléphone passe par l’autorisation d’un appareil, comme sur le réseau local. Fonctionne aussi avec le réseau local fermé (`CORNELIUS_LAN=0`). Cornelius ne retire que la publication qu’il a créée, ne remplace jamais un port 443 déjà publié, retire une publication publique (`funnel`) restée sur son nom, et ne déconnecte que le Tailscale qu’il a lui-même relié au compte (depuis l’état « NeedsLogin »). Quand Tailscale relaie vers la machine (boucle locale, `0.0.0.0`, une adresse ou le nom de la machine), la boucle locale n’est traitée comme la machine que si `tailscaled` utilise un TUN du noyau : en espace utilisateur, ou tant que son mode est inconnu, réseau local ouvert ou fermé, tout client passe par l’autorisation d’un appareil. Sans voisin Tailscale, rien ne change. Voir [Cornelius portable](docs/fonctionnalites/cornelius-portable.md). Dépendance ajoutée : `qrcode-generator` (MIT).
+
 ### 2026-11-08 : fermer quand on dit merci
 
 **Ajouté**
