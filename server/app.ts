@@ -238,8 +238,8 @@ export async function createApp(
     5000,
     portableOwnershipStore(db),
   );
-  // Le mode réseau de tailscaled (TUN ou espace utilisateur) décide de la confiance dans la boucle
-  // locale quand le réseau local est fermé : il est lu avant de servir la première requête.
+  // Le mode réseau de tailscaled (TUN du noyau ou espace utilisateur) décide de la confiance dans
+  // la boucle locale quand il relaie vers elle : il est lu avant de servir la première requête.
   if (portable.configured) await portable.status().catch(() => {});
   const adminPassword = new AdminPassword(db, config.adminPassword, DEFAULT_ADMIN_PASSWORD, now);
   const defaultPassword = () => adminPassword.isDefault();
@@ -801,12 +801,6 @@ export async function createApp(
     return !socket || isLoopback(socket.remoteAddress);
   }
   /**
-   * La requête arrive par Cornelius portable : son hôte est le nom de Cornelius sur le réseau
-   * privé Tailscale. `tailscaled` la relaie depuis la boucle locale (ou depuis son conteneur) :
-   * elle vient pourtant d'un téléphone. Elle n'est donc jamais traitée comme venant de la
-   * machine, et passe par l'autorisation d'un appareil, comme un appareil du réseau local.
-   */
-  /**
    * La requête a été relayée par un mandataire (`tailscale serve` pose toujours
    * X-Forwarded-For) : elle vient d'ailleurs, quel que soit son `Host`, que le client choisit
    * librement. Un processus local qui ajouterait cet en-tête ne ferait que perdre des droits.
@@ -815,15 +809,26 @@ export async function createApp(
     return request.headers['x-forwarded-for'] !== undefined;
   }
   /**
-   * Réseau local fermé et Tailscale en espace utilisateur dans le même réseau que Cornelius
-   * (`network_mode: service:cornelius`) : une connexion directe d'un pair à l'adresse Tailscale
-   * du nœud (`http://100.x.y.z:3000`) arrive depuis la boucle locale, sans X-Forwarded-For. La
-   * boucle locale n'est alors plus la machine : tout client passe par l'autorisation d'un
-   * appareil. Avec un TUN du noyau, une connexion directe garde l'adresse 100.x du pair.
+   * tailscaled relaie vers la boucle locale de Cornelius (installation native, ou conteneur en
+   * `network_mode: service:cornelius`) sans un TUN du noyau dont on soit sûr : en espace
+   * utilisateur, une connexion directe d'un pair à l'adresse Tailscale du nœud
+   * (`http://100.x.y.z:3000` ou `https://100.x.y.z:3443`) arrive depuis la boucle locale, sans
+   * X-Forwarded-For, réseau local ouvert ou fermé. La boucle locale n'est alors plus la
+   * machine : tout client passe par l'autorisation d'un appareil. Elle ne le redevient que si
+   * tailscaled a dit utiliser un TUN du noyau (une connexion directe y garde l'adresse 100.x du
+   * pair) ; tant qu'il n'a pas répondu, le mode est inconnu et la boucle locale reste partagée.
+   * Une cible hors de la boucle locale (Tailscale dans son propre conteneur,
+   * `cornelius-serveur:3443`) n'y touche pas.
    */
   function loopbackShared(): boolean {
-    return portable.configured && config.lan !== true && portable.userspace();
+    return portable.configured && portable.targetOnLoopback() && !portable.kernelTun();
   }
+  /**
+   * La requête arrive par Cornelius portable : son hôte est le nom de Cornelius sur le réseau
+   * privé Tailscale. `tailscaled` la relaie depuis la boucle locale (ou depuis son conteneur) :
+   * elle vient pourtant d'un téléphone. Elle n'est donc jamais traitée comme venant de la
+   * machine, et passe par l'autorisation d'un appareil, comme un appareil du réseau local.
+   */
   function viaPortable(request: FastifyRequest): boolean {
     const host = request.hostname.toLowerCase();
     return portable.hostnames().some((name) => name.toLowerCase() === host);

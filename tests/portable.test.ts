@@ -13,6 +13,8 @@ async function fakeTailscaled(t: TestContext) {
   const state = {
     backend: 'NeedsLogin',
     tun: true,
+    /** Réponse de `status` : 503 simule un démon qui ne répond pas encore. */
+    statusCode: 200,
     authUrl: '' as string,
     prefs: {} as Record<string, unknown>,
     serve: {} as Record<string, any>,
@@ -30,6 +32,8 @@ async function fakeTailscaled(t: TestContext) {
         res.writeHead(status, { 'Content-Type': 'application/json', ...headers });
         res.end(value === undefined ? '' : JSON.stringify(value));
       };
+      if (req.url === '/localapi/v0/status' && state.statusCode !== 200)
+        return send(state.statusCode, { error: 'indisponible' });
       if (req.url === '/localapi/v0/status')
         return send(200, {
           BackendState: state.backend,
@@ -209,11 +213,12 @@ test('un port 443 déjà publié par autre chose n’est jamais remplacé ni ret
 async function appWithPortable(
   t: TestContext,
   overrides: Partial<AppConfig> = {},
-  { tun = true }: { tun?: boolean } = {},
+  { tun = true, statusCode = 200 }: { tun?: boolean; statusCode?: number } = {},
 ) {
   const { state, socket } = await fakeTailscaled(t);
   state.backend = 'Running';
   state.tun = tun;
+  state.statusCode = statusCode;
   const imageRoot = mkdtempSync(join(tmpdir(), 'cornelius-portable-images-'));
   const services = await createApp(
     {
@@ -373,6 +378,46 @@ test('réseau local fermé, Tailscale en espace utilisateur : la boucle locale n
     (await noyau.inject({ url: '/api/state', headers: { host: 'localhost' } })).statusCode,
     200,
   );
+});
+
+test('réseau local ouvert, Tailscale en espace utilisateur : la boucle locale n’est plus la machine', async (t) => {
+  // Sans CORNELIUS_TAILSCALE_TARGET, la cible est https+insecure://127.0.0.1:3443 : un pair qui
+  // ouvre https://100.x.y.z:3443 arrive par la boucle locale, sans X-Forwarded-For.
+  const app = await appWithPortable(t, { lan: true, adminPassword: 'cornelius' }, { tun: false });
+  const direct = { host: 'localhost' };
+  assert.notEqual((await app.inject({ url: '/api/state', headers: direct })).statusCode, 200);
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/login',
+    headers: { ...direct, origin: 'http://localhost' },
+    payload: { password: 'cornelius' },
+  });
+  assert.notEqual(login.statusCode, 200);
+});
+
+test('mode réseau de tailscaled inconnu (démon muet) : la boucle locale n’est pas la machine', async (t) => {
+  // tailscaled ne répond pas au démarrage : rien ne dit que son TUN est celui du noyau.
+  for (const lan of [true, false]) {
+    const app = await appWithPortable(t, { lan }, { statusCode: 503 });
+    assert.notEqual(
+      (await app.inject({ url: '/api/state', headers: { host: 'localhost' } })).statusCode,
+      200,
+      `lan: ${lan}`,
+    );
+  }
+});
+
+test('Tailscale dans son propre conteneur (cible hors boucle locale) : la machine reste la machine', async (t) => {
+  // Montage Docker à deux conteneurs : tailscaled relaie vers cornelius-serveur:3443, jamais par
+  // la boucle locale de Cornelius, quel que soit son mode réseau.
+  for (const options of [{ tun: false }, { statusCode: 503 }]) {
+    const app = await appWithPortable(t, { tailscaleTarget: target }, options);
+    assert.equal(
+      (await app.inject({ url: '/api/state', headers: { host: 'localhost' } })).statusCode,
+      200,
+      JSON.stringify(options),
+    );
+  }
 });
 
 test('un Tailscale déjà relié mais arrêté (Stopped) ne devient pas celui de Cornelius', async (t) => {

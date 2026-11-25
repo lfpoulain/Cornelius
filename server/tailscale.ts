@@ -1,6 +1,7 @@
 import { request as httpRequest } from 'node:http';
 import type { DatabaseSync } from 'node:sqlite';
 import type { PortableState, PortableStatus } from '../shared/portable.js';
+import { isLoopback } from './network.js';
 
 export type { PortableDevice, PortableState, PortableStatus } from '../shared/portable.js';
 
@@ -85,9 +86,28 @@ export class TailscalePortable {
     return !!this.socket;
   }
 
-  /** Vrai si le démon tourne en espace utilisateur (voir `tun`). */
-  userspace(): boolean {
-    return this.tun === false;
+  /**
+   * Vrai seulement si le démon a dit utiliser un TUN du noyau (voir `tun`). Inconnu (démon muet,
+   * ou version qui ne le dit pas) compte comme l'espace utilisateur : c'est le cas sûr.
+   */
+  kernelTun(): boolean {
+    return this.tun === true;
+  }
+
+  /**
+   * La cible est sur la boucle locale de Cornelius : tailscaled partage alors son réseau
+   * (installation native, ou conteneur en network_mode: service). Une cible illisible compte
+   * comme la boucle locale : c'est le cas sûr.
+   */
+  targetOnLoopback(): boolean {
+    let host: string;
+    try {
+      const target = this.target.includes('://') ? this.target : `http://${this.target}`;
+      host = new URL(target).hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    } catch {
+      return true;
+    }
+    return !host || host === 'localhost' || host.endsWith('.localhost') || isLoopback(host);
   }
 
   /** Noms d'hôte que Cornelius doit accepter (contrôle contre le « DNS rebinding »). */
