@@ -22,6 +22,7 @@ import {
 } from './configuration.js';
 import { cardOverlap, cardTokens, DUPLICATE_CARD_OVERLAP } from './card-overlap.js';
 import type { LiveAudioConnection, LiveConnection, LiveGateway } from './gateway.js';
+import { PLAYER_CONTROL_TOOL, playerControlTool, type Player } from '../player.js';
 
 export interface AddonToolBridge {
   tools(profileId?: string | null): {
@@ -39,6 +40,8 @@ export interface AddonToolBridge {
     args?: unknown,
   ): Promise<{ outcome: AddonReadOutcome; tool: ToolResult } | null>;
   sourceLabel(addonId: string): string;
+  /** Outil de lecture d'un module (`play`) : le son part vers le miroir, pas de carte. */
+  isPlayTool?(name: string): boolean;
   /** Sources autorisées pour ce profil : identifiants que le modèle peut nommer. */
   sourcesFor(profileId: string | null): { addonId: string; ref: string | null; label: string }[];
 }
@@ -121,6 +124,9 @@ export interface AlarmsToolBridge {
     args: unknown,
   ): { tool: ToolResult; card: LunaCardRequest | null };
 }
+
+/** Lecteur du miroir : lecture demandée par un module, commandes communes. */
+export type PlayerBridge = Pick<Player, 'play' | 'control' | 'playingAnything'>;
 
 interface ActiveSession {
   scope: Scope;
@@ -288,7 +294,10 @@ export class LiveTransport implements SessionTransport {
       imageGeneration?: ImageGenerationToolBridge;
       mail?: MailToolBridge;
       alarms?: AlarmsToolBridge;
+      player?: PlayerBridge;
       personality?: (profileId: string | null) => PersonalityPreferences;
+      /** Modèle de délégation à envoyer (vide : celui du mode) ; sinon celui du contrôleur. */
+      delegationModel?: () => string;
     } = {},
     private readonly now: () => number = Date.now,
   ) {}
@@ -524,7 +533,8 @@ export class LiveTransport implements SessionTransport {
         webSearch: this.controller.isWebSearchEnabled(),
         voice: this.controller.getSpeechVoice(),
         voiceOnly,
-        delegationModel: this.controller.getDelegationModel(),
+        delegationModel:
+          this.integrations.delegationModel?.() ?? this.controller.getDelegationModel(),
       },
     );
   }
@@ -532,8 +542,15 @@ export class LiveTransport implements SessionTransport {
     return (this.integrations.homeAssistant?.tools(profileId !== null).length ?? 0) > 0;
   }
   private toolDescriptors(profileId: string | null) {
+    const addonTools = this.integrations.addons?.tools(profileId) ?? [];
+    // Les commandes de lecture suivent les outils qui jouent, ou ce qui joue déjà.
+    const player =
+      !!this.integrations.player &&
+      (this.integrations.player.playingAnything() ||
+        addonTools.some((tool) => this.integrations.addons?.isPlayTool?.(tool.name)));
     return [
-      ...(this.integrations.addons?.tools(profileId) ?? []),
+      ...addonTools,
+      ...(player ? [playerControlTool] : []),
       ...(this.integrations.actions?.tools(profileId) ?? []),
       ...(this.integrations.homeAssistant?.tools(profileId !== null) ?? []),
       ...(this.integrations.agents?.tools(profileId) ?? []),
@@ -1264,6 +1281,11 @@ export class LiveTransport implements SessionTransport {
         this.runAlarms(active, delegation, item.call_id, name, args);
         return;
       }
+      if (name === PLAYER_CONTROL_TOOL && this.integrations.player) {
+        this.beginTool(active, delegation);
+        void this.runPlayerControl(active, delegation, item.call_id, args);
+        return;
+      }
       if (this.integrations.addons?.parseTool(name)) {
         this.beginTool(active, delegation);
         void this.runAddon(active, delegation, countKey, item.call_id, name, args);
@@ -1551,9 +1573,34 @@ export class LiveTransport implements SessionTransport {
     const rawRef = object(args).instanceRef;
     const instanceRef = typeof rawRef === 'string' && rawRef.trim() ? rawRef.trim() : null;
     let tool: ToolResult = toolFailure('Résultat indisponible.');
+    const play = bridge.isPlayTool?.(name) === true;
+    // Le lecteur ne vit que sur le miroir pour l’instant : rien n’est collecté pour rien.
+    if (play && (active.satelliteId || !this.integrations.player)) {
+      this.sendItem(
+        active,
+        callId,
+        toolFailure(
+          'La lecture se fait sur le miroir, pas sur ce satellite : demandez-la devant le miroir.',
+          'unavailable',
+        ),
+      );
+      this.finishTool(active, delegation);
+      return;
+    }
     try {
       const invoked = await bridge.invoke(name, profileId, instanceRef, active.abort.signal, args);
-      if (invoked) {
+      const playback = invoked?.outcome.ok ? invoked.outcome.playback : null;
+      if (invoked && playback && !active.closing && !active.finalized) {
+        // Le bandeau du lecteur remplace la carte ; l’outil suit l’accusé du miroir.
+        tool = await this.integrations.player!.play(
+          {
+            ...playback,
+            addonId: invoked.outcome.ok ? invoked.outcome.instance.addonId : '',
+            instanceRef: invoked.outcome.ok ? invoked.outcome.instance.ref : null,
+          },
+          active.abort.signal,
+        );
+      } else if (invoked) {
         tool = invoked.tool;
         // Satellite : pas d’écran, le résumé du module suffit à la réponse parlée.
         if (invoked.outcome.ok && !active.closing && !active.finalized && !active.satelliteId) {
@@ -1592,6 +1639,21 @@ export class LiveTransport implements SessionTransport {
         tool: name,
         error,
       });
+    }
+    this.sendItem(active, callId, tool);
+    this.finishTool(active, delegation);
+  }
+  private async runPlayerControl(
+    active: ActiveSession,
+    delegation: string,
+    callId: string,
+    args: unknown,
+  ) {
+    let tool: ToolResult;
+    try {
+      tool = await this.integrations.player!.control(args, active.abort.signal);
+    } catch {
+      tool = toolFailure('Lecteur indisponible.');
     }
     this.sendItem(active, callId, tool);
     this.finishTool(active, delegation);

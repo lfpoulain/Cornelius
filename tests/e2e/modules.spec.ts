@@ -86,6 +86,38 @@ test('un jeton manquant est expliqué en tête du module et bloque l’ajout de 
   await expect(clock.getByText('Jeton manquant', { exact: true })).toHaveCount(0);
 });
 
+test('un jeton facultatif manquant est proposé sans bloquer l’ajout de source', async ({
+  page,
+}) => {
+  // Le catalogue déclare le jeton Météo Concept facultatif et absent.
+  await page.route('**/api/admin/addons', async (route) => {
+    if (route.request().method() !== 'GET') return route.fallback();
+    const response = await route.fetch();
+    const catalog = (await response.json()) as {
+      definitions?: { id: string; secrets?: { configured: boolean; optional?: boolean }[] }[];
+    };
+    for (const definition of catalog.definitions ?? [])
+      for (const secret of definition.secrets ?? []) {
+        secret.configured = definition.id !== 'weather';
+        secret.optional = definition.id === 'weather';
+      }
+    await route.fulfill({ response, json: catalog });
+  });
+  await login(page, '/admin');
+  await page.getByRole('button', { name: 'Modules', exact: true }).click();
+  const weather = page
+    .locator('[data-slot="card"]')
+    .filter({ has: page.locator('#module-weather') });
+  await expect(weather.getByText('Jeton manquant', { exact: true })).toHaveCount(0);
+  await page.locator('#module-weather > summary').click();
+  await expect(
+    weather.getByText(
+      'Ce module peut utiliser un jeton Météo Concept (gratuit). Il fonctionne sans, avec moins de fonctions. Collez-le ici : il est pris en compte tout de suite (ou ajoutez CORNELIUS_METEO_CONCEPT_TOKEN dans le fichier .env).',
+    ),
+  ).toBeVisible();
+  await expect(weather.getByRole('button', { name: 'Ajouter une source' })).toBeEnabled();
+});
+
 test('un réglage invalide est signalé sous son champ, en français, sans rien enregistrer', async ({
   page,
 }) => {

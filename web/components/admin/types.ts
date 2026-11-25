@@ -75,12 +75,14 @@ export interface AddonSearchResultView {
   detail?: string;
 }
 
-/** Jeton requis par un module : sa présence seulement, jamais sa valeur. */
+/** Jeton déclaré par un module : sa présence seulement, jamais sa valeur. */
 export interface AddonSecretView {
   env: string;
   label: string;
   url: string | null;
   note: string | null;
+  /** Le module fonctionne sans : il est proposé sans bloquer l’ajout d’une source. */
+  optional?: boolean;
   configured: boolean;
 }
 

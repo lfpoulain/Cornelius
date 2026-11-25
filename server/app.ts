@@ -90,6 +90,8 @@ import { setSatelliteVolume } from './satellite-volume.js';
 import { VoiceUsage, voiceUsageMeasure } from './voice-usage.js';
 import { registerAlarms } from './alarms-api.js';
 import { AlarmsRepository } from './alarms-store.js';
+import { Player } from './player.js';
+import { registerPlayer } from './player-api.js';
 import { MAIL_PASSWORD_SECRET } from '../shared/mail.js';
 import { HomeAssistant } from './home-assistant.js';
 import { HomeAssistantRepository } from './home-assistant-store.js';
@@ -402,6 +404,23 @@ export async function createApp(
   );
   const alarms = new Alarms(new AlarmsRepository(db, now), timeZone, logs, now);
   const alarmTools = new AlarmTools(alarms, now);
+  // Lecteur audio du miroir : la page doit être là pour jouer (contrôleur créé plus bas).
+  const player = new Player({
+    logs,
+    now,
+    mirrorConnected: () => controller.isBrowserConnected(),
+    // Reprendre : le module est encore chargé et sa source encore active.
+    available: (request) =>
+      !!addonRuntime.get(request.addonId) &&
+      addonInstances
+        .listInstances()
+        .some(
+          (instance) =>
+            instance.enabled &&
+            instance.addonId === request.addonId &&
+            instance.ref === request.instanceRef,
+        ),
+  });
   const agents = new Agents(new AgentRepository(db, now), new HermesClient(http, now), now);
   const initialKey = openaiKey();
   const selectedVoiceKey = () =>
@@ -422,7 +441,7 @@ export async function createApp(
         : createLiveGateway(key, logs, liveEndpoint().effectiveBaseUrl);
   };
   /** Serveur Live : l’administration passe avant .env, qui passe avant OpenAI. */
-  const liveEndpoint = (): Omit<LiveEndpointView, 'models'> => {
+  const liveEndpoint = (): Omit<LiveEndpointView, 'models' | 'kind'> => {
     const baseUrl = preferences.getLiveBaseUrl();
     const envBaseUrl = config.liveBaseUrl ?? '';
     return {
@@ -433,6 +452,11 @@ export async function createApp(
     };
   };
   let liveModels: string[] = [];
+  /** Le serveur Live s’est annoncé comme Localive à la dernière lecture de ses modèles. */
+  let liveIsLocalive = false;
+  /** Un modèle de délégation imposé ne vaut que pour un serveur Live personnalisé. */
+  const delegationModel = () =>
+    liveEndpoint().source === 'default' ? '' : controller.getDelegationModel();
   if (liveEndpoint().source !== 'default')
     logs.write('info', 'openai', 'API Live remplacée par un serveur compatible', {
       baseUrl: liveEndpoint().effectiveBaseUrl,
@@ -475,7 +499,9 @@ export async function createApp(
       imageGeneration,
       mail: mailer,
       alarms: alarmTools,
+      player,
       personality: (id) => personality.get(id),
+      delegationModel,
     },
     now,
   );
@@ -539,6 +565,8 @@ export async function createApp(
   controller.setAmbientProjection((state) => ambient.view(state));
   controller.setAlarmsProjection((state) => alarms.mirrorView(state));
   alarms.onChange(() => controller.publish());
+  controller.setPlayerProjection(() => player.mirrorView());
+  player.onChange(() => controller.publish());
   controller.setBrowserAudioReady(false);
   live.attach(controller);
   agents.onCapabilitiesChanged = (profileId) => live.refreshAgentTools(profileId);
@@ -967,6 +995,19 @@ export async function createApp(
       .send(readFileSync(file));
   });
 
+  function currentKiosk(req: FastifyRequest): boolean {
+    return !!kiosk && !!req.cookies[kioskCookie] && kiosk.kioskId === req.cookies[kioskCookie];
+  }
+  registerPlayer(app, {
+    player,
+    logs,
+    requireAdmin,
+    // Seul l’onglet courant du miroir lit le flux et accuse réception.
+    kiosk: async (req, reply) => {
+      if (!currentKiosk(req))
+        await reply.code(409).send({ error: 'Un autre onglet affiche déjà le miroir.' });
+    },
+  });
   registerHardware(app, {
     logs,
     live,
@@ -977,8 +1018,7 @@ export async function createApp(
     downloads,
     requireAdmin,
     devices,
-    currentKiosk: (req) =>
-      !!kiosk && !!req.cookies[kioskCookie] && kiosk.kioskId === req.cookies[kioskCookie],
+    currentKiosk,
     workerAuthorized: (req) =>
       !!config.perceptionToken &&
       equalSecret(String(req.headers.authorization ?? ''), 'Bearer ' + config.perceptionToken),
@@ -1343,7 +1383,10 @@ export async function createApp(
         label: secret.label.replace(/^(un|une)\s+/u, '').replace(/^./u, (c) => c.toUpperCase()),
         usedBy: secret.addon.sourceLabel,
         url: secret.url ?? null,
-        note: secret.note ?? null,
+        // Jeton facultatif : le module fonctionne sans, le dire à côté de la précision du module.
+        note: secret.optional
+          ? ['Facultatif', secret.note].filter(Boolean).join(' · ')
+          : (secret.note ?? null),
       })),
     ];
   }
@@ -1557,7 +1600,7 @@ export async function createApp(
     const features = {
       webSearch: controller.isWebSearchEnabled(),
       voice: controller.getSpeechVoice(),
-      delegationModel: controller.getDelegationModel(),
+      delegationModel: delegationModel(),
     };
     const base = liveConfiguration(tools, undefined, delegationMode, features);
     const effective = liveConfiguration(tools, preferences, delegationMode, features);
@@ -1849,7 +1892,14 @@ export async function createApp(
     },
   );
   // Serveur Live compatible : remplace OpenAI pour la conversation (miroir et satellites).
-  const liveEndpointView = (): LiveEndpointView => ({ ...liveEndpoint(), models: liveModels });
+  const liveEndpointView = (): LiveEndpointView => {
+    const endpoint = liveEndpoint();
+    return {
+      ...endpoint,
+      models: liveModels,
+      kind: endpoint.source === 'default' ? 'openai' : liveIsLocalive ? 'localive' : 'compatible',
+    };
+  };
   app.get('/api/admin/live-endpoint', { preHandler: requireAdmin }, async () => liveEndpointView());
   app.patch<{ Body: { baseUrl?: unknown } }>(
     '/api/admin/live-endpoint',
@@ -1867,6 +1917,7 @@ export async function createApp(
       const after = liveEndpoint().effectiveBaseUrl;
       if (after !== before) {
         liveModels = [];
+        liveIsLocalive = false;
         live.setGateway(voiceGateway());
         logs.write('info', 'openai', 'Serveur Live modifié', { baseUrl: after });
       }
@@ -1887,7 +1938,10 @@ export async function createApp(
           .send({ error: 'Ajoutez d’abord la clé OpenAI dans Clés et accès → Clés et jetons.' });
       const { effectiveBaseUrl } = liveEndpoint();
       try {
-        liveModels = await listLiveModels(key, effectiveBaseUrl);
+        ({ models: liveModels, localive: liveIsLocalive } = await listLiveModels(
+          key,
+          effectiveBaseUrl,
+        ));
       } catch (error) {
         logs.write('warn', 'openai', 'Liste des modèles Live illisible', {
           baseUrl: effectiveBaseUrl,
@@ -2037,6 +2091,12 @@ export async function createApp(
           // resynchronisation garde la conversation, et le délai navigateur (5 s) la ferme
           // si la page ne revient pas. Une fermeture voulue par la page la libère aussitôt.
           if (![1006, 1011, 1013].includes(code)) controller.setBrowserAudioReady(false);
+          // Plus de miroir, plus de son : la lecture s’arrête, sauf si la page revient vite
+          // (coupure réseau brève) ou si un autre onglet a déjà pris le relais.
+          const grace = [1006, 1011, 1013].includes(code) ? 10_000 : 0;
+          setTimeout(() => {
+            if (!kiosk) player.stop('déconnexion');
+          }, grace).unref();
         }
       });
       socket.send(JSON.stringify(controller.snapshot()));
@@ -2158,5 +2218,5 @@ export async function createApp(
     perception.dispose();
     db.close();
   });
-  return { app, controller, profiles, logs, memory, agents, alarms };
+  return { app, controller, live, profiles, logs, memory, agents, alarms, player };
 }
