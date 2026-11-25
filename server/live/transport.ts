@@ -11,6 +11,14 @@ import { toolFailure, type ToolResult } from '../../shared/addons.js';
 import type { AddonReadOutcome } from '../addons/runtime.js';
 import type { SessionController, SessionTransport } from '../controller.js';
 import { SATELLITE_VOLUME_TOOL, satelliteVolumeTool } from '../satellite-volume.js';
+import {
+  END_CONVERSATION_TOOL,
+  endConversationResult,
+  endConversationTool,
+  isClosingPhrase,
+  isNewRequest,
+  isYesAnswer,
+} from './conversation-end.js';
 import { illustrationPrompt } from '../image-illustration.js';
 import { validators } from '../../shared/validation.js';
 import type { PersonalityPreferences } from '../../shared/personality.js';
@@ -118,6 +126,8 @@ export interface AlarmsToolBridge {
     parameters: Record<string, unknown>;
   }[];
   handles(name: string): boolean;
+  /** Une alarme sonne : « arrête », « c’est bon » s’adressent à elle, pas à la conversation. */
+  ringing?(): boolean;
   run(
     input: { profileId: string | null; profileName: string | null; satelliteId: string | null },
     name: string,
@@ -165,6 +175,26 @@ interface ActiveSession {
   continued: Set<string>;
   touched: Set<string>;
   heardUserTranscript: boolean;
+  /** Mot de fin : ce que la personne dit depuis la dernière réponse de Cornelius. */
+  userTurn: string;
+  /** Transcription arrivée après le début de la réponse : examinée après un court silence. */
+  userTurnTimer: ReturnType<typeof setTimeout> | null;
+  /** Dernière réponse de Cornelius ; une question appelle une réponse, pas une fin. */
+  assistantText: string;
+  replyStarted: boolean;
+  askedQuestion: boolean;
+  /** Dernier morceau de réponse reçu. */
+  lastOutputAt: number;
+  /** Réponses commencées depuis la dernière phrase de la personne. */
+  repliesSinceTurn: number;
+  /** La réponse précédant celle en cours finissait par une question : figé à son début. */
+  questionBeforeReply: boolean;
+  /** Début de la phrase en cours de la personne (premier morceau transcrit). */
+  userTurnStartedAt: number;
+  /** conversation__end accepté : instant de la demande. */
+  toolEndAt: number | null;
+  /** Satellite : fin de lecture estimée de l’audio déjà envoyé (16 kHz). */
+  playbackUntil: number;
   audioCaughtUp: boolean;
   contextAppends: Map<string, (accepted: boolean) => void>;
   cameraContextIds: Set<string>;
@@ -225,6 +255,18 @@ function cardAnnouncement(card: LunaCardRequest): string {
 const SATELLITE_AUDIO_FORMAT = { type: 'audio/pcm', rate: 16000 } as const;
 // Lecture du satellite (tampon et haut-parleur) après le dernier son audible de Cornelius.
 const SATELLITE_ECHO_GUARD_MS = 600;
+/** Silence après la dernière transcription de la personne : sa phrase est complète. */
+const USER_TURN_SETTLE_MS = 700;
+/** Pause dans la parole de Cornelius au-delà de laquelle un nouveau morceau ouvre une réponse. */
+const REPLY_GAP_MS = 1000;
+/**
+ * Retard maximal de la transcription sur l'appel de conversation__end : une phrase commencée
+ * avant est celle qui a conduit le modèle à fermer, pas une nouvelle demande.
+ */
+const TOOL_END_TRANSCRIPT_LAG_MS = 1500;
+const QUESTION_END = /[?？]\s*$/u;
+/** PCM16 mono à 16 kHz : 32 octets par milliseconde. */
+const SATELLITE_PCM_BYTES_PER_MS = 32;
 // Outils sans objet sur un satellite : pas d’écran ni de caméra ; sans profil, pas de mémoire.
 const SATELLITE_EXCLUDED_TOOLS = /^(vision|image)__/u;
 const ANONYMOUS_EXCLUDED_TOOLS = /^memory__/u;
@@ -390,6 +432,17 @@ export class LiveTransport implements SessionTransport {
       continued: new Set(),
       touched: new Set(),
       heardUserTranscript: false,
+      userTurn: '',
+      userTurnTimer: null,
+      assistantText: '',
+      replyStarted: false,
+      askedQuestion: false,
+      lastOutputAt: 0,
+      repliesSinceTurn: 0,
+      questionBeforeReply: false,
+      userTurnStartedAt: 0,
+      toolEndAt: null,
+      playbackUntil: 0,
       audioCaughtUp: false,
       contextAppends: new Map(),
       cameraContextIds: new Set(),
@@ -537,6 +590,7 @@ export class LiveTransport implements SessionTransport {
         voiceOnly,
         delegationModel:
           this.integrations.delegationModel?.() ?? this.controller.getDelegationModel(),
+        endPhrases: this.controller.getEndPhrases(),
         waitForReply: this.integrations.waitForReply?.(),
       },
     );
@@ -564,6 +618,7 @@ export class LiveTransport implements SessionTransport {
       ...(this.vision?.tools() ?? []),
       ...(this.memory?.tools() ?? []),
       ...(this.satelliteVolume ? [satelliteVolumeTool] : []),
+      ...(this.controller.isEndWordEnabled() ? [endConversationTool] : []),
     ];
   }
   /** Contexte silencieux : la description locale informe la réponse sans être lue à voix haute. */
@@ -770,6 +825,8 @@ export class LiveTransport implements SessionTransport {
   private finalize(active: ActiveSession) {
     if (active.finalized || this.active !== active) return;
     this.clearCloseTimer();
+    if (active.userTurnTimer) clearTimeout(active.userTurnTimer);
+    active.userTurnTimer = null;
     this.memory?.close(active.scope);
     active.finalized = true;
     active.abort.abort();
@@ -1048,8 +1105,13 @@ export class LiveTransport implements SessionTransport {
     // Satellite : le flux de sortie (16 kHz, silences compris) part tel quel vers sa pièce.
     if (active.satelliteId && String(object(event).type ?? '') === 'session.output_audio.delta') {
       const delta = object(event).delta;
-      if (typeof delta === 'string' && delta.length <= 262_144)
-        this.satelliteOutput?.(active.satelliteId, Buffer.from(delta, 'base64'));
+      if (typeof delta === 'string' && delta.length <= 262_144) {
+        const pcm = Buffer.from(delta, 'base64');
+        this.satelliteOutput?.(active.satelliteId, pcm);
+        // Le satellite joue en temps réel ce qui peut arriver plus vite : fin de lecture estimée.
+        active.playbackUntil =
+          Math.max(this.now(), active.playbackUntil) + pcm.length / SATELLITE_PCM_BYTES_PER_MS;
+      }
       if (audibleLiveOutput(event)) active.echoUntil = this.now() + SATELLITE_ECHO_GUARD_MS;
     }
     // Le calcul d’énergie ne sert qu’à la minuterie de silence (mode voix ou option).
@@ -1058,7 +1120,10 @@ export class LiveTransport implements SessionTransport {
       this.controller.silenceTracking() &&
       audibleLiveOutput(event)
     )
-      this.controller.noteAssistantOutput(active.scope);
+      this.controller.noteAssistantOutput(
+        active.scope,
+        active.satelliteId ? active.playbackUntil : undefined,
+      );
     if (event.type === 'session.usage.updated') return;
     if (event.type === 'session.closed') {
       this.finalize(active);
@@ -1072,8 +1137,44 @@ export class LiveTransport implements SessionTransport {
     )
       this.memory?.transcript(active.scope, event);
     if (event.type === 'session.input_transcript.delta') {
+      if (!active.userTurn) {
+        // Nouvelle phrase : la réponse précédente de Cornelius était-elle une question ? Si la
+        // transcription est en retard, la réponse à cette phrase a déjà commencé : la réponse
+        // d'avant compte aussi. Dans le doute, le serveur laisse décider le modèle.
+        active.askedQuestion =
+          QUESTION_END.test(active.assistantText) ||
+          (active.repliesSinceTurn >= 2 && active.questionBeforeReply);
+        active.replyStarted = false;
+        active.repliesSinceTurn = 0;
+        active.userTurnStartedAt = this.now();
+      }
+      if (typeof event.delta === 'string' && active.userTurn.length < 500)
+        active.userTurn += event.delta;
+      // La transcription peut arriver après le début de la réponse : examinée après un silence.
+      if (active.userTurnTimer) clearTimeout(active.userTurnTimer);
+      active.userTurnTimer = setTimeout(() => {
+        active.userTurnTimer = null;
+        if (this.active === active && !active.closing) this.endOnClosingPhrase(active);
+      }, USER_TURN_SETTLE_MS);
       this.controller.noteUserTranscript(active.scope);
       this.controller.setVoiceActivity(active.scope, 'listening', 1200);
+    }
+    // Cornelius commence à répondre : la phrase de la personne est complète.
+    if (
+      event.type === 'session.delegation.created' ||
+      event.type === 'session.output_transcript.delta'
+    )
+      this.endOnClosingPhrase(active);
+    if (event.type === 'session.output_transcript.delta' && typeof event.delta === 'string') {
+      const now = this.now();
+      if (!active.replyStarted || now - active.lastOutputAt > REPLY_GAP_MS) {
+        active.questionBeforeReply = QUESTION_END.test(active.assistantText);
+        active.assistantText = '';
+        active.repliesSinceTurn += 1;
+      }
+      active.replyStarted = true;
+      active.lastOutputAt = now;
+      active.assistantText = (active.assistantText + event.delta).slice(-300).trim();
     }
     if (event.type === 'session.delegation.created') {
       this.controller.setAssistantBusy(active.scope, true);
@@ -1093,6 +1194,47 @@ export class LiveTransport implements SessionTransport {
     active.touched.add(delegation);
     active.continued.delete(delegation);
     active.pending.set(delegation, (active.pending.get(delegation) ?? 0) + 1);
+  }
+  /**
+   * Mot de fin reconnu dans la transcription, sans attendre que le modèle délègue l'outil
+   * conversation__end : une phrase faite seulement d'une formule de fin ferme la conversation.
+   */
+  private endOnClosingPhrase(active: ActiveSession) {
+    if (active.userTurnTimer) clearTimeout(active.userTurnTimer);
+    active.userTurnTimer = null;
+    const said = active.userTurn;
+    if (!said) return;
+    active.userTurn = '';
+    // La phrase qui a provoqué conversation__end, transcrite après coup, ne l'annule pas.
+    const causedToolEnd =
+      active.toolEndAt !== null &&
+      active.userTurnStartedAt < active.toolEndAt + TOOL_END_TRANSCRIPT_LAG_MS;
+    if (!this.controller.isEndWordEnabled()) return;
+    if (isClosingPhrase(said, this.controller.getEndPhrases())) {
+      // « Ça va bien, merci » répond à une question ; « c’est bon » arrête ce qui sonne
+      // (alarms__respond). Le modèle, qui a le contexte, garde alors conversation__end.
+      if (active.askedQuestion || this.integrations.alarms?.ringing?.()) return;
+      if (this.controller.requestEnd(active.scope))
+        this.logs?.write('info', 'session', 'Fin de conversation demandée', {
+          interactionId: active.scope.interactionId,
+          source: 'transcription',
+        });
+      return;
+    }
+    // « Avec plaisir. Autre chose ? » puis « Oui. » : la personne cherche sa demande. Seulement
+    // pour une phrase commencée après conversation__end, qui n'a donc pas pu le provoquer.
+    const yesAfterEnd =
+      active.askedQuestion &&
+      (active.toolEndAt === null || active.userTurnStartedAt > active.toolEndAt) &&
+      isYesAnswer(said);
+    // Une nouvelle demande après le mot de fin : la conversation continue.
+    if (
+      (yesAfterEnd || (!causedToolEnd && isNewRequest(said))) &&
+      this.controller.cancelEnd(active.scope)
+    )
+      this.logs?.write('info', 'session', 'Fin de conversation annulée', {
+        interactionId: active.scope.interactionId,
+      });
   }
   private finishTool(active: ActiveSession, delegation: string) {
     const count = (active.pending.get(delegation) ?? 0) - 1;
@@ -1257,6 +1399,19 @@ export class LiveTransport implements SessionTransport {
         return;
       }
       const name = typeof item.name === 'string' ? item.name : '';
+      // Un autre outil après le mot de fin (« merci… ah, et la météo ? ») : la personne demande
+      // encore quelque chose, la fin demandée est oubliée, même si la transcription est en retard.
+      if (
+        name !== END_CONVERSATION_TOOL &&
+        name !== 'ui__show_luna_card' &&
+        this.controller.cancelEnd(active.scope)
+      ) {
+        active.toolEndAt = null;
+        this.logs?.write('info', 'session', 'Fin de conversation annulée', {
+          interactionId: active.scope.interactionId,
+          source: 'outil',
+        });
+      }
       let args: unknown = null;
       try {
         args = JSON.parse(item.arguments);
@@ -1318,6 +1473,19 @@ export class LiveTransport implements SessionTransport {
             ? this.satelliteVolume(active.satelliteId, args)
             : toolFailure('Le volume se règle seulement sur un satellite.'),
         );
+        this.finishTool(active, delegation);
+        return;
+      }
+      if (name === END_CONVERSATION_TOOL && this.controller.isEndWordEnabled()) {
+        this.beginTool(active, delegation);
+        const accepted = this.controller.requestEnd(active.scope);
+        if (accepted) active.toolEndAt = this.now();
+        if (accepted)
+          this.logs?.write('info', 'session', 'Fin de conversation demandée', {
+            interactionId: active.scope.interactionId,
+            source: 'outil',
+          });
+        this.sendItem(active, item.call_id, endConversationResult(accepted));
         this.finishTool(active, delegation);
         return;
       }
@@ -1940,6 +2108,8 @@ export class LiveTransport implements SessionTransport {
       clearTimeout(this.closeTimer);
       this.closeTimer = null;
     }
+    if (this.active?.userTurnTimer) clearTimeout(this.active.userTurnTimer);
+    if (this.active) this.active.userTurnTimer = null;
     this.onClosed?.();
     this.onClosed = null;
     this.active?.abort.abort();

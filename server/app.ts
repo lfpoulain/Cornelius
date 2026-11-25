@@ -87,6 +87,11 @@ import { Alarms } from './alarms.js';
 import { AlarmTools } from './alarms-tools.js';
 import { setSatelliteVolume } from './satellite-volume.js';
 import { VoiceUsage, voiceUsageMeasure } from './voice-usage.js';
+import {
+  END_PHRASE_MAX_LENGTH,
+  END_PHRASES_MAX,
+  endConversationTool,
+} from './live/conversation-end.js';
 import { registerAlarms } from './alarms-api.js';
 import { AlarmsRepository } from './alarms-store.js';
 import { Player } from './player.js';
@@ -1480,12 +1485,14 @@ export async function createApp(
       ...alarmTools.tools(profileId),
       ...vision.tools(),
       ...memory.tools(),
+      ...(controller.isEndWordEnabled() ? [endConversationTool] : []),
     ];
     const delegationMode = controller.snapshot().state.delegationMode;
     const features = {
       webSearch: controller.isWebSearchEnabled(),
       voice: controller.getSpeechVoice(),
       delegationModel: delegationModel(),
+      endPhrases: controller.getEndPhrases(),
     };
     const base = liveConfiguration(tools, undefined, delegationMode, features);
     const effective = liveConfiguration(tools, preferences, delegationMode, features);
@@ -1732,6 +1739,32 @@ export async function createApp(
     if (!enabledSchema(request.body))
       return reply.code(400).send({ error: 'Fermeture après la réponse invalide.' });
     controller.setReplyClose(request.body.enabled);
+    return controller.snapshot();
+  });
+  app.patch('/api/admin/end-word', { preHandler: requireAdmin }, async (request, reply) => {
+    if (!enabledSchema(request.body))
+      return reply.code(400).send({ error: 'Fermeture sur un mot de fin invalide.' });
+    controller.setEndWord(request.body.enabled);
+    return controller.snapshot();
+  });
+  const endPhrasesSchema = compile<{ phrases: string[] }>({
+    type: 'object',
+    additionalProperties: false,
+    required: ['phrases'],
+    properties: {
+      phrases: {
+        type: 'array',
+        maxItems: END_PHRASES_MAX,
+        items: { type: 'string', minLength: 1, maxLength: END_PHRASE_MAX_LENGTH },
+      },
+    },
+  });
+  app.patch('/api/admin/end-word/phrases', { preHandler: requireAdmin }, async (request, reply) => {
+    if (!endPhrasesSchema(request.body))
+      return reply.code(400).send({
+        error: `Formules de fin invalides : ${END_PHRASES_MAX} au plus, de 1 à ${END_PHRASE_MAX_LENGTH} caractères.`,
+      });
+    controller.setEndPhrases(request.body.phrases);
     return controller.snapshot();
   });
   app.patch('/api/admin/wait-for-reply', { preHandler: requireAdmin }, async (request, reply) => {
