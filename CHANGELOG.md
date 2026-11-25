@@ -6,7 +6,39 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
-Rien pour l’instant.
+### 2026-11-24 : informations permanentes adaptées au contenu
+
+**Corrigé**
+
+- **Miroir : une information permanente ne déborde plus sur ses voisines.** Une ligne à valeur longue (un titre d’actualité) élargissait sa tuile jusqu’à passer par-dessus les modules suivants. Le miroir adapte maintenant la mise en page au contenu : la valeur principale réduit sa taille pour tenir sur une ligne (« SP95-E10 1,807 € »), une ligne dont la valeur est une phrase se replie sur deux lignes dans une tuile plus large, et les lignes des cartes suivent la même règle. Aucun changement à faire dans les modules. Voir la [référence](docs/modules/reference.md#laffichage-permanent).
+
+**Modifié**
+
+- **Miroir : cartes retouchées.** La teinte de la famille (météo, transports, web…) revient dans le libellé, en trait sous le titre, en lueur derrière la valeur et à l’amorce des séparateurs. Le contenu se dépose ligne après ligne à l’arrivée de la carte (sans effet en mouvement réduit). Sur un écran vertical (1080 x 1920 et au-delà), les lignes de la carte principale, jusque-là masquées, s’affichent dans sa moitié droite.
+
+### 2026-11-24 : lecteur audio du miroir
+
+**Ajouté**
+
+- **Lecteur audio du miroir.** Un module peut faire écouter une radio, un podcast ou un son sur le miroir (« mets France Inter ») : un bandeau montre le logo, le titre et un bouton **Arrêter**. Le son baisse quand Cornelius écoute, se coupe quand il parle (un podcast se met en pause), et revient après. « Arrête la musique », « remets la radio » et « plus fort » sont des commandes communes à tous les modules. Le serveur relaie le flux : la page du miroir ne contacte aucun service extérieur et sa politique de sécurité ne change pas. Le miroir seulement pour l’instant. Voir [Le lecteur audio](docs/fonctionnalites/lecteur-audio.md) ([#62](https://github.com/lfpoulain/Cornelius/issues/62), proposé par [LucQuebec](https://github.com/LucQuebec)).
+- **Modules : outil de lecture.** Un outil déclare `play: true` ; `collect` reçoit `context.play` et rend une demande `playback` (flux https direct, titre, précision, logo, `live` ou `file`), que le cœur contrôle et joue. Ajout compatible `apiVersion: 1`, `minCoreVersion: '0.4.1'`. Voir la [référence](docs/modules/reference.md#loutil-de-lecture) ; un module de démonstration est dans `tests/e2e/modules/lecteur_demo`.
+- **Mot d’appel et musique** : un banc d’essai hors ligne (`perception/wake_music_bench.py`) et un protocole d’essai dans la pièce. Voir [Mot d’appel et musique](docs/developpement/mesure-mot-appel-musique.md).
+
+### 2026-11-24 : voix et délégation selon le serveur Live
+
+**Modifié**
+
+- **Voix et modèles : l’administration suit le serveur Live.** Avec OpenAI, la délégation garde ses trois modes, sans liste de modèles. Avec Localive, reconnu à sa liste de modèles, la voix devient « Voix féminine » ou « Voix masculine » (Localive parle avec ses propres voix) et la délégation affiche son cerveau, réglé dans Localive. Avec un autre serveur compatible, seule la liste de ses modèles de délégation reste, sans `gpt-live-1`. La liste se lit d’elle-même ; un modèle choisi pour un serveur personnalisé n’est plus envoyé à OpenAI.
+
+### 2026-11-23 : jetons facultatifs, lignes lisibles sur le miroir
+
+**Ajouté**
+
+- **Modules : jeton facultatif.** Un jeton déclaré dans `secrets` peut porter `optional: true` quand le module fonctionne sans, avec moins de fonctions (par exemple l’horaire sans le temps réel). Absent, il est proposé dans la carte du module (« Ce module peut utiliser… ») sans badge « Jeton manquant » ni blocage de « Ajouter une source », et **Clés et jetons** le marque « Facultatif ». Voir la [référence](docs/modules/reference.md#les-secrets) ([lfpoulain/cornelius-modules#34](https://github.com/lfpoulain/cornelius-modules/pull/34)).
+
+**Corrigé**
+
+- **Miroir : une étiquette longue ne coupe plus la valeur.** Sur les lignes de l’affichage permanent et des cartes, la valeur (un prix, une heure) garde sa largeur ; seule l’étiquette se replie sur deux lignes, puis se termine par « … ». Les pense-bêtes du jour gardent l’heure entière et replient leur texte ([#59](https://github.com/lfpoulain/Cornelius/issues/59), signalé par [LucQuebec](https://github.com/LucQuebec)).
 
 ## 0.4.1 · 2026-11-23
 

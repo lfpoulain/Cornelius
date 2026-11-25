@@ -83,6 +83,10 @@ Une carte s’efface d’elle-même au bout d’une minute environ, et toutes di
 
 Un réveil, un minuteur ou un rappel qui arrive s’affiche en ambre au-dessus de l’orbe, l’écran de veille se retire et le miroir sonne, de plus en plus fort, une fois la voix activée. Ouvrir une conversation coupe le son : Cornelius annonce ce qui sonne, et « arrête » ou « encore dix minutes » y répondent. Au-dessus des informations permanentes, un bandeau montre aussi le minuteur en cours avec son compte à rebours, le prochain réveil et les pense-bêtes du jour. Voir [Les alarmes et les rappels](../fonctionnalites/alarmes-et-rappels.md).
 
+### Ce qui joue
+
+Quand un module fait écouter une radio, un podcast ou un son (« mets France Inter »), un bandeau en haut de l’écran montre ce qui joue : le logo, l’état (« En direct », « Son baissé », « En pause »), le titre et un bouton **Arrêter**. Pendant une conversation, le son baisse quand Cornelius écoute et se coupe quand il parle ; un podcast se met en pause puis reprend. « Arrête la musique », « remets la radio » ou « plus fort » le commandent à la voix. Voir [Le lecteur audio](../fonctionnalites/lecteur-audio.md).
+
 ### Les informations permanentes
 
 En haut de l’écran, des informations restent visibles sans rien demander : l’heure, la météo, les prochains passages d’une ligne de transport. Elles ne demandent ni micro, ni conversation, ni OpenAI, et ne font jamais parler Cornelius.

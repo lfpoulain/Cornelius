@@ -49,18 +49,23 @@ export function liveSocketUrl(baseUrl: string, path: string): string {
   return baseUrl.replace(/\/+$/u, '').replace(/^http/u, 'ws') + path;
 }
 
-/** Identifiants des modèles du serveur Live (GET /models), triés ; au plus 500. */
+/**
+ * Identifiants des modèles du serveur Live (GET /models), triés ; au plus 500. `localive` :
+ * le serveur s’annonce comme Localive (owned_by), qui choisit lui-même voix et cerveau.
+ */
 export async function listLiveModels(
   apiKey: string,
   baseUrl: string = DEFAULT_LIVE_BASE_URL,
-): Promise<string[]> {
+): Promise<{ models: string[]; localive: boolean }> {
   const client = new OpenAI({ apiKey, baseURL: baseUrl, timeout: 10_000, maxRetries: 0 });
   const ids = new Set<string>();
+  let localive = false;
   for await (const model of client.models.list()) {
     if (typeof model.id === 'string' && model.id) ids.add(model.id);
+    if (model.owned_by === 'localive') localive = true;
     if (ids.size >= 500) break;
   }
-  return [...ids].sort((a, b) => a.localeCompare(b));
+  return { models: [...ids].sort((a, b) => a.localeCompare(b)), localive };
 }
 
 export function createLiveGateway(

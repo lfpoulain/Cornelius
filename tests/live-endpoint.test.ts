@@ -51,6 +51,7 @@ test('le serveur Live se règle dans l’administration, avant .env et OpenAI', 
     effectiveBaseUrl: 'http://10.0.0.5:9000/v1',
     source: 'env',
     models: [],
+    kind: 'compatible',
   });
   assert.equal(
     (await f.app.inject({ url: '/api/admin/live-endpoint', headers: { origin } })).statusCode,
@@ -93,6 +94,7 @@ test('le serveur Live se règle dans l’administration, avant .env et OpenAI', 
   });
   assert.equal(openai.json().effectiveBaseUrl, DEFAULT_LIVE_BASE_URL);
   assert.equal(openai.json().source, 'default');
+  assert.equal(openai.json().kind, 'openai');
 });
 
 test('la liste des modèles est lue sur le serveur Live, avec la clé OpenAI', async (t) => {
@@ -133,6 +135,7 @@ test('la liste des modèles est lue sur le serveur Live, avec la clé OpenAI', a
   });
   assert.equal(models.statusCode, 200, models.body);
   assert.deepEqual(models.json().models, ['gpt-6-luna', 'qwen-live']);
+  assert.equal(models.json().kind, 'compatible');
   assert.equal(authorization, 'Bearer cle-test');
   assert.equal(models.body.includes('cle-test'), false);
 
@@ -145,6 +148,71 @@ test('la liste des modèles est lue sur le serveur Live, avec la clé OpenAI', a
     payload: {},
   });
   assert.equal(down.statusCode, 502);
+});
+
+test('Localive est reconnu à sa liste de modèles, jusqu’au changement d’adresse', async (t) => {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(
+      JSON.stringify({
+        object: 'list',
+        data: ['gpt-live-1', 'lmstudio'].map((id) => ({
+          id,
+          object: 'model',
+          created: 0,
+          owned_by: 'localive',
+        })),
+      }),
+    );
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => server.close());
+  const { port } = server.address() as AddressInfo;
+  const f = await fixture(t);
+  const patch = (baseUrl: string) =>
+    f.app.inject({
+      method: 'PATCH',
+      url: '/api/admin/live-endpoint',
+      headers: f.headers,
+      payload: { baseUrl },
+    });
+  await patch(`http://127.0.0.1:${port}/v1`);
+  const models = await f.app.inject({
+    method: 'POST',
+    url: '/api/admin/live-endpoint/models',
+    headers: f.headers,
+    payload: {},
+  });
+  assert.equal(models.json().kind, 'localive');
+  assert.deepEqual(models.json().models, ['gpt-live-1', 'lmstudio']);
+  const moved = await patch('http://192.168.1.60:8787/v1');
+  assert.equal(moved.json().kind, 'compatible');
+  assert.deepEqual(moved.json().models, []);
+});
+
+test('le modèle imposé ne part qu’à un serveur Live personnalisé', async (t) => {
+  const f = await fixture(t);
+  f.controller.setDelegationModel('qwen-live');
+  const sent = () =>
+    (
+      f.live as unknown as {
+        configuration(
+          profileId: string | null,
+          voiceOnly: boolean,
+        ): {
+          delegation?: { type: string; responses: { model: string } };
+        };
+      }
+    ).configuration(null, false).delegation?.responses.model;
+  assert.equal(sent(), 'gpt-6-luna');
+  await f.app.inject({
+    method: 'PATCH',
+    url: '/api/admin/live-endpoint',
+    headers: f.headers,
+    payload: { baseUrl: 'http://192.168.1.60:8787/v1' },
+  });
+  assert.equal(sent(), 'qwen-live');
 });
 
 test('le modèle de délégation choisi remplace celui du mode, et se retire', async (t) => {

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DelegationMode } from '../../../shared/delegation';
-import { OPENAI_DELEGATION_MODELS } from '../../../shared/live-endpoint';
+import { delegationModelsOf } from '../../../shared/live-endpoint';
 import type { MirrorState } from '../../../shared/types';
 import { api } from '../../api';
 import type { RunAction } from './types';
 import { isSessionActive } from './format';
 import { ConfirmAction, Field } from './shared';
+import { liveServerLabel } from './LiveEndpointSettings';
+import { loadLiveModels, useLiveEndpoint } from './liveEndpointStore';
 import { ChoiceGroup } from '../ui/choice-card';
 import { Button } from '../ui/button';
 import { NativeSelect, NativeSelectOption } from '../ui/native-select';
@@ -44,18 +46,9 @@ export function DelegationSettings({ state, run }: { state: MirrorState; run: Ru
   const active = isSessionActive(state);
   const [confirming, setConfirming] = useState<Pending | null>(null);
   const answer = useRef<((ok: boolean) => void) | null>(null);
-  // Modèles lus sur le serveur Live : conservés par le serveur jusqu’au changement d’adresse.
-  const [serverModels, setServerModels] = useState<string[]>([]);
-  useEffect(() => {
-    let current = true;
-    api
-      .liveEndpoint()
-      .then((view) => current && setServerModels(view.models))
-      .catch(() => {});
-    return () => {
-      current = false;
-    };
-  }, []);
+  // Le serveur Live décide de ce qui se règle ici : les modes pour OpenAI, un modèle sinon.
+  const { view } = useLiveEndpoint();
+  const kind = view?.kind ?? 'openai';
   const decide = (confirmed: boolean) => {
     const resolve = answer.current;
     const pending = confirming;
@@ -85,89 +78,93 @@ export function DelegationSettings({ state, run }: { state: MirrorState; run: Ru
   const model = state.delegationModel ?? '';
   const chooseModel = (next: string) =>
     confirmFirst({
-      message: `Une conversation est en cours : changer de modèle la termine. La suivante utilisera ${next || 'le modèle du mode'}.`,
+      message: `Une conversation est en cours : changer de modèle la termine. La suivante utilisera ${next || 'gpt-6-luna'}.`,
       apply: () =>
         run(
-          next ? `Modèle de délégation : ${next}.` : 'Modèle de délégation : selon le mode.',
+          next ? `Modèle de délégation : ${next}.` : 'Modèle de délégation retiré.',
           () => api.delegationModel(next),
           { key: 'delegation-model', payload: next },
         ),
     });
-  const known = new Set<string>(OPENAI_DELEGATION_MODELS);
-  const others = serverModels.filter((item) => !known.has(item));
-  const orphan = model && !known.has(model) && !serverModels.includes(model);
+  const serverModels = delegationModelsOf(view?.models ?? []);
+  const orphan = model && !serverModels.includes(model);
+  const reload = () => void run('Liste des modèles relue.', loadLiveModels, { key: 'live-models' });
+  const reloadButton = (
+    <Button type="button" variant="outline" onClick={reload}>
+      Relire la liste
+    </Button>
+  );
   return (
     <Card>
       <CardHeader>
         {/* Rangée dans « Réglages avancés », dont le résumé porte le h3. */}
         <CardTitle as="h4">Délégation : recherches et actions</CardTitle>
         <CardDescription>
-          Choisissez le modèle et la vitesse pour les recherches, les cartes et les commandes
-          confiées par Cornelius.
+          {kind === 'openai'
+            ? 'Choisissez la vitesse des recherches, des cartes et des commandes confiées par Cornelius.'
+            : `Les recherches, les cartes et les commandes confiées par Cornelius passent par le serveur Live (${view ? liveServerLabel(view) : ''}).`}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <ChoiceGroup
-          legend="Mode de délégation"
-          hideLegend
-          value={state.delegationMode}
-          options={modes}
-          onValueChange={chooseMode}
-        />
-        <Field
-          id="delegation-model"
-          label="Modèle de délégation"
-          help={
-            model
-              ? 'Ce modèle remplace celui du mode ; la vitesse et le raisonnement du mode restent appliqués.'
-              : 'Selon le mode : GPT-6 Luna, ou GPT-6 Astra en ultra rapide. « Charger la liste » lit les modèles du serveur Live.'
-          }
-        >
-          <div className="flex flex-wrap gap-2">
-            <NativeSelect
-              id="delegation-model"
-              wrapperClassName="min-w-0 flex-1 basis-56"
-              className="w-full font-mono"
-              value={model}
-              onChange={(event) => void chooseModel(event.target.value)}
-            >
-              <NativeSelectOption value="">Selon le mode</NativeSelectOption>
-              <optgroup label="Modèles OpenAI">
-                {OPENAI_DELEGATION_MODELS.map((item) => (
+        {kind === 'openai' && (
+          <ChoiceGroup
+            legend="Mode de délégation"
+            hideLegend
+            value={state.delegationMode}
+            options={modes}
+            onValueChange={chooseMode}
+          />
+        )}
+        {kind === 'localive' && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border p-4 text-sm">
+            <p className="min-w-0 flex-1 basis-64 leading-relaxed">
+              {serverModels.length > 0 ? (
+                <>
+                  Localive répond avec son cerveau{' '}
+                  <code className="font-mono font-medium">{serverModels.join(', ')}</code>.
+                </>
+              ) : (
+                'Localive répond avec son cerveau.'
+              )}{' '}
+              <span className="text-muted-foreground">
+                Il se choisit dans l’administration de Localive (Cerveau), pas ici.
+              </span>
+            </p>
+            {reloadButton}
+          </div>
+        )}
+        {kind === 'compatible' && (
+          <Field
+            id="delegation-model"
+            label="Modèle de délégation"
+            help={
+              serverModels.length > 0
+                ? 'Modèles proposés par le serveur Live, hors modèles de conversation.'
+                : 'Aucun modèle lu sur le serveur Live : vérifiez son adresse, puis relisez la liste.'
+            }
+          >
+            <div className="flex flex-wrap gap-2">
+              <NativeSelect
+                id="delegation-model"
+                wrapperClassName="min-w-0 flex-1 basis-56"
+                className="w-full font-mono"
+                value={model}
+                onChange={(event) => void chooseModel(event.target.value)}
+              >
+                <NativeSelectOption value="">Non choisi (gpt-6-luna)</NativeSelectOption>
+                {serverModels.map((item) => (
                   <NativeSelectOption key={item} value={item}>
                     {item}
                   </NativeSelectOption>
                 ))}
-              </optgroup>
-              {others.length > 0 && (
-                <optgroup label="Serveur Live">
-                  {others.map((item) => (
-                    <NativeSelectOption key={item} value={item}>
-                      {item}
-                    </NativeSelectOption>
-                  ))}
-                </optgroup>
-              )}
-              {orphan && (
-                <optgroup label="Choix actuel">
-                  <NativeSelectOption value={model}>{model}</NativeSelectOption>
-                </optgroup>
-              )}
-            </NativeSelect>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                void run('Liste des modèles chargée.', async () => {
-                  const view = await api.liveModels();
-                  setServerModels(view.models);
-                })
-              }
-            >
-              Charger la liste
-            </Button>
-          </div>
-        </Field>
+                {orphan && (
+                  <NativeSelectOption value={model}>{model} (absent du serveur)</NativeSelectOption>
+                )}
+              </NativeSelect>
+              {reloadButton}
+            </div>
+          </Field>
+        )}
         {confirming && (
           <ConfirmAction
             message={confirming.message}
@@ -176,11 +173,13 @@ export function DelegationSettings({ state, run }: { state: MirrorState; run: Ru
             onCancel={() => decide(false)}
           />
         )}
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          Changer de mode ou de modèle termine la conversation en cours ; la suivante utilisera ce
-          choix.
-        </p>
-        {state.delegationMode === 'ultrafast' && (
+        {kind !== 'localive' && (
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            Changer de {kind === 'openai' ? 'mode' : 'modèle'} termine la conversation en cours ; la
+            suivante utilisera ce choix.
+          </p>
+        )}
+        {kind === 'openai' && state.delegationMode === 'ultrafast' && (
           <p className="text-sm text-muted-foreground">
             Ce traitement très rapide dépend des limites de votre compte OpenAI et passe par ses
             serveurs mondiaux ou américains : il ne fonctionne pas si votre compte OpenAI garde ses

@@ -8,6 +8,7 @@ import {
   type AmbientDisplay,
   type AddonHttpClient,
   type AddonInstance,
+  type AddonPlayback,
   type AddonPresentation,
   type AddonSearchField,
   type AddonSearchResult,
@@ -20,6 +21,7 @@ import { compile, validators } from '../../shared/validation.js';
 import type { DiagnosticLog } from '../logs.js';
 import type { AddonRepository } from '../storage.js';
 import { configFieldErrors, type ConfigFieldError } from './config-errors.js';
+import { blockedHost } from '../player-stream.js';
 
 /** Un calendrier change rarement : un relevé peut rester valable une journée. */
 const maxFreshMs = 24 * 60 * 60_000;
@@ -97,6 +99,11 @@ export interface AddonReadSuccess {
   stale: boolean;
   /** Rien à signaler, dit par le module lui-même (« rien de prévu »). */
   empty: boolean;
+  /**
+   * Demande de lecture contrôlée, rendue seulement par un outil `play` ; `null` quand cet
+   * outil n'a rien à jouer (la carte et la phrase du module sont alors utilisées).
+   */
+  playback?: AddonPlayback | null;
 }
 
 export interface AddonReadFailure {
@@ -141,6 +148,35 @@ function instanceKey(instance: AddonInstance): string {
     instance.configVersion,
     instance.config,
   ]);
+}
+
+/**
+ * Écart d'une demande de lecture au contrat, ou null : schéma, puis adresses https sans
+ * identifiants (un schéma ne voit pas `https://moi:secret@…`), hors du réseau local.
+ */
+export function playbackProblem(playback: unknown): string | null {
+  if (!validators.addonPlayback(playback))
+    return (validators.addonPlayback.errors ?? [])
+      .slice(0, 3)
+      .map((error) => `${error.instancePath || '/'} ${error.message ?? ''}`.trim())
+      .join(' ; ');
+  for (const [field, raw] of [
+    ['url', playback.url],
+    ['imageUrl', playback.imageUrl],
+  ] as const) {
+    if (raw === null) continue;
+    let url: URL;
+    try {
+      url = new URL(raw);
+    } catch {
+      return `/${field} adresse illisible`;
+    }
+    if (url.protocol !== 'https:') return `/${field} https attendu`;
+    if (url.username || url.password) return `/${field} identifiants interdits`;
+    // Le relais le refuserait de toute façon : dit dès la demande, avec le champ en cause.
+    if (blockedHost(url.hostname)) return `/${field} adresse du réseau local`;
+  }
+  return null;
 }
 
 function fail(
@@ -241,6 +277,17 @@ export class AddonRuntime {
     return { addonId, toolName };
   }
 
+  /** L'outil Live est-il un outil de lecture (`play`) d'un module connu ? */
+  isPlayTool(name: string): boolean {
+    const parsed = this.parseTool(name);
+    return (
+      !!parsed &&
+      this.addons
+        .get(parsed.addonId)!
+        .tools.some((tool) => tool.name === parsed.toolName && tool.play === true)
+    );
+  }
+
   sourceLabel(addonId: string): string {
     return this.addons.get(addonId)?.sourceLabel ?? addonId;
   }
@@ -286,6 +333,7 @@ export class AddonRuntime {
       signal,
       query,
       Object.keys(checked.args).length ? checked.args : null,
+      tool.play === true,
     );
     return { outcome, tool: this.toolResult(outcome) };
   }
@@ -397,6 +445,7 @@ export class AddonRuntime {
         label: secret.label,
         url: secret.url ?? null,
         note: secret.note ?? null,
+        optional: secret.optional === true,
         configured: this.secret(secret.name) !== undefined,
       })),
     }));
@@ -513,8 +562,10 @@ export class AddonRuntime {
     signal: AbortSignal,
     query: string | null = null,
     args: ToolArgs | null = null,
+    play = false,
   ): Promise<AddonReadOutcome> {
-    const onDemand = query !== null || args !== null;
+    // Un outil de lecture est toujours à la demande : un flux ne se ressert pas d'un cache.
+    const onDemand = query !== null || args !== null || play;
     const addon = this.addons.get(addonId);
     if (!addon)
       return fail('Ce module est inconnu.', {
@@ -526,11 +577,14 @@ export class AddonRuntime {
     if ('ok' in resolved) return resolved;
     const instance = resolved.instance;
     let snapshot: ModuleSnapshot;
+    let playback: AddonPlayback | undefined;
     try {
       if (signal.aborted) throw new AddonCollectError('unavailable', 'Collecte annulée.', true);
-      snapshot = onDemand
-        ? await this.collectQuery(instance, addon, { query, args }, signal)
-        : await this.ensureSnapshot(instance, addon, signal);
+      if (onDemand) {
+        const collected = await this.collectQuery(instance, addon, { query, args, play }, signal);
+        snapshot = collected.snapshot;
+        playback = collected.playback;
+      } else snapshot = await this.ensureSnapshot(instance, addon, signal);
       if (signal.aborted || !this.isCurrent(instance))
         throw new AddonCollectError('unavailable', 'Collecte annulée ou source modifiée.', true);
     } catch (error) {
@@ -611,7 +665,24 @@ export class AddonRuntime {
         retryable: false,
       });
     }
-    return { ok: true, instance, snapshot, presentation, stale, card, empty };
+    if (!play) return { ok: true, instance, snapshot, presentation, stale, card, empty };
+    if (playback === undefined)
+      return { ok: true, instance, snapshot, presentation, stale, card, empty, playback: null };
+    const problem = playbackProblem(playback);
+    if (problem) {
+      // Le détail reste au journal : il peut citer une adresse que l'oral n'a pas à dire.
+      this.options.logs?.write('error', 'addon', 'Demande de lecture non conforme', {
+        addonId,
+        instanceId: instance.id,
+        problem: problem.slice(0, 300),
+      });
+      return fail('Données reçues mais illisibles.', {
+        code: 'malformed',
+        message: 'Demande de lecture non conforme.',
+        retryable: false,
+      });
+    }
+    return { ok: true, instance, snapshot, presentation, stale, card, empty, playback };
   }
 
   toolResult(outcome: AddonReadOutcome): ToolResult {
@@ -684,9 +755,9 @@ export class AddonRuntime {
   private async collectQuery(
     instance: AddonInstance,
     addon: AddonDefinition,
-    request: { query: string | null; args: ToolArgs | null },
+    request: { query: string | null; args: ToolArgs | null; play: boolean },
     signal: AbortSignal,
-  ): Promise<ModuleSnapshot> {
+  ): Promise<{ snapshot: ModuleSnapshot; playback: AddonPlayback | undefined }> {
     const startedAt = this.now();
     const validateConfig = this.validator(
       this.configValidators,
@@ -706,6 +777,7 @@ export class AddonRuntime {
       timeZone: this.timeZone,
       ...(request.query !== null ? { query: request.query } : {}),
       ...(request.args !== null ? { args: request.args } : {}),
+      ...(request.play ? { play: true as const } : {}),
     });
     if (signal.aborted || !this.isCurrent(instance))
       throw new AddonCollectError('unavailable', 'Collecte annulée ou source modifiée.', true);
@@ -725,7 +797,7 @@ export class AddonRuntime {
       status: collection.empty ? 'empty' : 'ready',
       durationMs: fetchedAt - startedAt,
     });
-    return {
+    const snapshot: ModuleSnapshot = {
       schemaVersion: 1,
       snapshotId: `${addon.id}:${instance.ref ?? instance.id}:q${sequence}`.slice(0, 128),
       cacheKey: `${addon.id}:${instance.ref ?? instance.id}:query`.slice(0, 256),
@@ -740,6 +812,8 @@ export class AddonRuntime {
       status: collection.empty ? 'empty' : 'ready',
       data: collection.data as Record<string, unknown>,
     };
+    // Lue seulement pour un outil de lecture : ailleurs, une demande rendue est ignorée.
+    return { snapshot, playback: request.play ? collection.playback : undefined };
   }
 
   private isCurrent(instance: AddonInstance): boolean {

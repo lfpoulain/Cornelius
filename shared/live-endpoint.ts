@@ -1,8 +1,12 @@
 /** API Live d’OpenAI, remplacée par un serveur compatible choisi dans l’administration ou .env. */
 export const DEFAULT_LIVE_BASE_URL = 'https://api.openai.com/v1';
 
-/** Modèles de délégation d’OpenAI, proposés même sans lecture de la liste du serveur. */
-export const OPENAI_DELEGATION_MODELS = ['gpt-6-luna', 'gpt-6-astra'] as const;
+/**
+ * Nature du serveur Live : OpenAI (adresse par défaut), Localive (reconnu à sa liste de
+ * modèles) ou un autre serveur compatible. Elle décide de ce que l’administration propose
+ * pour la voix et la délégation.
+ */
+export type LiveServerKind = 'openai' | 'localive' | 'compatible';
 
 /** Serveur Live tel que vu par l’administration ; la clé n’y figure jamais. */
 export interface LiveEndpointView {
@@ -15,6 +19,17 @@ export interface LiveEndpointView {
   source: 'admin' | 'env' | 'default';
   /** Modèles lus sur le serveur avec « Charger la liste » ; vide tant qu’ils ne l’ont pas été. */
   models: string[];
+  kind: LiveServerKind;
+}
+
+/** Modèles de conversation (gpt-live-1…) : ils ne servent pas à la délégation. */
+export function isLiveConversationModel(id: string): boolean {
+  return /^gpt-live/iu.test(id);
+}
+
+/** Modèles d’un serveur Live utilisables pour la délégation. */
+export function delegationModelsOf(models: readonly string[]): string[] {
+  return models.filter((id) => !isLiveConversationModel(id));
 }
 
 /**
@@ -44,7 +59,8 @@ export function normalizeLiveBaseUrl(value: string): string {
 }
 
 /**
- * Modèle de délégation imposé : vide pour suivre le mode (Luna ou Astra), sinon un identifiant
+ * Modèle de délégation imposé à un serveur Live personnalisé (OpenAI suit toujours le mode) :
+ * vide pour suivre le mode (Luna ou Astra), sinon un identifiant
  * de modèle tel que le serveur le donne (lettres, chiffres, . _ : / -).
  */
 export function isDelegationModel(value: unknown): value is string {

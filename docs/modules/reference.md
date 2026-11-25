@@ -18,11 +18,12 @@ Cette page vit avec le code qu’elle décrit : toute évolution du contrat la m
 | Lire une information : météo, horaires, disponibilités, agenda | Un module, décrit ici |
 | Répondre à une question libre à partir d’un service | Un module avec un [outil à la demande](#loutil-à-la-demande) |
 | Une lecture paramétrée par la voix (« samedi », « et le SP98 ? ») | Des [arguments typés](#les-arguments-typés) sur l’outil |
+| Écouter une radio, un podcast ou un son sur le miroir | Un [outil de lecture](#loutil-de-lecture) (`play`) |
 | Déclencher un effet : allumer une lampe, ouvrir un portail | Une [commande HTTP](README.md#les-commandes-http), réglée dans l’administration, sans code |
 | Piloter les appareils de Home Assistant | L’intégration [Home Assistant](../fonctionnalites/home-assistant.md) |
 | Confier une tâche longue à un agent personnel | Les [agents Hermes](../fonctionnalites/agents-hermes.md) |
 | Afficher une information sans la demander | Le champ `ambient` d’un module, plus bas |
-| Toucher à la caméra, au son ou à l’analyse d’image | Le cœur de Cornelius ; Vision et Génération d’image ne sont pas des modules de ce contrat |
+| Toucher à la caméra, au micro ou à l’analyse d’image | Le cœur de Cornelius ; Vision et Génération d’image ne sont pas des modules de ce contrat |
 | Envoyer une image ou un message à quelqu’un du foyer | Le module natif [E-mail](../fonctionnalites/envoi-par-e-mail.md), dans le cœur |
 | Un réveil, un minuteur, un rappel | La fonction native [Alarmes et rappels](../fonctionnalites/alarmes-et-rappels.md), dans le cœur |
 | Un nouveau type de carte, ou un outil qui agit | Une évolution du cœur, à concevoir à part |
@@ -70,7 +71,7 @@ Le fichier `index.ts` DOIT exporter par défaut un objet `AddonDefinition<TConfi
 | `dataVersion` | Entier ≥ 1, à incrémenter quand les anciennes données ne sont plus lisibles |
 | `dataSchema` | JSON Schema des données normalisées (pas de l’enveloppe du relevé) |
 | `freshMs` | Durée de validité d’un succès, en millisecondes, entier > 0, ramenée par le cœur entre 5 secondes et 24 heures |
-| `tools` | Liste des outils vocaux ; fournir au moins `read`, ou un [outil à la demande](#loutil-à-la-demande) (le chargeur accepte une liste vide, mais la voix ne pourrait alors pas lire la source). Un outil peut déclarer des [arguments typés](#les-arguments-typés) |
+| `tools` | Liste des outils vocaux ; fournir au moins `read`, ou un [outil à la demande](#loutil-à-la-demande) (le chargeur accepte une liste vide, mais la voix ne pourrait alors pas lire la source). Un outil peut déclarer des [arguments typés](#les-arguments-typés), ou être un [outil de lecture](#loutil-de-lecture) |
 | `search` | Facultatif : recherche assistée dans le formulaire |
 | `ambient` | Facultatif : `{ present(snapshot, context) }` pour l’affichage permanent |
 | `collect` | `async (context) => AddonCollection<TData>` |
@@ -134,6 +135,7 @@ L’aperçu d’une source sous son nom (« 20 vélos · Mairie - Opéra ») est
 | `context.secret(name)` | Un jeton déclaré et branché, ou `undefined` |
 | `context.query` | La question d’un [outil à la demande](#loutil-à-la-demande), sinon `undefined` |
 | `context.args` | Les [arguments typés](#les-arguments-typés) donnés par le modèle, déjà contrôlés ; absent pour une lecture ordinaire |
+| `context.play` | `true` quand l’outil appelé est un [outil de lecture](#loutil-de-lecture) ; absent sinon (**Tester**, affichage permanent, autres outils) |
 | `context.timeZone` | Le fuseau horaire du foyer (IANA, « Europe/Paris » par défaut, réglé par `CORNELIUS_TIMEZONE`) : « aujourd’hui », « ce soir » et les heures DOIVENT s’y calculer |
 
 `present` et `ambient.present` reçoivent `{ instance, now(), timeZone }`. `search.find` reçoit `{ http, signal, secret, timeZone }`, sans source ni horloge.
@@ -201,7 +203,7 @@ Les libellés viennent de [web/components/admin/format.ts](../../web/components/
 
 Adaptez la correspondance aux statuts réels du fournisseur. `retryable` informe seulement : il ne programme aucune nouvelle tentative. Une autre exception est rapportée comme `upstream`, « Le module a rencontré une erreur inattendue. », et son texte va au journal (300 caractères au plus). Ne masquez jamais une panne par des données vides ou d’exemple.
 
-`collect` renvoie `{ data, empty?, source?, observedAt?, freshMs?, cacheKey? }` :
+`collect` renvoie `{ data, empty?, source?, observedAt?, freshMs?, cacheKey?, playback? }` (`playback` : voir [L’outil de lecture](#loutil-de-lecture)) :
 
 - `data` DOIT respecter `dataSchema`, sinon la collecte échoue en `malformed` ;
 - `empty: true` signale un succès **sans rien à signaler** : aucun passage cette nuit, rien de publié, une station sans prix. Le cœur appelle quand même `present` : si le module sait le dire (« Aucun passage prévu pour le moment »), sa carte et sa phrase sont utilisées, avec le statut d’outil `empty` ; s’il lève une exception, Cornelius dit « La source ne fournit aucune donnée utile pour le moment. ». Zéro place libre n’est pas vide, et une semaine sans rendez-vous DEVRAIT rester un succès ordinaire ;
@@ -306,6 +308,14 @@ Le cœur vérifie ce contenu ([schemas/ambient-presentation.schema.json](../../s
 
 Sur le miroir ([web/components/AmbientModules.tsx](../../web/components/AmbientModules.tsx)), l’en-tête est le « Nom affiché » de la source, plus précis que le titre du module : `title` est obligatoire mais n’est pas affiché. Viennent ensuite `value`, `subtitle`, les lignes `items`, puis « Relevé » avec la date et l’heure de la collecte (sauf avec `showCollectedAt: false`). Un relevé en repli affiche à la place « Dernière donnée connue » et son ancienneté.
 
+Le miroir adapte la mise en page au contenu ([web/components/fit.ts](../../web/components/fit.ts)), sans rien demander au module :
+
+- **`value`** s’affiche en grand tant qu’elle tient sur la largeur de la tuile ; plus longue (« SP95-E10 1,807 € »), sa taille diminue pour rester sur une ligne. Au-delà de 24 caractères, c’est une phrase : petite, sur deux lignes au plus.
+- **Une ligne à valeur courte** (20 caractères au plus : un prix, une heure, une température) garde sa valeur entière à droite ; c’est l’étiquette qui se replie sur deux lignes au plus, puis se termine par « … ».
+- **Une ligne à valeur longue** (un titre d’actualité, un message) devient une ligne de texte : l’étiquette, courte, reste à gauche et la valeur se replie sur deux lignes. La tuile est alors plus large.
+
+Rien ne sort de la tuile ni ne recouvre la voisine. Le plus lisible reste une valeur courte, avec le nom ou l’adresse dans l’étiquette ou dans `subtitle`. Les lignes des cartes du miroir suivent les mêmes règles.
+
 L’option « Afficher en permanence sur le miroir » n’est proposée que pour un module qui déclare `ambient`, et le serveur refuse de l’activer sinon. Le choix appartient à la source (désactivé par défaut), hors des réglages du module. Les règles de visibilité sont décrites dans [Les modules](README.md#laffichage-permanent).
 
 Une présentation permanente est recalculée à chaque nouvelle collecte, et à l’instant `refreshAt` qu’elle donne, **sans réseau** : la minute suivante pour une horloge ou un compte à rebours, 17 h pour « ce soir, on sort les poubelles », la fin d’un rendez-vous, minuit pour « demain ». Sans `refreshAt`, un texte qui dépend de l’heure peut rester faux jusqu’à la collecte suivante.
@@ -407,6 +417,78 @@ Extension compatible v1, pour un module qui répond à une question libre (une r
 
 `collect` DOIT donc traiter les deux cas : avec `query`, la réponse ; sans, une vérification utile à **Tester** (le module [Ragator](../../addons/ragator/index.ts) lit l’état du corpus). `dataSchema` couvre les deux formes, et `present` aussi. Le délai `timeoutMs` reste celui du module : un service lent DEVRAIT le relever et le dire dans la description de l’outil, pour que Cornelius prévienne avant d’appeler.
 
+### L’outil de lecture
+
+Extension compatible v1 (Cornelius 0.4.1), pour un module qui fait **écouter** quelque chose sur le miroir : une radio (« mets France Inter »), un podcast, un son. Le module trouve le flux ; le cœur le contrôle, le relaie, le joue, l’affiche et le pilote. Arrêter, reprendre et régler le volume sont des commandes du cœur, communes à tous les modules : un module ne les déclare pas.
+
+L’outil déclare `play: true`, en général avec une [question](#loutil-à-la-demande) (le nom de la station) ou des [arguments typés](#les-arguments-typés). `collect` reçoit `context.play` et rend, à côté de `data`, une demande de lecture `playback` :
+
+```ts
+tools: [
+  {
+    name: 'ecouter',
+    description: 'Écouter une station sur le miroir (« mets France Inter »). query : le nom de la station.',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['instanceRef', 'query'],
+      properties: { instanceRef: { type: ['string', 'null'] }, query: { type: 'string' } },
+    },
+    query: { maxLength: 80 },
+    play: true,
+  },
+],
+async collect(context) {
+  if (!context.play) return { data: verification() }; // Tester, outil read
+  const station = trouver(context.config.stations, context.query);
+  if (!station) throw new AddonCollectError('not_found', `Aucune station « ${context.query} ».`);
+  return {
+    data: { station: station.nom },
+    playback: {
+      url: station.flux, // https, flux direct
+      title: station.nom,
+      subtitle: 'En direct',
+      imageUrl: station.logo, // https, ou null
+      kind: 'live',
+    },
+  };
+},
+```
+
+| Champ de `playback` | Règle |
+| --- | --- |
+| `url` | Adresse `https://` d’un **flux audio direct** (MP3, AAC, Ogg, Opus), 2 000 caractères au plus, sans identifiants. Ni liste de lecture (m3u, pls) ni HLS (m3u8) : le module lit la liste lui-même avec `context.http` et rend l’adresse du flux qu’elle contient |
+| `title` | Ce qui joue, 1 à 80 caractères (« France Inter ») |
+| `subtitle` | `null` ou 1 à 120 caractères (« Le 7/9 », titre d’un épisode) |
+| `imageUrl` | `null` ou logo `https://` : PNG, JPEG, WebP ou GIF de 512 Kio au plus (SVG refusé) |
+| `kind` | `live` : flux sans fin (radio), baissé pendant une conversation ; `file` : fichier qui se termine (podcast, son), mis en pause pendant une conversation puis repris |
+
+Le cœur vérifie la demande ([schemas/addon-playback.schema.json](../../schemas/addon-playback.schema.json), puis https et absence d’identifiants). Ensuite :
+
+| Règle | Effet |
+| --- | --- |
+| Lecture à la demande | Toujours, même sans question ni argument : ni cache, ni regroupement, ni repli, rien d’enregistré ; le relevé de la source n’est pas touché |
+| Demande valide | Elle remplace ce qui jouait. Le **bandeau de lecture** du miroir remplace la carte du module (titre, précision, logo, bouton **Arrêter**) ; `present` sert encore, pour le cas sans `playback` |
+| Résultat de l’outil | Il attend que le miroir entende le flux (ou, pour un `file` demandé pendant la conversation, qu’il soit prêt à jouer), 8 secondes au plus : `succeeded` (« France Inter joue sur le miroir. »), `failed` avec la raison (« Flux introuvable. », « Liste de lecture (m3u, pls, HLS) non prise en charge. »), ou `unknown` si le miroir ne répond pas |
+| Pas de `playback` | Rien ne joue : la carte et la phrase du module, comme une lecture ordinaire (par exemple `empty: true` et « aucune station ne correspond ») |
+| Demande non conforme | Échec `malformed`, « Données reçues mais illisibles. » ; « Demande de lecture non conforme » au journal, avec le champ en cause |
+| `playback` d’un outil sans `play` | Ignoré |
+| Conversation d’un satellite | L’outil répond, sans collecter, que la lecture se fait sur le miroir |
+
+**Le relais.** Le miroir ne contacte jamais l’hôte du flux : il lit `/api/player/<id>/stream`, que le serveur remplit en ouvrant l’adresse du module. La politique de sécurité de la page (CSP) reste `default-src 'self'`, sans hôte ajouté. Le relais suit trois redirections au plus, jamais vers http ; il refuse une adresse du réseau local, de la machine ou non routable (IPv4, IPv6, et IPv6 qui porte une IPv4), écrite telle quelle, obtenue par résolution du nom ou après une redirection, ainsi qu’un type qui n’est pas de l’audio (page HTML, liste de lecture) ; il ne demande pas les métadonnées ICY et transmet `Range`, pour avancer dans un fichier. Le délai de 8 secondes vaut pour la réponse du service, pas pour la suite du flux. Le logo (`/api/player/<id>/image`) passe par la même voie gardée. Une `url` ou une `imageUrl` qui vise `localhost` ou une adresse locale écrite telle quelle rend la demande non conforme.
+
+**Pendant une conversation** tenue par le miroir, un flux `live` descend à 15 % de son volume quand Cornelius écoute ou réfléchit, et se coupe quand il parle (le flux continue : pas de retard au retour) ; un `file` se met en pause et reprend après. Une alarme qui sonne coupe aussi le son. Une conversation sur un satellite ne change rien au miroir.
+
+**Les commandes communes.** Dès qu’un outil de lecture est proposé, ou que quelque chose joue, le modèle reçoit `player__control` : `stop` (« arrête la musique »), `resume` (relance la dernière lecture), `volume` (0 à 10, ou plus fort et moins fort de deux en deux ; 6 au départ). Le bandeau du miroir a aussi un bouton **Arrêter**, et la lecture s’arrête quand la page du miroir se ferme (après dix secondes pour une coupure réseau). `resume` ne relance pas une lecture dont le module ou la source a été désactivé ou supprimé depuis.
+
+**Le journal** (origine « Lecteur audio ») note la demande, le début, l’échec et l’arrêt (voix, miroir, déconnexion du miroir, administration, nouvelle lecture, fin, erreur), avec l’hôte du flux seulement : jamais l’adresse complète, qui peut porter un jeton.
+
+**Limites actuelles.** Le miroir seulement : les satellites ne lisent que la voix de Cornelius, en PCM 16 kHz ; leur lecture demandera un transcodage par le serveur. Une seule lecture à la fois. Ni HLS ni liste de lecture. Le module de démonstration [tests/e2e/modules/lecteur_demo](../../tests/e2e/modules/lecteur_demo/index.ts) est un exemple complet.
+
+**Compatibilité.** Un module qui déclare `play` DOIT déclarer `minCoreVersion: '0.4.1'` : un cœur plus ancien ne lit pas `playback` et répondrait par la carte du module, sans rien jouer. Pour l’essayer sur la branche `beta` avant la publication de 0.4.1 (le cœur y annonce encore 0.4.0), omettez provisoirement `minCoreVersion`, ou laissez-le à la dernière version publiée, puis passez-le à `'0.4.1'` à la publication.
+
+**Tester.** `f.invoke('ecouter', { query: 'France Inter' })` rend `{ outcome, tool }` ; `outcome.playback` est la demande contrôlée, ou `null`. Une demande non conforme fait échouer l’appel en `malformed`, ce que `f.contract(outcome)` signale.
+
 ## Les secrets
 
 Déclarez chaque jeton dans `secrets` :
@@ -418,12 +500,15 @@ Déclarez chaque jeton dans `secrets` :
 | `label` | Le jeton précédé de « un » ou « une », 80 caractères au plus |
 | `url` | Facultatif : page d’inscription, en http ou https |
 | `note` | Facultatif : précision courte (40 caractères au plus), par exemple « gratuit » |
+| `optional` | Facultatif, faux par défaut : vrai quand le module fonctionne sans ce jeton, avec moins de fonctions (temps réel, avis…) |
 
-L’administration affiche alors « Ce module a besoin d’… » tant que le jeton manque, et grise « Ajouter une source ». Elle ne voit jamais la valeur.
+L’administration affiche alors « Ce module a besoin d’… » tant que le jeton manque, marque le module « Jeton manquant » et grise « Ajouter une source ». Elle ne voit jamais la valeur.
+
+Un jeton `optional` absent est seulement proposé : « Ce module peut utiliser … Il fonctionne sans, avec moins de fonctions. », sans badge « Jeton manquant » ni blocage de l’ajout d’une source. **Clés et accès → Clés et jetons** le marque « Facultatif ». Un cœur antérieur à 0.4.1 ignore le champ et traite le jeton comme requis : déclarez `minCoreVersion: '0.4.1'` si une source doit pouvoir être créée sans lui, sinon dites dans la fiche qu’il faut saisir le jeton sur un cœur plus ancien.
 
 La déclaration suffit à brancher le jeton : il se saisit dans la carte du module ou dans **Clés et accès → Clés et jetons**, et sinon se lit dans la variable `env` du fichier `.env`. Il est masqué dans le journal dès qu’il est saisi. Les variables réservées au cœur (`OPENAI_API_KEY`, `CORNELIUS_ADMIN_PASSWORD`, `CORNELIUS_PERCEPTION_TOKEN`, `CORNELIUS_IMAGE_GENERATION_TOKEN`) sont ignorées. Documentez la variable, sans valeur, dans [.env.example](../../.env.example) et dans la fiche du module, et testez avec un jeton fictif : absent, refusé, accepté.
 
-Dans le module, un jeton absent DOIT lever `config_invalid`. La syntaxe `${secret:NOM}` et les variables `CORNELIUS_SECRET_<NOM>` sont réservées aux commandes HTTP : `context.secret()` ne les lit pas.
+Dans le module, un jeton requis absent DOIT lever `config_invalid`. Sans un jeton `optional`, le module DOIT répondre quand même avec ce qu’il sait faire, et DEVRAIT dire ce qui manque (« Horaire seulement : sans clé, ni avis ni temps réel. ») ; ses tests couvrent le jeton absent, refusé et accepté. La syntaxe `${secret:NOM}` et les variables `CORNELIUS_SECRET_<NOM>` sont réservées aux commandes HTTP : `context.secret()` ne les lit pas.
 
 ## La recherche assistée
 
@@ -484,6 +569,7 @@ Les mêmes exports qu’avant restent disponibles : `validateAddonDefinition`, `
 
 | Cornelius | Ajouts compatibles v1 |
 | --- | --- |
+| 0.4.1 | `optional` d’un jeton déclaré dans `secrets` : le module fonctionne sans, l’administration ne bloque plus l’ajout d’une source ; [outil de lecture](#loutil-de-lecture) : `play` d’un outil, `context.play`, `playback` de la collecte, commandes communes `player__control` |
 | 0.4.0 | Icônes des cartes et de l’affichage permanent : `icon` sur la valeur et sur les lignes, liste `cardIcons` ; client HTTP : `bytes()`, corps brut d’une réponse (format binaire) ; `createTestModule` accepte une réponse en `Uint8Array` |
 | 0.2.0 | `display` ; `arguments` des outils et `context.args` ; `context.timeZone` ; `refreshAt` de l’affichage permanent ; présentation d’un relevé vide ; fraîcheur jusqu’à 24 heures ; client HTTP : redirections, encodage, `truncated`, `url`, User-Agent, `cacheMs` ; formulaire : listes déroulantes et listes répétées ; `clearLabel` ; `createTestModule` |
 | 0.1.0 | Contrat v1, outil à la demande (`query`), secrets, recherche assistée, affichage permanent, `minCoreVersion` |
@@ -519,6 +605,9 @@ Une nouvelle `dataVersion` force une collecte, et l’ancien relevé n’est plu
 | La source change pendant une lecture | Résultat ignoré, nouvelle lecture à la prochaine demande |
 | Le module lève une exception inattendue | `upstream`, message générique, texte au journal |
 | Le module change de `dataVersion` | Nouvelle collecte ; pas de repli sur l’ancien relevé |
+| Un outil de lecture rend une adresse http | `malformed`, « Données reçues mais illisibles. », détail au journal |
+| Le flux est une liste m3u, pls ou HLS | « Liste de lecture (m3u, pls, HLS) non prise en charge. », dit et noté au journal |
+| La lecture est demandée depuis un satellite | « La lecture se fait sur le miroir, pas sur ce satellite », sans collecte |
 
 ## Annexe : consigne pour un assistant de code
 

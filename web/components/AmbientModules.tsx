@@ -1,6 +1,7 @@
 import { CardIconView } from './card-icons';
-import { useEffect, useMemo, useState } from 'react';
-import type { AmbientDisplay } from '../../shared/addons';
+import { rowKind, valueFit } from './fit';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import type { AmbientDisplay, CardIcon } from '../../shared/addons';
 import { ambientProfile } from '../../shared/ambient';
 import type { MirrorState } from '../../shared/types';
 
@@ -23,6 +24,21 @@ function ageLabel(fetchedAt: string, now: number): string {
   const hours = Math.round(minutes / 60);
   if (hours < 24) return shortAge.format(-hours, 'hour');
   return longAge.format(-Math.round(hours / 24), 'day');
+}
+
+/** Valeur principale, dont la taille suit la longueur et la largeur de la tuile (fit.ts). */
+function AmbientValue({ value, icon }: { value: string; icon?: CardIcon }) {
+  const fit = valueFit(value, !!icon);
+  return (
+    <p
+      className="ambient-value"
+      data-size={fit.long ? 'long' : undefined}
+      style={{ '--value-chars': fit.chars } as CSSProperties}
+    >
+      {icon && <CardIconView name={icon} />}
+      {value}
+    </p>
+  );
 }
 
 /** Informations présentes sur le miroir, indépendantes des cartes et de la voix. */
@@ -52,28 +68,26 @@ export function AmbientModules({ state, now }: { state: MirrorState; now: number
       {displays.map((display) => {
         const content = display.content;
         const status = statusLabel(display);
+        // Une ligne de texte (un titre d’actualité) demande une tuile plus large.
+        const wide = content?.items.some((item) => rowKind(item) === 'text');
         return (
           <section
             key={display.instanceId}
             className="ambient-module"
             data-layout={content?.layout ?? 'metric'}
             data-status={display.status}
+            data-wide={wide || undefined}
             aria-label={display.label}
           >
             {/* Un seul en-tête : le nom choisi pour cette source (« Météo maison »), plus précis
                 que le titre générique du module (« Météo »). */}
             <h2 className="ambient-heading">{display.label}</h2>
-            {content?.value && (
-              <p className="ambient-value">
-                {content.icon && <CardIconView name={content.icon} />}
-                {content.value}
-              </p>
-            )}
+            {content?.value && <AmbientValue value={content.value} icon={content.icon} />}
             {content?.subtitle && <p className="ambient-subtitle">{content.subtitle}</p>}
             {!!content?.items.length && (
               <dl className="ambient-items">
                 {content.items.map((item, index) => (
-                  <div key={index}>
+                  <div key={index} data-row={rowKind(item)}>
                     <dt>
                       {item.icon && <CardIconView name={item.icon} />}
                       {item.label}
