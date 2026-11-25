@@ -340,6 +340,8 @@ export class LiveTransport implements SessionTransport {
       personality?: (profileId: string | null) => PersonalityPreferences;
       /** Modèle de délégation à envoyer (vide : celui du mode) ; sinon celui du contrôleur. */
       delegationModel?: () => string;
+      /** Localive : attendre la réponse avant de réécouter ; undefined : rien n’est envoyé. */
+      waitForReply?: () => boolean | undefined;
     } = {},
     private readonly now: () => number = Date.now,
   ) {}
@@ -589,6 +591,7 @@ export class LiveTransport implements SessionTransport {
         delegationModel:
           this.integrations.delegationModel?.() ?? this.controller.getDelegationModel(),
         endPhrases: this.controller.getEndPhrases(),
+        waitForReply: this.integrations.waitForReply?.(),
       },
     );
   }
@@ -1082,7 +1085,12 @@ export class LiveTransport implements SessionTransport {
     if (internal.type === 'voice.turn_completed')
       this.controller.setAssistantBusy(active.scope, false);
     if (internal.type === 'voice.state') {
-      const phase = internal.state;
+      // Localive : une phrase d’attente (« Je cherche ça… ») n’est pas la réponse, la demande
+      // est toujours en cours : l’orbe reste sur « Je réfléchis ».
+      const phase =
+        internal.state === 'speaking' && internal.interjection === true
+          ? 'thinking'
+          : internal.state;
       if (phase === 'listening' || phase === 'thinking' || phase === 'speaking' || phase === 'idle')
         this.controller.setVoiceActivity(active.scope, phase, 1200);
       this.controller.setAssistantBusy(active.scope, phase === 'thinking');

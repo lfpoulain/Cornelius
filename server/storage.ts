@@ -466,6 +466,12 @@ ${googlePhotosMigration}`,
     enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1))
   ) STRICT;
   INSERT OR IGNORE INTO home_assistant_climate (id) VALUES (1);`,
+  // Localive : micro ignoré de la fin de la demande au début de la réponse ; désactivé.
+  `CREATE TABLE IF NOT EXISTS wait_for_reply_preferences (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1))
+  ) STRICT;
+  INSERT OR IGNORE INTO wait_for_reply_preferences (id) VALUES (1);`,
   // Mot de fin (« merci », « c’est tout ») : désactivé, le comportement existant reste.
   `CREATE TABLE IF NOT EXISTS end_word_preferences (
     id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -900,6 +906,18 @@ export class SessionPreferences {
   setEndWord(enabled: boolean): void {
     this.db
       .prepare('UPDATE end_word_preferences SET enabled = ? WHERE id = 1')
+      .run(Number(enabled));
+  }
+  /** Localive : attendre le début de la réponse avant de réécouter. */
+  getWaitForReply(): boolean {
+    return (
+      this.db.prepare('SELECT enabled FROM wait_for_reply_preferences WHERE id = 1').get()
+        ?.enabled === 1
+    );
+  }
+  setWaitForReply(enabled: boolean): void {
+    this.db
+      .prepare('UPDATE wait_for_reply_preferences SET enabled = ? WHERE id = 1')
       .run(Number(enabled));
   }
   /** Mode voix : la caméra reconnaît la personne qui a dit « Cornelius ». */

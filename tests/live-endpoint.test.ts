@@ -261,3 +261,53 @@ test('la configuration Live suit le modèle imposé, sinon celui du mode', () =>
     'gpt-6-luna',
   );
 });
+
+test('attendre la réponse : réglage enregistré, envoyé à un serveur personnalisé, jamais à OpenAI', async (t) => {
+  const f = await fixture(t);
+  assert.equal(f.controller.snapshot().state.waitForReply, false);
+  const invalid = await f.app.inject({
+    method: 'PATCH',
+    url: '/api/admin/wait-for-reply',
+    headers: f.headers,
+    payload: { enabled: 'oui' },
+  });
+  assert.equal(invalid.statusCode, 400);
+  const saved = await f.app.inject({
+    method: 'PATCH',
+    url: '/api/admin/wait-for-reply',
+    headers: f.headers,
+    payload: { enabled: true },
+  });
+  assert.equal(saved.statusCode, 200, saved.body);
+  assert.equal(saved.json<StateEvent>().state.waitForReply, true);
+  assert.equal(f.controller.isWaitForReply(), true);
+  const localive = (config: ReturnType<typeof liveConfiguration>) =>
+    (config as { localive?: unknown }).localive;
+  assert.equal(localive(liveConfiguration([])), undefined);
+  assert.deepEqual(localive(liveConfiguration([], undefined, 'fast', { waitForReply: true })), {
+    wait_for_reply: true,
+  });
+  // OpenAI ne connaît pas cette option : elle ne part qu’à un serveur Live personnalisé.
+  const sent = () =>
+    localive(
+      (
+        f.live as unknown as {
+          configuration(
+            profileId: string | null,
+            voiceOnly: boolean,
+          ): ReturnType<typeof liveConfiguration>;
+        }
+      ).configuration(null, true),
+    );
+  assert.equal(sent(), undefined);
+  await f.app.inject({
+    method: 'PATCH',
+    url: '/api/admin/live-endpoint',
+    headers: f.headers,
+    payload: { baseUrl: 'http://192.168.1.60:8787/v1' },
+  });
+  assert.deepEqual(sent(), { wait_for_reply: true });
+  // Décoché, Cornelius l’envoie aussi : le réglage par défaut de Localive ne s’applique pas.
+  f.controller.setWaitForReply(false);
+  assert.deepEqual(sent(), { wait_for_reply: false });
+});

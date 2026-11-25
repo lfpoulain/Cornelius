@@ -149,6 +149,11 @@ export interface MirrorState {
   endWord?: boolean;
   /** Formules de fin propres au foyer, en plus de celles reconnues d’office. */
   endPhrases?: string[];
+  /**
+   * Localive : le micro est ignoré de la fin de la demande au début de la réponse (une phrase
+   * d’attente ne le rouvre pas) ; absent : non.
+   */
+  waitForReply?: boolean;
   /** Mode voix : la caméra s’allume au mot d’appel pour reconnaître la personne. */
   voiceRecognition?: boolean;
   /** Ouverture lue en deux questions : ce qui l’ouvre, et qui peut l’ouvrir. */

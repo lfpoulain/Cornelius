@@ -50,6 +50,12 @@ export interface LiveFeatures {
   delegationModel?: string;
   /** Formules de fin propres au foyer, données au modèle avec l’outil conversation__end. */
   endPhrases?: string[];
+  /**
+   * Localive : ignorer le micro de la fin de la demande au début de la réponse. Option propre
+   * à Localive (`session.localive.wait_for_reply`), à ne jamais envoyer à OpenAI ; absente :
+   * rien n’est envoyé et le réglage du serveur s’applique.
+   */
+  waitForReply?: boolean;
 }
 
 /** Consignes ajoutées en voix seule : elles priment sur toutes celles qui parlent de cartes. */
@@ -204,5 +210,8 @@ Les identifiants exacts des sources et des commandes autorisées sont dans la de
     if (config.delegation?.type === 'responses')
       config.delegation.responses.instructions += voiceOnlyDelegation;
   }
+  // Absente du type OpenAI : Localive la lit dans session.start (WebSocket comme WebRTC).
+  if (features.waitForReply !== undefined)
+    Object.assign(config, { localive: { wait_for_reply: features.waitForReply } });
   return config;
 }
