@@ -22,13 +22,29 @@ test('temps de conversation : par jour du foyer et par fournisseur, coût du seu
     usage.add(Number.NaN, 'mistral');
     usage.add(60, 'autre' as 'openai');
     let view = usage.view();
-    assert.deepEqual(view.today, { seconds: 155, sessions: 2, meteredSeconds: 117, cost: null });
-    assert.deepEqual(view.month, { seconds: 155, sessions: 2, meteredSeconds: 117, cost: null });
+    assert.deepEqual(view.today, {
+      seconds: 155,
+      sessions: 2,
+      meteredSeconds: 117,
+      cost: null,
+      xaiSeconds: 0,
+      xaiCost: null,
+    });
+    assert.deepEqual(view.month, {
+      seconds: 155,
+      sessions: 2,
+      meteredSeconds: 117,
+      cost: null,
+      xaiSeconds: 0,
+      xaiCost: null,
+    });
     assert.deepEqual(view.previousMonth, {
       seconds: 90,
       sessions: 1,
       meteredSeconds: 90,
       cost: null,
+      xaiSeconds: 0,
+      xaiCost: null,
     });
     assert.equal(view.perMinute, null);
     assert.equal(view.provider, 'mistral');
@@ -50,6 +66,8 @@ test('temps de conversation : par jour du foyer et par fournisseur, coût du seu
       sessions: 1,
       meteredSeconds: 0,
       cost: 0,
+      xaiSeconds: 0,
+      xaiCost: null,
     });
   } finally {
     db.close();
@@ -82,6 +100,8 @@ test('mesure de clôture : seule une conversation prête est comptée, une erreu
       sessions: 2,
       meteredSeconds: 45,
       cost: null,
+      xaiSeconds: 0,
+      xaiCost: null,
     });
     const failing = voiceUsageMeasure(
       {
@@ -94,6 +114,40 @@ test('mesure de clôture : seule une conversation prête est comptée, une erreu
     );
     assert.doesNotThrow(() => failing('cloture', { seconds: 10, ready: true }));
     assert.equal(errors.length, 1);
+  } finally {
+    db.close();
+  }
+});
+
+test('temps de conversation : Grok Voice compté à part, avec son propre prix par minute', () => {
+  const db = openDatabase(':memory:');
+  try {
+    const now = Date.parse('2026-11-25T20:00:00Z');
+    const usage = new VoiceUsage(
+      db,
+      () => now,
+      () => 'America/Toronto',
+      () => 'xai',
+    );
+    usage.add(90, 'xai');
+    usage.add(60, 'mistral');
+    usage.setPrice(0.02, '$', 0.08);
+    const view = usage.view();
+    assert.equal(view.xaiPerMinute, 0.08);
+    assert.equal(view.perMinute, 0.02);
+    assert.deepEqual(view.today, {
+      seconds: 150,
+      sessions: 2,
+      meteredSeconds: 60,
+      cost: 0.02,
+      xaiSeconds: 90,
+      xaiCost: 0.12,
+    });
+    // Sans prix pour xAI transmis, celui enregistré reste.
+    usage.setPrice(null, '$');
+    assert.equal(usage.view().xaiPerMinute, 0.08);
+    usage.setPrice(null, '$', null);
+    assert.equal(usage.view().today.xaiCost, null);
   } finally {
     db.close();
   }

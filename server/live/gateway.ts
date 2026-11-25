@@ -24,7 +24,7 @@ export interface LiveHandlers {
   failure(): void;
 }
 export interface LiveGateway {
-  provider?: 'openai' | 'mistral';
+  provider?: 'openai' | 'mistral' | 'xai';
   serverAudio?: boolean;
   hangup?(id: string): Promise<void>;
   /** Ouvre la connexion HTTPS que réutilisera la création de session, sans rien créer. */

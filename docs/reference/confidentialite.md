@@ -24,15 +24,15 @@ La caméra est lue par la perception, mais le micro est lu par le navigateur qui
 - **Le mot « Cornelius » ouvre la conversation.** Après **Activer la voix**, le micro reste ouvert pendant la veille. Le son va seulement au serveur, sur l’ordinateur (`127.0.0.1`), puis à la perception qui guette le mot. Rien ne sort de la machine.
 - **Micro gardé prêt** (dans **Quand il écoute → Réglages avancés**). Le micro reste prêt sur l’ordinateur. Le son n’est envoyé à la conversation qu’une fois celle-ci ouverte, avec le début de la phrase.
 - **Sans mot d’appel ni micro gardé prêt.** Le micro préparé est relâché après 15 secondes si aucune conversation ne s’ouvre.
-- **Pendant une conversation.** Le son part chez le fournisseur vocal, le temps de la conversation seulement. Avec OpenAI, le navigateur l’envoie directement ; avec Mistral, il passe par le serveur Cornelius, qui le transmet. Il passe aussi par la détection locale de la parole.
+- **Pendant une conversation.** Le son part chez le fournisseur vocal, le temps de la conversation seulement. Avec OpenAI, le navigateur l’envoie directement ; avec Mistral ou xAI, il passe par le serveur Cornelius, qui le transmet. Il passe aussi par la détection locale de la parole.
 
 **Les satellites audio.** Un satellite envoie le son de son micro à l’ordinateur, par le réseau local et chiffré (WebSocket sécurisé, port `3443`), seulement quand Cornelius écoute « Cornelius » ou pendant sa propre conversation. L’ordinateur y cherche le mot, puis transmet la conversation au fournisseur vocal comme pour le miroir. Une conversation de satellite rattaché à une personne nourrit la mémoire de cette personne ; sinon, elle ne laisse aucun souvenir. En veille, un appui bref sur le bouton du satellite coupe son micro (il n’envoie plus aucun son, même après un redémarrage) ; pendant une conversation, il la ferme. Voir [Les satellites audio](../fonctionnalites/satellites.md).
 
-Pour couper tout envoi vers OpenAI et Mistral, utilisez **Bloquer les services IA** (voir plus bas).
+Pour couper tout envoi vers OpenAI, Mistral et xAI, utilisez **Bloquer les services IA** (voir plus bas).
 
 ## Ce qui part chez le fournisseur vocal, et quand
 
-Le fournisseur vocal est OpenAI par défaut, ou Mistral s’il est choisi dans **Voix et modèles → Voix de Cornelius**. Un seul des deux reçoit une conversation donnée. Voir [Le fournisseur vocal](../fonctionnalites/fournisseur-vocal.md).
+Le fournisseur vocal est OpenAI par défaut, ou Mistral ou xAI s’il est choisi dans **Voix et modèles → Voix de Cornelius**. Un seul reçoit une conversation donnée. Voir [Le fournisseur vocal](../fonctionnalites/fournisseur-vocal.md).
 
 **Pendant une conversation**, le fournisseur reçoit :
 
@@ -43,7 +43,7 @@ Le fournisseur vocal est OpenAI par défaut, ou Mistral s’il est choisi dans *
 - les noms des destinataires d’e-mail et le résultat d’un envoi, jamais leurs adresses ;
 - les recherches sur le web, faites par le fournisseur, si **Modules → Web → Autoriser la recherche web** est activé.
 
-Les conversations sont ouvertes avec l’option `store: false` d’OpenAI, qui demande de ne pas conserver la réponse pour la consulter ensuite. Cette option ne dit rien des autres règles de conservation d’OpenAI : voir les conditions de votre compte. Avec Mistral, chaque fermeture de conversation supprime la session chez Mistral ; ses autres règles de conservation dépendent aussi des conditions de votre compte.
+Les conversations sont ouvertes avec l’option `store: false` d’OpenAI, qui demande de ne pas conserver la réponse pour la consulter ensuite. Cette option ne dit rien des autres règles de conservation d’OpenAI : voir les conditions de votre compte. Avec Mistral, chaque fermeture de conversation supprime la session chez Mistral ; ses autres règles de conservation dépendent aussi des conditions de votre compte. Avec xAI, la fermeture coupe la connexion : xAI ne propose pas de supprimer une session, sa conservation dépend des conditions de votre compte xAI.
 
 **Après une conversation**, si la personne était seule, reconnue, et que sa mémoire est autorisée, le texte de ce qu’elle a dit et ses souvenirs actuels sont envoyés au fournisseur mémoire choisi, qui propose quoi retenir. Ce choix est indépendant de celui de la conversation : il peut revenir à une API compatible OpenAI tenue à la maison, et alors aucun secours ne l’envoie ailleurs par défaut. Ce texte est ensuite effacé. Voir [La mémoire](../fonctionnalites/memoire.md).
 
@@ -78,7 +78,7 @@ Tout est sur l’ordinateur du miroir, dans le dossier `data/` (voir [Configurat
 | Source Google Photos de l’écran de veille | lien partagé et réglages dans la base et ses sauvegardes ; liste et images relayées uniquement en mémoire |
 | Mot de passe de l’administration | le fichier `.env` au départ ; s’il est changé dans **Clés et accès**, une empreinte (scrypt) dans la base, jamais le mot de passe lui-même |
 | Secrets des commandes (`CORNELIUS_SECRET_*`) | le fichier `.env`, jamais dans la base |
-| Clés OpenAI et Mistral, jetons Météo et Transports, mot de passe SMTP | la base locale s’ils sont saisis dans l’administration (ils y passent avant ceux de `.env`), sinon le fichier `.env`. L’administration n’en montre que les quatre derniers caractères, et le journal les masque. |
+| Clés OpenAI, Mistral et xAI, jetons Météo et Transports, mot de passe SMTP | la base locale s’ils sont saisis dans l’administration (ils y passent avant ceux de `.env`), sinon le fichier `.env`. L’administration n’en montre que les quatre derniers caractères, et le journal les masque. |
 
 Sous Linux, la base, ses copies, `.env` et le journal ne sont lisibles que par leur propriétaire.
 
@@ -116,7 +116,7 @@ Tout cela est aussi retiré des copies de sécurité. Les données du foyer (sty
 
 Le journal (rubrique **Journal**, fichier `data/logs/cornelius.log`) ne note que des informations techniques. Avant l’écriture, il masque :
 
-- les clés OpenAI et Mistral, le mot de passe, les jetons de la perception, du générateur d’images, de Météo et de Transports ;
+- les clés OpenAI, Mistral et xAI, le mot de passe, les jetons de la perception, du générateur d’images, de Météo et de Transports ;
 - tout texte qui ressemble à une clé OpenAI ou à un jeton d’accès (`Bearer …`) ;
 - tout champ dont le nom évoque un jeton, un secret, un mot de passe, un cookie, une clé, une transcription, du son, une image ou une signature de visage.
 
@@ -130,7 +130,7 @@ Le miroir, lui, ne demande aucun mot de passe. Le miroir et l’administration r
 
 ## Les dépenses
 
-Cornelius ne bloque jamais une conversation pour son coût. La carte **Voix et modèles → Temps de conversation** compte la durée des conversations par jour et par fournisseur ; elle n’estime un coût que pour le temps passé avec Mistral, facturé à la minute, et seulement si vous saisissez son prix. OpenAI facture aux jetons (voix, délégation, recherche web, images) : aucun coût n’est estimé pour lui, consultez sa console. Fixez vos limites de dépense dans votre compte OpenAI ou Mistral. Avec Mistral, facturé à la minute, une conversation se ferme après 20 secondes sans activité et dure 15 minutes au plus. Les modes **Rapide** et **Ultra rapide** de **Voix et modèles → Délégation : recherches et actions** coûtent plus cher que **Normal**.
+Cornelius ne bloque jamais une conversation pour son coût. La carte **Voix et modèles → Temps de conversation** compte la durée des conversations par jour et par fournisseur ; elle n’estime un coût que pour le temps passé avec Mistral ou xAI, facturés à la minute, et seulement si vous saisissez leur prix. OpenAI facture aux jetons (voix, délégation, recherche web, images) : aucun coût n’est estimé pour lui, consultez sa console. Fixez vos limites de dépense dans votre compte OpenAI, Mistral ou xAI. Avec Mistral ou xAI, facturés à la minute, une conversation se ferme après 20 secondes sans activité et dure 15 minutes au plus. Les modes **Rapide** et **Ultra rapide** de **Voix et modèles → Délégation : recherches et actions** coûtent plus cher que **Normal**.
 
 Le bouton **Bloquer les services IA**, dans le panneau **Conversation** de la rubrique **Quand il écoute** (le seul où ce panneau est complet), ferme la conversation en cours et interdit toute nouvelle connexion à OpenAI et à Mistral, extraction de souvenirs et images OpenAI comprises. Le blocage reste après un redémarrage. **Autoriser les services IA** le lève. La caméra, la reconnaissance et la vision locale continuent de fonctionner.
 

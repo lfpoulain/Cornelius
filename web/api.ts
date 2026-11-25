@@ -125,10 +125,10 @@ const slow = { timeoutMs: SLOW_REQUEST_TIMEOUT_MS };
 
 export const api = {
   voiceUsage: () => request<VoiceUsageView>('/api/admin/voice-usage'),
-  setVoicePrice: (perMinute: number | null, currency: '$' | '€') =>
+  setVoicePrice: (perMinute: number | null, currency: '$' | '€', xaiPerMinute?: number | null) =>
     request<VoiceUsageView>('/api/admin/voice-usage/price', {
       method: 'PATCH',
-      body: JSON.stringify({ perMinute, currency }),
+      body: JSON.stringify({ perMinute, currency, xaiPerMinute }),
     }),
   agent: (profileId: string) =>
     request<AgentAdminView>('/api/admin/agents/' + encodeURIComponent(profileId)),
@@ -296,6 +296,12 @@ export const api = {
     request<StateEvent>('/api/admin/voice-provider', {
       method: 'PATCH',
       body: JSON.stringify({ provider }),
+    }),
+  xaiVoice: () => request<{ voice: string }>('/api/admin/xai-voice'),
+  setXaiVoice: (voice: string) =>
+    request<{ voice: string }>('/api/admin/xai-voice', {
+      method: 'PATCH',
+      body: JSON.stringify({ voice }),
     }),
   speechVoice: (voice: string) =>
     request<StateEvent>('/api/admin/voice', {
