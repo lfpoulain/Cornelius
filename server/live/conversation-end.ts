@@ -61,6 +61,16 @@ const closingWords = new Set([
   'reposer',
   'voilà',
   'cest',
+  // Confirmations courantes : « non, rien d’autre », « très bien, merci », « c’est gentil »,
+  // « ça marche », « merci à toi », « impeccable ».
+  'rien',
+  'autre',
+  'très',
+  'gentil',
+  'marche',
+  'toi',
+  'vous',
+  'impeccable',
 ]);
 /** Ce qui fait d'une phrase une fin d'échange ; « ok » ou « super » seuls ne suffisent pas. */
 const closingMarkers = [
@@ -120,6 +130,16 @@ export function isNewRequest(text: string): boolean {
   if (!question && all.every((word) => fillers.has(word) || closingWords.has(word))) return false;
   const words = all.filter((word) => word.length >= 2 && !fillers.has(word));
   return words.length >= 2 || words.some((word) => word.length >= 4);
+}
+
+/**
+ * Un « oui » (« oui », « euh, oui », « ouais », « attends ») : après « Autre chose ? », la personne
+ * a encore quelque chose à demander et cherche ses mots. « Oui merci » compte aussi.
+ */
+export function isYesAnswer(text: string): boolean {
+  return /^(?:(?:euh|heu|ben|bah|ah|oh) )*(?:oui|ouais|si|attends?)(?: |$)/u.test(
+    normalizePhrase(text),
+  );
 }
 
 /** Casse, accents composés, ponctuation et apostrophes ramenés à des mots séparés d’espaces. */

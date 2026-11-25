@@ -1793,18 +1793,36 @@ test('mot de fin : la conversation se ferme quand Cornelius se tait, malgré une
   assert.equal(f.state().session.phase, 'ready');
 });
 
-test('mot de fin : une réponse qui ne finit pas ferme quand même après 10 s', (t) => {
+test('mot de fin : un outil en cours garde la conversation, un outil bloqué ferme après 30 s', (t) => {
   const f = fixture(t);
   f.controller.setEndWord(true);
   f.engage();
   const scope = f.ready();
   f.controller.setAssistantBusy(scope, true);
   assert.equal(f.controller.requestEnd(scope), true);
-  f.advance(9000);
+  // « Merci… ah, et la météo ? » : la délégation météo tourne encore après 10 s.
+  f.advance(10_000);
+  assert.equal(f.state().session.phase, 'ready');
+  f.advance(19_000);
   assert.equal(f.state().session.phase, 'ready');
   f.advance(1000);
   assert.equal(f.state().session.phase, 'closing');
   assert.equal(f.state().session.reason, 'Fin de conversation demandée.');
+});
+
+test('mot de fin : l’outil fini, la conversation ferme après le court délai habituel', (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  f.engage();
+  const scope = f.ready();
+  f.controller.setAssistantBusy(scope, true);
+  assert.equal(f.controller.requestEnd(scope), true);
+  f.advance(5000);
+  f.controller.setAssistantBusy(scope, false);
+  f.advance(1000);
+  assert.equal(f.state().session.phase, 'ready');
+  f.advance(2000);
+  assert.equal(f.state().session.phase, 'closing');
 });
 
 test('mot de fin : une nouvelle demande l’annule, la conversation continue', (t) => {

@@ -132,6 +132,8 @@ const replyCloseGraceMs = 2_000;
  */
 const endWordGraceMs = 2_000;
 const endWordMaxMs = 10_000;
+/** Outil ou délégation en cours après le mot de fin : fermeture forcée seulement au-delà. */
+const endWordBusyMaxMs = 30_000;
 // Mode voix : délai laissé à la caméra pour reconnaître la personne après le mot d’appel.
 const voiceIdentityWindowMs = 8000;
 
@@ -1958,11 +1960,14 @@ export class SessionController {
       this.endQuietSince = null;
       return false;
     }
-    if (now - this.endRequestedAt >= endWordMaxMs) return true;
+    // Un outil ou une délégation en cours n’est pas coupé au délai habituel : la personne a pu
+    // enchaîner une demande juste après le mot de fin. Un délai plus long reste, contre un outil
+    // bloqué.
     if (this.assistantBusy) {
       this.endQuietSince = null;
-      return false;
+      return now - this.endRequestedAt >= endWordBusyMaxMs;
     }
+    if (now - this.endRequestedAt >= endWordMaxMs) return true;
     this.endQuietSince ??= now;
     return now - this.endQuietSince >= endWordGraceMs;
   }

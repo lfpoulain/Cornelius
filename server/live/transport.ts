@@ -17,6 +17,7 @@ import {
   endConversationTool,
   isClosingPhrase,
   isNewRequest,
+  isYesAnswer,
 } from './conversation-end.js';
 import { illustrationPrompt } from '../image-illustration.js';
 import { validators } from '../../shared/validation.js';
@@ -821,6 +822,8 @@ export class LiveTransport implements SessionTransport {
   private finalize(active: ActiveSession) {
     if (active.finalized || this.active !== active) return;
     this.clearCloseTimer();
+    if (active.userTurnTimer) clearTimeout(active.userTurnTimer);
+    active.userTurnTimer = null;
     this.memory?.close(active.scope);
     active.finalized = true;
     active.abort.abort();
@@ -1210,8 +1213,17 @@ export class LiveTransport implements SessionTransport {
         });
       return;
     }
+    // « Avec plaisir. Autre chose ? » puis « Oui. » : la personne cherche sa demande. Seulement
+    // pour une phrase commencée après conversation__end, qui n'a donc pas pu le provoquer.
+    const yesAfterEnd =
+      active.askedQuestion &&
+      (active.toolEndAt === null || active.userTurnStartedAt > active.toolEndAt) &&
+      isYesAnswer(said);
     // Une nouvelle demande après le mot de fin : la conversation continue.
-    if (!causedToolEnd && isNewRequest(said) && this.controller.cancelEnd(active.scope))
+    if (
+      (yesAfterEnd || (!causedToolEnd && isNewRequest(said))) &&
+      this.controller.cancelEnd(active.scope)
+    )
       this.logs?.write('info', 'session', 'Fin de conversation annulée', {
         interactionId: active.scope.interactionId,
       });
@@ -1379,6 +1391,19 @@ export class LiveTransport implements SessionTransport {
         return;
       }
       const name = typeof item.name === 'string' ? item.name : '';
+      // Un autre outil après le mot de fin (« merci… ah, et la météo ? ») : la personne demande
+      // encore quelque chose, la fin demandée est oubliée, même si la transcription est en retard.
+      if (
+        name !== END_CONVERSATION_TOOL &&
+        name !== 'ui__show_luna_card' &&
+        this.controller.cancelEnd(active.scope)
+      ) {
+        active.toolEndAt = null;
+        this.logs?.write('info', 'session', 'Fin de conversation annulée', {
+          interactionId: active.scope.interactionId,
+          source: 'outil',
+        });
+      }
       let args: unknown = null;
       try {
         args = JSON.parse(item.arguments);
@@ -2075,6 +2100,8 @@ export class LiveTransport implements SessionTransport {
       clearTimeout(this.closeTimer);
       this.closeTimer = null;
     }
+    if (this.active?.userTurnTimer) clearTimeout(this.active.userTurnTimer);
+    if (this.active) this.active.userTurnTimer = null;
     this.onClosed?.();
     this.onClosed = null;
     this.active?.abort.abort();

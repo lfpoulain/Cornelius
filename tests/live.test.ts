@@ -1086,6 +1086,87 @@ test('conversation__end avant la transcription de la phrase : elle ne l’annule
   );
 });
 
+test('mot de fin : une demande enchaînée vite, transcrite en retard, l’annule par son outil', async (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  await f.ready();
+  const call = (delegation: string, callId: string, name: string) => {
+    f.emit({ type: 'session.delegation.created', delegation_id: delegation });
+    f.emit({
+      type: 'response.event',
+      delegation_id: delegation,
+      event: {
+        type: 'response.output_item.done',
+        item: { type: 'function_call', call_id: callId, name, arguments: '{}' },
+      },
+    });
+  };
+  // « Merci. Ah, et la météo de demain ? » : les deux phrases collées, transcrites dans la
+  // fenêtre de retard de l'outil ; seule la délégation météo dit qu'il reste une demande.
+  call('fin', 'end-call', 'conversation__end');
+  await setImmediate();
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Avec plaisir.' });
+  f.advance(600);
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Merci. Ah, et la météo de demain ?' });
+  call('meteo', 'meteo-call', 'weather__read');
+  await setImmediate();
+  assert.ok(
+    f.logs
+      .snapshot()
+      .entries.some(
+        (entry) =>
+          entry.event === 'Fin de conversation annulée' &&
+          (entry.details as { source?: string }).source === 'outil',
+      ),
+  );
+  f.advance(12_000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+});
+
+test('mot de fin : « Oui. » après « Autre chose ? » retient la conversation', async (t) => {
+  const f = fixture(t);
+  f.controller.setEndWord(true);
+  await f.ready();
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Merci.' });
+  f.emit({ type: 'session.delegation.created', delegation_id: 'fin' });
+  f.emit({
+    type: 'response.event',
+    delegation_id: 'fin',
+    event: {
+      type: 'response.output_item.done',
+      item: {
+        type: 'function_call',
+        call_id: 'end-call',
+        name: 'conversation__end',
+        arguments: '{}',
+      },
+    },
+  });
+  await setImmediate();
+  f.emit({ type: 'session.output_transcript.delta', delta: 'Avec plaisir. Autre chose ?' });
+  f.advance(1000);
+  f.emit({ type: 'session.input_transcript.delta', delta: 'Oui.' });
+  await delay(800);
+  assert.ok(
+    f.logs.snapshot().entries.some((entry) => entry.event === 'Fin de conversation annulée'),
+  );
+  f.advance(3000);
+  assert.equal(f.controller.snapshot().state.session.phase, 'ready');
+
+  // « Non merci. » à la même question confirme la fin.
+  const g = fixture(t);
+  g.controller.setEndWord(true);
+  await g.ready();
+  g.emit({ type: 'session.input_transcript.delta', delta: 'Merci.' });
+  g.emit({ type: 'session.output_transcript.delta', delta: 'Avec plaisir. Autre chose ?' });
+  g.advance(1000);
+  g.emit({ type: 'session.input_transcript.delta', delta: 'Non merci.' });
+  await delay(800);
+  g.advance(1000);
+  g.advance(2000);
+  assert.equal(g.controller.snapshot().state.session.phase, 'closing');
+});
+
 test('conversation__end : transcription en retard à chaque tour, la fin tient', async (t) => {
   const f = fixture(t);
   f.controller.setEndWord(true);
