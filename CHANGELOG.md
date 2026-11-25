@@ -6,6 +6,28 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-25 : attendre la réponse avant de réécouter
+
+**Ajouté**
+
+- **Attendre la réponse avant de réécouter** (Administration → Mise en route → Voix de Cornelius, avec Localive). Une fois la demande comprise, une voix dans la pièce ne peut plus l’interrompre ni la remplacer pendant la réflexion. Le micro se rouvre au début de la réponse, qu’on peut toujours couper. Une phrase d’attente de Localive laisse l’orbe sur « Je réfléchis ». Nécessite la version de Localive qui gère `localive.wait_for_reply`. Voir l’[administration](docs/utilisation/administration.md).
+
+### 2026-11-20 : Cornelius portable
+
+**Ajouté**
+
+- **Cornelius portable** : carte de l’administration (rubrique **Clés et accès**) qui met Cornelius sur les téléphones du foyer, partout, sans l’ouvrir à Internet. Elle pilote un `tailscaled` voisin par son interface locale (`CORNELIUS_TAILSCALE_SOCKET`) : lien de connexion au compte et son code QR, publication sur le réseau privé (`serve`, jamais `funnel`) avec un certificat reconnu par les navigateurs, ce qui permet d’installer Cornelius comme application, codes QR pour ajouter un téléphone, liste des appareils, déconnexion avec confirmation. Le nom privé de Cornelius est accepté sans `CORNELIUS_ALLOWED_HOSTS`, et une requête relayée (nom privé, ou `X-Forwarded-For` posé par `tailscale serve`, quel que soit le `Host` choisi par le client) n’est jamais traitée comme venant de la machine : le téléphone passe par l’autorisation d’un appareil, comme sur le réseau local. Fonctionne aussi avec le réseau local fermé (`CORNELIUS_LAN=0`). Cornelius ne retire que la publication qu’il a créée, ne remplace jamais un port 443 déjà publié, retire une publication publique (`funnel`) restée sur son nom, et ne déconnecte que le Tailscale qu’il a lui-même relié au compte (depuis l’état « NeedsLogin »). Quand Tailscale relaie vers la boucle locale, celle-ci n’est traitée comme la machine que si `tailscaled` utilise un TUN du noyau : en espace utilisateur, ou tant que son mode est inconnu, réseau local ouvert ou fermé, tout client passe par l’autorisation d’un appareil. Sans voisin Tailscale, rien ne change. Voir [Cornelius portable](docs/fonctionnalites/cornelius-portable.md). Dépendance ajoutée : `qrcode-generator` (MIT).
+
+### 2026-11-08 : fermer quand on dit merci
+
+**Ajouté**
+
+- **Fin de parole → Fermer quand on dit merci** (désactivée par défaut) : quand la personne clôt l’échange sans nouvelle demande (« merci », « c’est tout », « au revoir », « bonne nuit »), Cornelius répond d’une formule courte puis la conversation se ferme 2 s après la fin de sa réponse, au plus tard 10 s après. La parole entendue dans la pièce ne la retient pas : utile sur un satellite quand on parle ensuite à quelqu’un d’autre. La fin est reconnue par le serveur dans la transcription (une phrase faite seulement d’une formule de fin), ou par le modèle avec l’outil vocal `conversation__end`. Route `PATCH /api/admin/end-word` et champ `endWord` de l’état. **Autres formules de fin** : celles du foyer, une par ligne (20 au plus, 60 caractères), reconnues quand elles forment toute la phrase et données au modèle ; route `PATCH /api/admin/end-word/phrases`, champ `endPhrases`, table `end_word_phrases`. Le réglage vaut à partir de la conversation suivante.
+
+## 0.4.1 · 2026-11-25
+
+Cornelius fait écouter la radio, un podcast ou un son sur le miroir, et les modules gagnent l’outil de lecture et les jetons facultatifs. La voix Mistral fonctionne enfin, et le miroir ne se dit plus « pas configuré » avec une clé Mistral seule. L’administration suit le serveur Live (OpenAI, Localive ou un autre serveur compatible), et le miroir soigne ses cartes et ses informations permanentes.
+
 ### 2026-11-24 : informations permanentes adaptées au contenu
 
 **Corrigé**
@@ -40,11 +62,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 - **Miroir : une étiquette longue ne coupe plus la valeur.** Sur les lignes de l’affichage permanent et des cartes, la valeur (un prix, une heure) garde sa largeur ; seule l’étiquette se replie sur deux lignes, puis se termine par « … ». Les pense-bêtes du jour gardent l’heure entière et replient leur texte ([#59](https://github.com/lfpoulain/Cornelius/issues/59), signalé par [LucQuebec](https://github.com/LucQuebec)).
 
-### 2026-11-20 : Cornelius portable
+### 2026-11-23 : la voix Mistral enfin audible, miroir honnête
 
-**Ajouté**
+**Corrigé**
 
-- **Cornelius portable** : carte de l’administration (rubrique **Clés et accès**) qui met Cornelius sur les téléphones du foyer, partout, sans l’ouvrir à Internet. Elle pilote un `tailscaled` voisin par son interface locale (`CORNELIUS_TAILSCALE_SOCKET`) : lien de connexion au compte et son code QR, publication sur le réseau privé (`serve`, jamais `funnel`) avec un certificat reconnu par les navigateurs, ce qui permet d’installer Cornelius comme application, codes QR pour ajouter un téléphone, liste des appareils, déconnexion avec confirmation. Le nom privé de Cornelius est accepté sans `CORNELIUS_ALLOWED_HOSTS`, et une requête relayée (nom privé, ou `X-Forwarded-For` posé par `tailscale serve`, quel que soit le `Host` choisi par le client) n’est jamais traitée comme venant de la machine : le téléphone passe par l’autorisation d’un appareil, comme sur le réseau local. Fonctionne aussi avec le réseau local fermé (`CORNELIUS_LAN=0`). Cornelius ne retire que la publication qu’il a créée, ne remplace jamais un port 443 déjà publié, retire une publication publique (`funnel`) restée sur son nom, et ne déconnecte que le Tailscale qu’il a lui-même relié au compte (depuis l’état « NeedsLogin »). Quand Tailscale relaie vers la boucle locale, celle-ci n’est traitée comme la machine que si `tailscaled` utilise un TUN du noyau : en espace utilisateur, ou tant que son mode est inconnu, réseau local ouvert ou fermé, tout client passe par l’autorisation d’un appareil. Sans voisin Tailscale, rien ne change. Voir [Cornelius portable](docs/fonctionnalites/cornelius-portable.md). Dépendance ajoutée : `qrcode-generator` (MIT).
+- **Voix Mistral** : la dépendance `@livekit/rtc-node` manquait. Le SDK de Mistral l’exige pour toute session vocale Node et la refuse avant même d’appeler l’API : chaque conversation Mistral échouait en silence, quelle que soit la clé. Elle s’installe maintenant avec Cornelius ([#61](https://github.com/lfpoulain/Cornelius/pull/61), par [gedar52](https://github.com/gedar52)).
+- **Miroir** : avec une clé Mistral et aucune clé OpenAI, le miroir annonçait à tort « Cornelius n’est pas encore configuré ». Il suit désormais la clé du fournisseur vocal choisi, comme la liste de préparation et l’administration, et un serveur qui ne diffuse pas encore sa configuration ne bloque pas non plus.
 
 ## 0.4.0 · 2026-11-20
 

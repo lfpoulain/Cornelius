@@ -62,10 +62,52 @@ export function VoiceSettings({ state, run }: { state: MirrorState; run: RunActi
           <>
             <LiveEndpointSettings run={run} />
             <SpeechVoiceField voice={voice} run={run} />
+            <WaitForReplyField enabled={state.waitForReply === true} run={run} />
           </>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Localive seulement : le micro est ignoré de la fin de la demande au début de la réponse.
+ * Localive l’applique lui-même, au moment où il valide la fin de la phrase.
+ */
+function WaitForReplyField({ enabled, run }: { enabled: boolean; run: RunAction }) {
+  const { view } = useLiveEndpoint();
+  if (view?.kind !== 'localive') return null;
+  return (
+    <label className="admin-mode-option admin-wake-option">
+      <input
+        type="checkbox"
+        aria-label="Attendre la réponse avant de réécouter"
+        aria-describedby="wait-for-reply-detail"
+        checked={enabled}
+        onChange={(event) => {
+          const next = event.target.checked;
+          void run(
+            next
+              ? 'Cornelius attendra sa réponse avant de réécouter.'
+              : 'Cornelius écoute aussi pendant qu’il réfléchit.',
+            () => api.waitForReply(next),
+            { key: 'wait-for-reply', payload: { enabled: next } },
+          );
+        }}
+      />
+      <span className="admin-mode-card">
+        <span className="admin-mode-top">
+          <strong>Attendre la réponse avant de réécouter</strong>
+          <span className="admin-checkbox" aria-hidden="true" />
+        </span>
+        <span className="admin-mode-detail" id="wait-for-reply-detail">
+          Une fois votre demande comprise, Cornelius n’écoute plus pendant qu’il réfléchit : une
+          voix dans la pièce ne peut ni l’interrompre ni remplacer votre demande. Une phrase
+          d’attente (« Je cherche ça… ») ne rouvre pas le micro ; la réponse le rouvre, et vous
+          pouvez alors la couper. S’applique à la prochaine conversation.
+        </span>
+      </span>
+    </label>
   );
 }
 

@@ -365,6 +365,21 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ enabled }),
     }),
+  endWord: (enabled: boolean) =>
+    request<StateEvent>('/api/admin/end-word', {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    }),
+  endPhrases: (phrases: string[]) =>
+    request<StateEvent>('/api/admin/end-word/phrases', {
+      method: 'PATCH',
+      body: JSON.stringify({ phrases }),
+    }),
+  waitForReply: (enabled: boolean) =>
+    request<StateEvent>('/api/admin/wait-for-reply', {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    }),
   visionMode: (mode: VisionMode) =>
     request<{ ok: boolean }>('/api/admin/vision', {
       method: 'PATCH',
