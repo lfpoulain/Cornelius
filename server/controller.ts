@@ -85,6 +85,8 @@ export interface SessionPreferencesStore {
   setSilenceClose?(settings: SilenceClose): void;
   getReplyClose?(): boolean;
   setReplyClose?(enabled: boolean): void;
+  getWaitForReply?(): boolean;
+  setWaitForReply?(enabled: boolean): void;
   getVoiceRecognition?(): boolean;
   setVoiceRecognition?(enabled: boolean): void;
   getScreensaver?(): ScreensaverSettings;
@@ -265,6 +267,8 @@ export class SessionController {
   private satelliteSilenceMs: number | null = null;
   private voiceRecognition = false;
   private replyClose = false;
+  /** Localive : micro ignoré de la fin de la demande au début de la réponse. */
+  private waitForReply = false;
   // Fermeture après la première réponse : la personne a parlé, puis Cornelius lui a répondu.
   private userTurnHeard = false;
   private replyHeard = false;
@@ -316,6 +320,7 @@ export class SessionController {
     this.silenceClose = { ...(preferences?.getSilenceClose?.() ?? DEFAULT_SILENCE_CLOSE) };
     this.voiceRecognition = preferences?.getVoiceRecognition?.() ?? false;
     this.replyClose = preferences?.getReplyClose?.() ?? false;
+    this.waitForReply = preferences?.getWaitForReply?.() ?? false;
     this.delegationMode = preferences?.getDelegationMode?.() ?? DEFAULT_DELEGATION_MODE;
     this.delegationModel = preferences?.getDelegationModel?.() ?? '';
     this.timings = { ...(preferences?.getPresenceTimings?.() ?? DEFAULT_PRESENCE_TIMINGS) };
@@ -397,6 +402,10 @@ export class SessionController {
     return this.webSearch;
   }
 
+  isWaitForReply(): boolean {
+    return this.waitForReply;
+  }
+
   greetingMode(): GreetingMode {
     return this.greeting;
   }
@@ -469,6 +478,7 @@ export class SessionController {
       knownPeopleOnly: this.knownPeopleOnly,
       silenceClose: { ...this.silenceClose },
       replyClose: this.replyClose,
+      waitForReply: this.waitForReply,
       voiceRecognition: this.voiceRecognition,
       opening: this.opening(),
       wakeWord: {
@@ -1148,6 +1158,13 @@ export class SessionController {
   setReplyClose(enabled: boolean): void {
     this.preferences?.setReplyClose?.(enabled);
     this.replyClose = enabled;
+    this.publish();
+  }
+
+  /** S’applique à la conversation suivante, comme la voix. */
+  setWaitForReply(enabled: boolean): void {
+    this.preferences?.setWaitForReply?.(enabled);
+    this.waitForReply = enabled;
     this.publish();
   }
 

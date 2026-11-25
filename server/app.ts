@@ -485,6 +485,10 @@ export async function createApp(
       player,
       personality: (id) => personality.get(id),
       delegationModel,
+      // Option propre à Localive : jamais envoyée à OpenAI. Envoyée active comme inactive, elle
+      // remplace le réglage par défaut du serveur Localive : Cornelius décide.
+      waitForReply: () =>
+        liveEndpoint().source === 'default' ? undefined : controller.isWaitForReply(),
     },
     now,
   );
@@ -1728,6 +1732,12 @@ export async function createApp(
     if (!enabledSchema(request.body))
       return reply.code(400).send({ error: 'Fermeture après la réponse invalide.' });
     controller.setReplyClose(request.body.enabled);
+    return controller.snapshot();
+  });
+  app.patch('/api/admin/wait-for-reply', { preHandler: requireAdmin }, async (request, reply) => {
+    if (!enabledSchema(request.body))
+      return reply.code(400).send({ error: 'Réglage « Attendre la réponse » invalide.' });
+    controller.setWaitForReply(request.body.enabled);
     return controller.snapshot();
   });
   const greetingSchema = compile<{ mode: GreetingMode }>({

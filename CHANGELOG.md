@@ -6,7 +6,9 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
-Rien pour l’instant.
+**Ajouté**
+
+- **Attendre la réponse avant de réécouter** (Administration → Mise en route → Voix de Cornelius, avec Localive). Une fois la demande comprise, une voix dans la pièce ne peut plus l’interrompre ni la remplacer pendant la réflexion. Le micro se rouvre au début de la réponse, qu’on peut toujours couper. Une phrase d’attente de Localive laisse l’orbe sur « Je réfléchis ». Nécessite la version de Localive qui gère `localive.wait_for_reply`. Voir l’[administration](docs/utilisation/administration.md).
 
 ## 0.4.1 · 2026-11-25
 
