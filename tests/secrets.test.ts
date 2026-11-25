@@ -239,7 +239,6 @@ test('clés : réservées à l’administration, noms inconnus et valeurs invali
 
 test('jeton par source (perSource) : priorité, repli module, isolation, masquage et suppression', async (t) => {
   const modulesDir = mkdtempSync(join(tmpdir(), 'cornelius-persource-mod-'));
-  t.after(() => rmSync(modulesDir, { recursive: true, force: true }));
   const modDir = join(modulesDir, 'photo_demo');
   mkdirSync(modDir, { recursive: true });
   writeFileSync(
@@ -299,6 +298,9 @@ test('jeton par source (perSource) : priorité, repli module, isolation, masquag
 
   const databasePath = join(modulesDir, 'cornelius.sqlite');
   const f = await fixture(t, { modulesDir, databasePath });
+  // Après la fermeture du serveur (crochet enregistré avant) : sous Windows, une base SQLite
+  // encore ouverte ne se supprime pas.
+  t.after(() => rmSync(modulesDir, { recursive: true, force: true }));
   const keyAlice = 'immich-secret-alice-1111';
   const keyBob = 'immich-secret-bob-2222';
   const keyModule = 'immich-secret-module-9999';
