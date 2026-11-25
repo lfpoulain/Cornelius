@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+Rien pour l’instant.
+
+## 0.4.1 · 2026-11-25
+
+Cornelius fait écouter la radio, un podcast ou un son sur le miroir, et les modules gagnent l’outil de lecture et les jetons facultatifs. La voix Mistral fonctionne enfin, et le miroir ne se dit plus « pas configuré » avec une clé Mistral seule. L’administration suit le serveur Live (OpenAI, Localive ou un autre serveur compatible), et le miroir soigne ses cartes et ses informations permanentes.
+
 ### 2026-11-24 : informations permanentes adaptées au contenu
 
 **Corrigé**
