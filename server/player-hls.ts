@@ -114,7 +114,15 @@ const droppedTags = [
   '#EXT-X-I-FRAME-STREAM-INF',
   '#EXT-X-IMAGE-STREAM-INF',
   '#EXT-X-SESSION-DATA',
+  '#EXT-X-CONTENT-STEERING',
 ];
+
+/**
+ * Attribut qui nomme une adresse (`URI`, `SERVER-URI`, `X-ASSET-URI`, `X-ASSET-LIST`…) : une
+ * balise qui en porte un sans être réécrite ci-dessous est retirée, pour qu'aucune adresse
+ * d'origine n'atteigne le miroir.
+ */
+const ADDRESS_ATTRIBUTE = /(^|-)URI$|^X-ASSET-LIST$/u;
 
 /** Codecs vidéo : une variante qui en porte un est retirée s'il reste une variante audio. */
 const VIDEO_CODECS = /\b(avc1|avc3|hvc1|hev1|dvh1|dvhe|vp08|vp09|vp8|vp9|av01)\b/iu;
@@ -161,8 +169,9 @@ function resolve(address: string, base: URL): string {
 
 /**
  * Réécrit une liste HLS : chaque adresse, résolue sur l'adresse finale de la liste, devient
- * `link(adresse, rôle)`. Refuse une liste chiffrée ; retire les variantes vidéo (s'il reste
- * une variante audio), les images, la faible latence et les sous-titres ; ajoute `BANDWIDTH`
+ * `link(adresse, rôle)`. Refuse une liste chiffrée ou à variables (`EXT-X-DEFINE`) ; retire
+ * les variantes vidéo (s'il reste une variante audio), les images, la faible latence, les
+ * sous-titres et toute autre balise qui nomme une adresse ; ajoute `BANDWIDTH`
  * à une variante qui n'en a pas (hls.js l'exige).
  */
 export function rewritePlaylist(
@@ -199,6 +208,8 @@ export function rewritePlaylist(
     if (!line.startsWith('#EXT')) continue; // commentaire
     const name = tagName(line);
     if (droppedTags.includes(name)) continue;
+    if (name === '#EXT-X-DEFINE')
+      throw new PlayerStreamError('Liste HLS à variables (EXT-X-DEFINE) non prise en charge.', 415);
     if (name === '#EXT-X-KEY' || name === '#EXT-X-SESSION-KEY') {
       const method = (attributes(line).get('METHOD') ?? 'NONE').toUpperCase();
       if (method !== 'NONE')
@@ -225,6 +236,7 @@ export function rewritePlaylist(
       out.push(attributes(line).has('BANDWIDTH') ? line : line.replace(':', ':BANDWIDTH=1,'));
       continue;
     }
+    if ([...attributes(line).keys()].some((key) => ADDRESS_ATTRIBUTE.test(key))) continue;
     out.push(line);
   }
   return out.join('\n') + '\n';

@@ -50,6 +50,7 @@ Une conversation tenue par un **satellite** dans une autre pièce ne change rien
 | « Flux introuvable », « Le flux est injoignable » | Le service du module ne répond pas ; réessayez plus tard ou signalez-le à l’auteur du module |
 | « Liste de lecture non prise en charge » | Le module fournit une liste au lieu d’un flux : à corriger dans le module |
 | « Flux chiffré (EXT-X-KEY) non pris en charge » | Ce service protège sa diffusion HLS : le miroir ne peut pas la lire |
+| « Format audio illisible par le miroir » | Les morceaux du flux HLS ne se décodent pas dans ce navigateur : signalez le poste à l’auteur du module |
 | « Le miroir n’est pas connecté » | Ouvrez la page du miroir |
 
 Chaque lecture laisse une trace dans **Journal**, origine « Lecteur audio » : la demande, le début, l’échec éventuel et l’arrêt, avec le nom du service seulement.

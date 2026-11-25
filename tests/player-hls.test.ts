@@ -221,6 +221,42 @@ test('hls : liste chiffrée refusée avec un message clair, METHOD=NONE accepté
   assert.throws(() => rewritePlaylist('<html>', base, link), /pas une liste HLS/u);
 });
 
+test('hls : aucune autre balise ne laisse passer une adresse d’origine', () => {
+  links.length = 0;
+  const base = new URL('https://cdn.example/a.m3u8');
+  const out = rewritePlaylist(
+    [
+      '#EXTM3U',
+      '#EXT-X-CONTENT-STEERING:SERVER-URI="https://pilote.example/steer",PATHWAY-ID="A"',
+      '#EXT-X-DATERANGE:ID="pub",START-DATE="2026-11-25T10:00:00Z",X-ASSET-URI="https://pub.example/a.m3u8"',
+      '#EXT-X-DATERANGE:ID="liste",START-DATE="2026-11-25T10:00:00Z",X-ASSET-LIST="https://pub.example/l.json"',
+      '#EXT-X-DATERANGE:ID="titre",START-DATE="2026-11-25T10:00:00Z",DURATION=180',
+      '#EXT-X-PROGRAM-DATE-TIME:2026-11-25T10:00:00Z',
+      '#EXTINF:6,',
+      's.ts',
+    ].join('\n'),
+    base,
+    link,
+  );
+  assert.ok(!out.includes('example'), out);
+  assert.ok(!out.includes('#EXT-X-CONTENT-STEERING'));
+  assert.equal(out.match(/#EXT-X-DATERANGE/gu)?.length, 1, 'la plage sans adresse reste');
+  assert.match(out, /#EXT-X-PROGRAM-DATE-TIME/u);
+  // Une liste à variables : ses adresses ne se résolvent pas sans substitution.
+  assert.throws(
+    () =>
+      rewritePlaylist(
+        '#EXTM3U\n#EXT-X-DEFINE:NAME="h",VALUE="https://cdn.example"\n#EXTINF:6,\n{$h}/s.ts\n',
+        base,
+        link,
+      ),
+    (error: unknown) =>
+      error instanceof PlayerStreamError &&
+      error.status === 415 &&
+      /EXT-X-DEFINE/u.test(error.message),
+  );
+});
+
 // --- Morceaux --------------------------------------------------------------------------------
 
 /** Trois paquets TS de 188 octets. */
@@ -497,6 +533,12 @@ test('routes hls : liste chiffrée ou trop lourde refusée, rien ne change pour 
   const m3u = await f.app.inject(`/api/player/${direct}/stream`);
   assert.equal(m3u.statusCode, 415);
   assert.match(m3u.json().error, /m3u, pls/u);
+  // Chaque voie ne lit que les siens : un flux direct n'a pas de liste HLS, et l'inverse.
+  const before = f.seen.length;
+  assert.equal((await f.app.inject(`/api/player/${direct}/hls`)).statusCode, 404);
+  const hls = f.start();
+  assert.equal((await f.app.inject(`/api/player/${hls}/stream`)).statusCode, 404);
+  assert.equal(f.seen.length, before, 'rien n’est contacté par la mauvaise voie');
 });
 
 test('hls : une adresse est HLS par son chemin .m3u8, paramètres non compris', () => {

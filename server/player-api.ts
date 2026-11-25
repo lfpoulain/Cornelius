@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { compile } from '../shared/validation.js';
 import type { DiagnosticLog } from './logs.js';
 import type { Player } from './player.js';
-import { hostOf } from './player.js';
+import { hostOf, isHlsAddress } from './player.js';
 import {
   fetchImage,
   forwardedHeaders,
@@ -110,6 +110,9 @@ export function registerPlayer(
     async (request, reply) => {
       const playing = player.playing(request.params.id);
       if (!playing) return reply.code(404).send({ error: 'Rien ne joue sous ce nom.' });
+      // Les listes HLS ne se lisent que sur cette route, et cette route ne lit qu'elles.
+      if (!isHlsAddress(playing.url))
+        return reply.code(404).send({ error: 'Ce flux n’est pas une liste HLS.' });
       return servePlaylist(request, reply, request.params.id, playing.url);
     },
   );
@@ -151,6 +154,8 @@ export function registerPlayer(
     async (request, reply) => {
       const playing = player.playing(request.params.id);
       if (!playing) return reply.code(404).send({ error: 'Rien ne joue sous ce nom.' });
+      if (isHlsAddress(playing.url))
+        return reply.code(404).send({ error: 'Un flux HLS se lit sous /hls.' });
       const abort = new AbortController();
       // Le miroir coupe (arrêt, nouvelle lecture, page fermée) : le flux amont aussi.
       request.raw.on('close', () => abort.abort());
