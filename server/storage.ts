@@ -48,6 +48,7 @@ import { secretsMigration } from './secrets.js';
 import { mailMigration, mailRecipientsMigration } from './mail-store.js';
 import { alarmsMigration } from './alarms-store.js';
 import { trustedDevicesMigration } from './trusted-devices.js';
+import { portableOwnershipMigration } from './tailscale.js';
 import { satellitesMigration } from './satellites-store.js';
 import {
   screensaverChoicesMigration,
@@ -484,6 +485,8 @@ ${googlePhotosMigration}`,
     phrases TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(phrases))
   ) STRICT;
   INSERT OR IGNORE INTO end_word_phrases (id) VALUES (1);`,
+  // Cornelius portable : le tailscaled que Cornelius a lui-même relié au compte.
+  portableOwnershipMigration,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */

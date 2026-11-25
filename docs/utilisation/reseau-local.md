@@ -55,6 +55,7 @@ Ajoutez `CORNELIUS_LAN=0` dans `.env`, puis redémarrez Cornelius : seul l’ord
 
 ## Voir aussi
 
+- [Cornelius portable](../fonctionnalites/cornelius-portable.md) : hors de la maison, avec un certificat reconnu, sans rien ouvrir sur Internet.
 - [L’administration](administration.md)
 - [Le miroir](miroir.md)
 - [Configuration](../reference/configuration.md#réseau-local)
