@@ -50,6 +50,17 @@ export class SecretStore {
     this.db.prepare('DELETE FROM secrets WHERE name = ?').run(name);
     this.changed(name);
   }
+  /** Supprime tous les jetons attachés à une source de module lors de sa suppression. */
+  deleteForSource(instanceId: string): void {
+    const prefix = sourceSecretPrefix(instanceId);
+    const names = this.db
+      .prepare('SELECT name FROM secrets WHERE name LIKE ?')
+      .all(`${prefix}%`)
+      .map((row) => String(row.name));
+    if (names.length === 0) return;
+    this.db.prepare('DELETE FROM secrets WHERE name LIKE ?').run(`${prefix}%`);
+    for (const name of names) this.changed(name);
+  }
   /** Toutes les valeurs connues, pour les masquer dans le journal. */
   values(): string[] {
     return this.db
@@ -64,6 +75,16 @@ export class SecretStore {
   private changed(name: string) {
     for (const listener of this.listeners) listener(name);
   }
+}
+
+/** Préfixe interne des jetons stockés par source dans SecretStore (jamais dans addon_instances.config). */
+export function sourceSecretPrefix(instanceId: string): string {
+  return `addon-source:${instanceId}:`;
+}
+
+/** Nom interne dans SecretStore d’un jeton propre à une source de module. */
+export function sourceSecretKey(instanceId: string, secretName: string): string {
+  return `${sourceSecretPrefix(instanceId)}${secretName}`;
 }
 
 /** Valeur acceptée : une ligne, sans espace, de 8 à 512 caractères. */

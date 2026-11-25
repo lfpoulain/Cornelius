@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-25 : jetons par source
+
+**Ajouté**
+
+- **Modules : jeton par source.** Un jeton déclaré dans `secrets` peut porter `perSource: true` : il se saisit alors aussi dans le formulaire de chaque source (une clé API par personne, par exemple pour une photothèque Immich). `context.secret()` lit d’abord le jeton de la source, puis celui du module (administration, puis `.env`) : un foyer avec une seule clé n’a rien à changer. Le jeton de la source est rangé à part, jamais dans la configuration, masqué dans le journal, supprimé avec la source ou son profil ; l’administration n’en montre que « Configuré · …abcd ». Ajout compatible `apiVersion: 1`. Voir la [référence](docs/modules/reference.md#les-secrets) ([#58](https://github.com/lfpoulain/Cornelius/issues/58), par [ewan-berthomieu](https://github.com/ewan-berthomieu)).
+
 ### 2026-11-25 : attendre la réponse avant de réécouter
 
 **Ajouté**

@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 import { createApp } from '../server/app.js';
+import { validateAddonDefinition } from '../server/addons/registry.js';
 import type { AppConfig } from '../server/config.js';
-import { secretValueError } from '../server/secrets.js';
+import { secretValueError, sourceSecretKey } from '../server/secrets.js';
 
 const origin = 'http://localhost';
 const password = 'mot-de-passe-cles';
@@ -233,4 +235,295 @@ test('clés : réservées à l’administration, noms inconnus et valeurs invali
     payload: { value: 'sk' },
   });
   assert.equal(invalid.statusCode, 400);
+});
+
+test('jeton par source (perSource) : priorité, repli module, isolation, masquage et suppression', async (t) => {
+  const modulesDir = mkdtempSync(join(tmpdir(), 'cornelius-persource-mod-'));
+  const modDir = join(modulesDir, 'photo_demo');
+  mkdirSync(modDir, { recursive: true });
+  writeFileSync(
+    join(modDir, 'index.ts'),
+    `export default {
+      apiVersion: 1,
+      id: 'photo_demo',
+      version: '1.0.0',
+      sourceLabel: 'Photothèque',
+      configVersion: 1,
+      dataVersion: 1,
+      freshMs: 60000,
+      configSchema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: { album: { type: 'string', maxLength: 40 } },
+      },
+      configDefaults: { album: 'tous' },
+      dataSchema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['tail'],
+        properties: { tail: { type: 'string' } },
+      },
+      secrets: [
+        {
+          name: 'apiKey',
+          env: 'CORNELIUS_PHOTO_DEMO_KEY',
+          label: 'une clé API Photo',
+          perSource: true,
+        },
+      ],
+      tools: [
+        {
+          name: 'read',
+          description: 'Lire la photothèque.',
+          parameters: { type: 'object', additionalProperties: false, properties: {} },
+        },
+      ],
+      async collect(context) {
+        const key = context.secret('apiKey');
+        if (!key) throw new Error('Clé absente');
+        return { data: { tail: key.slice(-6) } };
+      },
+      present(snapshot) {
+        return {
+          title: 'Photos',
+          primaryValue: String(snapshot.data?.tail ?? ''),
+          subtitle: null,
+          description: null,
+          items: [],
+          summary: 'OK',
+        };
+      },
+    };\n`,
+  );
+
+  const databasePath = join(modulesDir, 'cornelius.sqlite');
+  const f = await fixture(t, { modulesDir, databasePath });
+  // Après la fermeture du serveur (crochet enregistré avant) : sous Windows, une base SQLite
+  // encore ouverte ne se supprime pas.
+  t.after(() => rmSync(modulesDir, { recursive: true, force: true }));
+  const keyAlice = 'immich-secret-alice-1111';
+  const keyBob = 'immich-secret-bob-2222';
+  const keyModule = 'immich-secret-module-9999';
+
+  // 1. Jeton requis : refusé sans jeton de source ni repli module ; valeur invalide refusée.
+  const missing = await f.app.inject({
+    method: 'POST',
+    url: '/api/admin/addons/instances',
+    headers: f.headers,
+    payload: {
+      addonId: 'photo_demo',
+      profileId: null,
+      ref: 'alice',
+      label: 'Alice',
+      config: { album: 'vacances' },
+    },
+  });
+  assert.equal(missing.statusCode, 400);
+
+  const tooShort = await f.app.inject({
+    method: 'POST',
+    url: '/api/admin/addons/instances',
+    headers: f.headers,
+    payload: {
+      addonId: 'photo_demo',
+      profileId: null,
+      ref: 'alice',
+      label: 'Alice',
+      config: { album: 'vacances' },
+      secrets: { apiKey: 'court' },
+    },
+  });
+  assert.equal(tooShort.statusCode, 400);
+
+  // 2. Deux sources avec deux clés différentes : isolation + aucune fuite dans la réponse ni config.
+  const createdAlice = await f.app.inject({
+    method: 'POST',
+    url: '/api/admin/addons/instances',
+    headers: f.headers,
+    payload: {
+      addonId: 'photo_demo',
+      profileId: null,
+      ref: 'alice',
+      label: 'Alice',
+      config: { album: 'vacances' },
+      secrets: { apiKey: keyAlice },
+    },
+  });
+  assert.equal(createdAlice.statusCode, 201);
+  assert.ok(!createdAlice.body.includes(keyAlice));
+  const alice = createdAlice.json();
+  assert.deepEqual(alice.secrets, { apiKey: { configured: true, hint: '1111' } });
+  assert.deepEqual(alice.config, { album: 'vacances' });
+
+  const createdBob = await f.app.inject({
+    method: 'POST',
+    url: '/api/admin/addons/instances',
+    headers: f.headers,
+    payload: {
+      addonId: 'photo_demo',
+      profileId: null,
+      ref: 'bob',
+      label: 'Bob',
+      config: { album: 'famille' },
+      secrets: { apiKey: keyBob },
+    },
+  });
+  assert.equal(createdBob.statusCode, 201);
+  assert.ok(!createdBob.body.includes(keyBob));
+  const bob = createdBob.json();
+  assert.deepEqual(bob.secrets, { apiKey: { configured: true, hint: '2222' } });
+
+  const testAlice = (
+    await f.app.inject({
+      method: 'POST',
+      url: `/api/admin/addons/instances/${alice.id}/test`,
+      headers: f.headers,
+    })
+  ).json();
+  const testBob = (
+    await f.app.inject({
+      method: 'POST',
+      url: `/api/admin/addons/instances/${bob.id}/test`,
+      headers: f.headers,
+    })
+  ).json();
+  assert.equal(testAlice.snapshot.data.tail, 'e-1111');
+  assert.equal(testBob.snapshot.data.tail, 'b-2222');
+
+  // 3. Repli module : sans repli, effacer le jeton requis de la source est refusé.
+  const clearWithoutFallback = await f.app.inject({
+    method: 'PATCH',
+    url: `/api/admin/addons/instances/${alice.id}`,
+    headers: f.headers,
+    payload: { secrets: { apiKey: null } },
+  });
+  assert.equal(clearWithoutFallback.statusCode, 400);
+
+  // Ajout du jeton au niveau du module : Alice garde la priorité sur sa clé ; une nouvelle source
+  // sans clé propre utilise le repli module.
+  const saveModule = await f.app.inject({
+    method: 'PUT',
+    url: '/api/admin/secrets/CORNELIUS_PHOTO_DEMO_KEY',
+    headers: f.headers,
+    payload: { value: keyModule },
+  });
+  assert.equal(saveModule.statusCode, 200);
+
+  const testAlicePriority = (
+    await f.app.inject({
+      method: 'POST',
+      url: `/api/admin/addons/instances/${alice.id}/test`,
+      headers: f.headers,
+    })
+  ).json();
+  assert.equal(testAlicePriority.snapshot.data.tail, 'e-1111');
+
+  const createdShared = await f.app.inject({
+    method: 'POST',
+    url: '/api/admin/addons/instances',
+    headers: f.headers,
+    payload: {
+      addonId: 'photo_demo',
+      profileId: null,
+      ref: 'foyer',
+      label: 'Foyer',
+      config: { album: 'commun' },
+    },
+  });
+  assert.equal(createdShared.statusCode, 201);
+  const shared = createdShared.json();
+  assert.deepEqual(shared.secrets, { apiKey: { configured: false, hint: null } });
+  const testShared = (
+    await f.app.inject({
+      method: 'POST',
+      url: `/api/admin/addons/instances/${shared.id}/test`,
+      headers: f.headers,
+    })
+  ).json();
+  assert.equal(testShared.snapshot.data.tail, 'e-9999');
+
+  // Avec repli module, effacer le jeton d'Alice réussit et bascule sur le jeton module.
+  const clearWithFallback = await f.app.inject({
+    method: 'PATCH',
+    url: `/api/admin/addons/instances/${alice.id}`,
+    headers: f.headers,
+    payload: { secrets: { apiKey: null } },
+  });
+  assert.equal(clearWithFallback.statusCode, 200);
+  assert.deepEqual(clearWithFallback.json().secrets, {
+    apiKey: { configured: false, hint: null },
+  });
+  const testAliceFallback = (
+    await f.app.inject({
+      method: 'POST',
+      url: `/api/admin/addons/instances/${alice.id}/test`,
+      headers: f.headers,
+    })
+  ).json();
+  assert.equal(testAliceFallback.snapshot.data.tail, 'e-9999');
+
+  // 4. Aucune fuite dans GET /api/admin/addons ni dans le journal.
+  const catalog = await f.app.inject({ url: '/api/admin/addons', headers: f.headers });
+  assert.ok(!catalog.body.includes(keyAlice));
+  assert.ok(!catalog.body.includes(keyBob));
+  assert.ok(!catalog.body.includes(keyModule));
+  f.logs.write('info', 'addon', 'fuite test', { message: `fuite test ${keyBob}` });
+  const logsResponse = await f.app.inject({ url: '/api/admin/logs', headers: f.headers });
+  assert.ok(!logsResponse.body.includes(keyAlice));
+  assert.ok(!logsResponse.body.includes(keyBob));
+
+  // 5. Suppression avec la source : le jeton interne de Bob disparaît du SecretStore.
+  const bobKey = sourceSecretKey(bob.id, 'apiKey');
+  const readStored = (name: string) => {
+    const db = new DatabaseSync(databasePath, { readOnly: true });
+    try {
+      return (
+        db.prepare('SELECT value FROM secrets WHERE name = ?').get(name) as
+          { value: string } | undefined
+      )?.value;
+    } finally {
+      db.close();
+    }
+  };
+  assert.equal(readStored(bobKey), keyBob);
+  const delBob = await f.app.inject({
+    method: 'DELETE',
+    url: `/api/admin/addons/instances/${bob.id}`,
+    headers: f.headers,
+  });
+  assert.equal(delBob.statusCode, 200);
+  assert.equal(readStored(bobKey), undefined);
+
+  // 6. Validation contrat : perSource doit être un booléen.
+  const invalidDef = validateAddonDefinition({
+    apiVersion: 1,
+    id: 'bad_persource',
+    version: '1.0.0',
+    sourceLabel: 'Test',
+    configVersion: 1,
+    dataVersion: 1,
+    freshMs: 60000,
+    configSchema: { type: 'object' },
+    configDefaults: {},
+    dataSchema: { type: 'object' },
+    secrets: [
+      {
+        name: 'apiKey',
+        env: 'CORNELIUS_BAD_KEY',
+        label: 'une clé',
+        perSource: 'yes' as unknown as boolean,
+      },
+    ],
+    tools: [{ name: 'read', description: 'Lire', parameters: { type: 'object' } }],
+    collect: async () => ({ data: {} }),
+    present: () => ({
+      title: 'T',
+      primaryValue: null,
+      subtitle: null,
+      description: null,
+      items: [],
+      summary: 'ok',
+    }),
+  });
+  assert.ok(invalidDef);
 });

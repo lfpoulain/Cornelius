@@ -537,8 +537,8 @@ function AddonCard({
   const [adding, setAdding] = useState(false);
   const display = moduleDisplay(definition);
   const missingSecrets = (definition.secrets ?? []).filter((secret) => !secret.configured);
-  // Un jeton facultatif absent est proposé, sans bloquer l’ajout d’une source.
-  const missingRequired = missingSecrets.filter((secret) => !secret.optional);
+  // Un jeton facultatif ou par source absent ne bloque pas l’ajout d’une source.
+  const missingRequired = missingSecrets.filter((secret) => !secret.optional && !secret.perSource);
   const status = moduleStatus(instances, missingRequired.length);
   const blockedId = `module-${definition.id}-blocked`;
   return (
@@ -652,7 +652,9 @@ function MissingSecret({
         <p>
           {secret.optional
             ? `Ce module peut utiliser ${secret.label}`
-            : `Ce module a besoin ${elide(secret.label)}`}
+            : secret.perSource
+              ? `Ce module utilise ${secret.label} (par source ou par défaut pour tout le foyer)`
+              : `Ce module a besoin ${elide(secret.label)}`}
           {secret.note ? ` (${secret.note})` : ''}.
           {secret.optional ? ' Il fonctionne sans, avec moins de fonctions.' : ''} Collez-le ici :
           il est pris en compte tout de suite (ou ajoutez{' '}

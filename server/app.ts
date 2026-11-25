@@ -11,7 +11,7 @@ import { isCardSettings } from '../shared/cards.js';
 import { isLiveVoice } from '../shared/voices.js';
 import { isOrbScale, ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
 import { AdminPassword, equalSecret, newPasswordError } from './admin-password.js';
-import { SecretStore, secretValueError } from './secrets.js';
+import { SecretStore, secretValueError, sourceSecretKey } from './secrets.js';
 import { TrustedDevices } from './trusted-devices.js';
 import { portableOwnershipStore, TailscalePortable } from './tailscale.js';
 import { allowedHostname, isLoopback, isPrivateAddress, localAddresses } from './network.js';
@@ -350,9 +350,14 @@ export async function createApp(
         .map((secret) => [secret.name, { ...secret, addon }] as const),
     ),
   );
-  const addonSecret = (name: string) => {
+  const addonSecret = (name: string, instanceId?: string) => {
     const secret = addonSecrets.get(name);
-    return secret ? secretStore.get(secret.env) : undefined;
+    if (!secret) return undefined;
+    if (instanceId && secret.perSource) {
+      const sourceValue = secretStore.get(sourceSecretKey(instanceId, secret.name));
+      if (sourceValue) return sourceValue;
+    }
+    return secretStore.get(secret.env);
   };
   // Fuseau du foyer donné aux modules ; un nom inconnu retombe sur celui de Paris.
   let timeZone = config.timeZone ?? defaultTimeZone;
@@ -1105,6 +1110,7 @@ export async function createApp(
     actionRepository,
     profiles,
     logs,
+    secrets: secretStore,
     rejectedAddons: rejected,
     requireAdmin,
     onChanged: () => {
@@ -1740,6 +1746,9 @@ export async function createApp(
         return reply.code(404).send({ error: 'Profil introuvable.' });
       memory.invalidate(request.params.id);
       agents.invalidate(request.params.id);
+      for (const inst of addonInstances.listInstances()) {
+        if (inst.profileId === request.params.id) secretStore.deleteForSource(inst.id);
+      }
       profiles.delete(request.params.id);
       // Visage, souvenirs, contexte et jetons du profil quittent aussi les copies de sécurité.
       eraser.profileDeleted(request.params.id);

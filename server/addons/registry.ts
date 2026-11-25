@@ -107,7 +107,8 @@ function validateSecrets(secrets: unknown): string | null {
       !secret.label.trim() ||
       secret.label.length > 80 ||
       (secret.note !== undefined && (typeof secret.note !== 'string' || secret.note.length > 40)) ||
-      (secret.optional !== undefined && typeof secret.optional !== 'boolean')
+      (secret.optional !== undefined && typeof secret.optional !== 'boolean') ||
+      (secret.perSource !== undefined && typeof secret.perSource !== 'boolean')
     )
       return 'jeton déclaré invalide.';
     if (secret.url !== undefined) {

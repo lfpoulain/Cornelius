@@ -129,7 +129,7 @@ export interface AddonRuntimeOptions {
   now?: () => number;
   secrets?: Record<string, string | undefined>;
   /** Lue à chaque appel, avant `secrets` : une clé changée dans l’administration compte aussitôt. */
-  secretSource?: (name: string) => string | undefined;
+  secretSource?: (name: string, instanceId?: string) => string | undefined;
   /** Fuseau horaire du foyer, transmis aux modules (« Europe/Paris » par défaut). */
   timeZone?: string;
 }
@@ -338,9 +338,9 @@ export class AddonRuntime {
     return { outcome, tool: this.toolResult(outcome) };
   }
 
-  secret(name: string): string | undefined {
+  secret(name: string, instanceId?: string): string | undefined {
     const value = this.options.secretSource
-      ? this.options.secretSource(name)
+      ? this.options.secretSource(name, instanceId)
       : this.options.secrets?.[name];
     return value && value.trim() ? value : undefined;
   }
@@ -417,10 +417,13 @@ export class AddonRuntime {
     search: AddonSearchField[];
     ambient: boolean;
     secrets: {
+      name: string;
       env: string;
       label: string;
       url: string | null;
       note: string | null;
+      optional: boolean;
+      perSource: boolean;
       configured: boolean;
     }[];
   }[] {
@@ -441,11 +444,13 @@ export class AddonRuntime {
       ambient: !!addon.ambient,
       // Présence seulement : la valeur d'un jeton ne quitte jamais le serveur.
       secrets: (addon.secrets ?? []).map((secret) => ({
+        name: secret.name,
         env: secret.env,
         label: secret.label,
         url: secret.url ?? null,
         note: secret.note ?? null,
         optional: secret.optional === true,
+        perSource: secret.perSource === true,
         configured: this.secret(secret.name) !== undefined,
       })),
     }));
@@ -773,7 +778,7 @@ export class AddonRuntime {
       http: this.options.http,
       now: this.now,
       signal,
-      secret: (name) => this.secret(name),
+      secret: (name) => this.secret(name, instance.id),
       timeZone: this.timeZone,
       ...(request.query !== null ? { query: request.query } : {}),
       ...(request.args !== null ? { args: request.args } : {}),
@@ -844,7 +849,7 @@ export class AddonRuntime {
         http: this.options.http,
         now: this.now,
         signal,
-        secret: (name) => this.secret(name),
+        secret: (name) => this.secret(name, instance.id),
         timeZone: this.timeZone,
       });
       if (signal.aborted || !this.isCurrent(instance))

@@ -76,11 +76,13 @@ test('le catalogue dit quels jetons manquent, sans jamais renvoyer leur valeur',
   const secrets = (id: string) => catalog.definitions.find((entry) => entry.id === id)?.secrets;
   assert.deepEqual(secrets('weather'), [
     {
+      name: 'meteoConceptToken',
       env: 'CORNELIUS_METEO_CONCEPT_TOKEN',
       label: 'un jeton Météo Concept',
       url: 'https://api.meteo-concept.com/',
       note: 'gratuit',
       optional: false,
+      perSource: false,
       configured: false,
     },
   ]);

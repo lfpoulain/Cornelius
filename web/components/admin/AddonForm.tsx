@@ -224,6 +224,13 @@ export function InstanceForm({
   const [form, setForm] = useState<Record<string, string>>(() =>
     toForm(definition, instance?.config ?? definition.configDefaults),
   );
+  const perSourceSecrets = useMemo(
+    () => (definition.secrets ?? []).filter((secret) => secret.perSource && secret.name),
+    [definition.secrets],
+  );
+  // Valeurs saisies pour les jetons propres à la source ; null signifie effacement demandé.
+  const [secretValues, setSecretValues] = useState<Record<string, string | null>>({});
+  const [replacingSecrets, setReplacingSecrets] = useState<Record<string, boolean>>({});
   // Erreurs par champ renvoyées par le serveur ; un champ modifié perd la sienne.
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [checking, setChecking] = useState(false);
@@ -258,7 +265,8 @@ export function InstanceForm({
     JSON.stringify({ label, ref, owner, enabled, displayEnabled, form }),
   );
   useUnsavedChanges(
-    JSON.stringify({ label, ref, owner, enabled, displayEnabled, form }) !== initial,
+    JSON.stringify({ label, ref, owner, enabled, displayEnabled, form }) !== initial ||
+      Object.keys(secretValues).length > 0,
   );
   // Les champs alimentés par la recherche assistée ne sont pas saisis à la main.
   const managed = new Set(
@@ -325,6 +333,16 @@ export function InstanceForm({
     setErrors({});
     const profileId = owner || null;
     const trimmedRef = slug(ref) || null;
+    const secretsPayload: Record<string, string | null> = {};
+    for (const secret of perSourceSecrets) {
+      const name = secret.name!;
+      if (name in secretValues) {
+        const raw = secretValues[name];
+        if (raw === null) secretsPayload[name] = null;
+        else if (typeof raw === 'string' && raw.trim() !== '') secretsPayload[name] = raw.trim();
+      }
+    }
+    const hasSecretChanges = Object.keys(secretsPayload).length > 0;
     const done = instance
       ? await run('Source enregistrée.', () => {
           const patch: AddonInstancePatch = {
@@ -334,6 +352,7 @@ export function InstanceForm({
             enabled,
             displayEnabled: definition.ambient && displayEnabled,
             config,
+            ...(hasSecretChanges ? { secrets: secretsPayload } : {}),
           };
           return api.updateAddonInstance(instance.id, patch);
         })
@@ -346,6 +365,7 @@ export function InstanceForm({
             ref: trimmedRef,
             label: label.trim(),
             config,
+            ...(hasSecretChanges ? { secrets: secretsPayload } : {}),
           }),
         );
     if (done) await onDone();
@@ -450,6 +470,130 @@ export function InstanceForm({
           </div>
         );
       })}
+      {perSourceSecrets.length > 0 && (
+        <div className="space-y-3">
+          {perSourceSecrets.map((secret) => {
+            const name = secret.name!;
+            const existing = instance?.secrets?.[name];
+            const configured = Boolean(existing?.configured);
+            const cleared = secretValues[name] === null;
+            const replacing = Boolean(replacingSecrets[name]);
+            const canClear = Boolean(secret.optional || secret.configured);
+            const rawLabel = secret.label.replace(/^(un|une)\s+/iu, '');
+            const title = rawLabel.charAt(0).toUpperCase() + rawLabel.slice(1);
+            const inputId = `secret-${name}-${suffix}`;
+            const requiredHere = !secret.optional && !secret.configured;
+            return (
+              <Field
+                key={name}
+                id={inputId}
+                label={
+                  <>
+                    {title}
+                    {requiredHere && (
+                      <span className="text-muted-foreground" aria-hidden="true">
+                        *
+                      </span>
+                    )}
+                  </>
+                }
+                help={
+                  secret.configured
+                    ? 'Facultatif : laissé vide, cette source utilise le jeton du module.'
+                    : secret.optional
+                      ? 'Facultatif : propre à cette source.'
+                      : 'Propre à cette source. Jamais affiché après enregistrement.'
+                }
+              >
+                {configured && !replacing && !cleared ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      {existing?.hint ? `Configuré · …${existing.hint}` : 'Configuré'}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setReplacingSecrets((current) => ({ ...current, [name]: true }));
+                        setSecretValues((current) => ({ ...current, [name]: '' }));
+                      }}
+                    >
+                      Remplacer
+                    </Button>
+                    {canClear && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSecretValues((current) => ({ ...current, [name]: null }))}
+                      >
+                        Effacer
+                      </Button>
+                    )}
+                  </div>
+                ) : cleared ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Sera effacé à l’enregistrement.
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setSecretValues((current) => {
+                          const next = { ...current };
+                          delete next[name];
+                          return next;
+                        })
+                      }
+                    >
+                      Annuler
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      id={inputId}
+                      type="password"
+                      autoComplete="off"
+                      className="min-w-0 flex-1"
+                      maxLength={512}
+                      value={typeof secretValues[name] === 'string' ? secretValues[name] : ''}
+                      placeholder={
+                        secret.configured
+                          ? 'Laisser vide pour utiliser le jeton du module'
+                          : 'Collez le jeton de cette source'
+                      }
+                      onChange={(event) =>
+                        setSecretValues((current) => ({ ...current, [name]: event.target.value }))
+                      }
+                    />
+                    {configured && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setReplacingSecrets((current) => ({ ...current, [name]: false }));
+                          setSecretValues((current) => {
+                            const next = { ...current };
+                            delete next[name];
+                            return next;
+                          });
+                        }}
+                      >
+                        Annuler
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </Field>
+            );
+          })}
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
           id={`label-${suffix}`}
