@@ -105,7 +105,7 @@ export function VoiceUsageCard({
         <CardDescription>
           Durée des conversations vocales, par jour du foyer.{' '}
           {xaiMetered
-            ? 'xAI facture Grok Voice à la minute (0,08 $ US selon xAI) : avec un prix saisi ici, le coût du temps passé avec Grok est estimé (vérifiez-le dans la console xAI). '
+            ? 'xAI facture Grok Voice à la minute (0,08 $ US selon xAI) : avec un prix saisi ici, le coût du temps passé avec Grok est estimé. Ce n’est qu’une estimation : chez xAI, les appels d’outils et la recherche web sont facturés en plus de la minute (voyez la console xAI). '
             : ''}
           {metered
             ? 'Mistral facture la voix à la minute : avec un prix saisi ici, le coût du temps passé avec Mistral est estimé (vérifiez-le chez Mistral). Le temps passé avec OpenAI, facturé aux jetons, est compté sans coût.'

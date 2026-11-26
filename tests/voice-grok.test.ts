@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import type { IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { createServer as createHttpsServer } from 'node:https';
+import { generate } from 'selfsigned';
 import { WebSocketServer, type WebSocket } from 'ws';
 import {
   createGrokVoiceAdapter,
@@ -14,7 +16,17 @@ import {
 } from '../server/voice/grok.js';
 import type { VoiceConfiguration, VoiceEvent } from '../server/voice/provider.js';
 import { DiagnosticLog } from '../server/logs.js';
-import { openDatabase, SessionPreferences } from '../server/storage.js';
+import { LiveTransport } from '../server/live/transport.js';
+import { liveConfiguration } from '../server/live/configuration.js';
+import { createVoiceGateway } from '../server/voice/live-bridge.js';
+import type { VoiceConnection } from '../server/voice/provider.js';
+import { migrations, openDatabase, SessionPreferences } from '../server/storage.js';
+import { CustomProviderRepository } from '../server/custom-provider.js';
+import { VoiceUsage } from '../server/voice-usage.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import {
   isVoiceProvider,
   isXaiVoice,
@@ -31,29 +43,41 @@ const configuration: VoiceConfiguration = {
 };
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Faux serveur xAI : répond à session.update par session.updated, garde les messages reçus. */
+/** Faux serveur xAI en TLS (certificat jetable) : répond au premier session.update, garde le reste. */
 async function fakeXai(t: test.TestContext) {
-  const wss = new WebSocketServer({ port: 0, host: '127.0.0.1' });
-  await once(wss, 'listening');
+  const pems = await generate([{ name: 'commonName', value: 'localhost' }], {
+    keyType: 'ec',
+    curve: 'P-256',
+    algorithm: 'sha256',
+    extensions: [{ name: 'subjectAltName', altNames: [{ type: 7, ip: '127.0.0.1' }] }],
+  });
+  const server = createHttpsServer({ key: pems.private, cert: pems.cert });
+  const wss = new WebSocketServer({ server });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
   t.after(() => {
     for (const client of wss.clients) client.terminate();
     wss.close();
+    server.closeAllConnections();
+    server.close();
   });
   const received: Record<string, unknown>[] = [];
   const connection = once(wss, 'connection') as Promise<[WebSocket, IncomingMessage]>;
   void connection.then(([socket]) => {
+    let updates = 0;
     socket.on('message', (data) => {
       const event = JSON.parse(data.toString()) as Record<string, unknown>;
       received.push(event);
-      if (
-        event.type === 'session.update' &&
-        received.filter((e) => e.type === 'session.update').length === 1
-      )
+      if (event.type === 'session.update' && ++updates === 1)
         socket.send(JSON.stringify({ type: 'session.updated', session: { id: 'sess_1' } }));
     });
   });
-  const { port } = wss.address() as AddressInfo;
-  return { url: `ws://127.0.0.1:${port}/v1/realtime`, connection, received };
+  const { port } = server.address() as AddressInfo;
+  return {
+    options: { baseURL: `https://127.0.0.1:${port}/v1`, socket: { ca: pems.cert } },
+    connection,
+    received,
+  };
 }
 
 test('Grok Voice : modèle épinglé, libellé, clé et préférence du fournisseur', () => {
@@ -93,7 +117,7 @@ test('Grok Voice : session en PCM 16 kHz, clé dans l’en-tête seulement, jama
   const xai = await fakeXai(t);
   const logs = new DiagnosticLog({ console: false, secrets: ['cle-xai-secrete'] });
   const events: VoiceEvent[] = [];
-  const adapter = createGrokVoiceAdapter('cle-xai-secrete', logs, { voice: 'ara', url: xai.url });
+  const adapter = createGrokVoiceAdapter('cle-xai-secrete', logs, { voice: 'ara', ...xai.options });
   const session = adapter.connect(configuration, (event) => events.push(event));
   const [, request] = await xai.connection;
   assert.equal(request.headers.authorization, 'Bearer cle-xai-secrete');
@@ -119,7 +143,7 @@ test('Grok Voice : session en PCM 16 kHz, clé dans l’en-tête seulement, jama
 test('Grok Voice : voix rythmée, transcription unique, outil puis une seule relance', async (t) => {
   const xai = await fakeXai(t);
   const events: VoiceEvent[] = [];
-  const session = createGrokVoiceAdapter('cle', undefined, { url: xai.url }).connect(
+  const session = createGrokVoiceAdapter('cle', undefined, xai.options).connect(
     configuration,
     (event) => events.push(event),
   );
@@ -182,7 +206,7 @@ test('Grok Voice : voix rythmée, transcription unique, outil puis une seule rel
 test('Grok Voice : un bruit sans réponse ne laisse pas Cornelius en « réfléchit »', async (t) => {
   const xai = await fakeXai(t);
   const events: VoiceEvent[] = [];
-  const session = createGrokVoiceAdapter('cle', undefined, { url: xai.url }).connect(
+  const session = createGrokVoiceAdapter('cle', undefined, xai.options).connect(
     configuration,
     (event) => events.push(event),
   );
@@ -198,7 +222,7 @@ test('Grok Voice : un bruit sans réponse ne laisse pas Cornelius en « réfléc
 test('Grok Voice : données trop grosses ignorées, appel d’outil trop long refusé sans exécution', async (t) => {
   const xai = await fakeXai(t);
   const events: VoiceEvent[] = [];
-  const session = createGrokVoiceAdapter('cle', undefined, { url: xai.url }).connect(
+  const session = createGrokVoiceAdapter('cle', undefined, xai.options).connect(
     configuration,
     (event) => events.push(event),
   );
@@ -234,10 +258,7 @@ test('Grok Voice : données trop grosses ignorées, appel d’outil trop long re
 test('Grok Voice : un refus de xAI échoue proprement, sans message de xAI au journal', async (t) => {
   const xai = await fakeXai(t);
   const logs = new DiagnosticLog({ console: false });
-  const session = createGrokVoiceAdapter('cle', logs, { url: xai.url }).connect(
-    configuration,
-    () => {},
-  );
+  const session = createGrokVoiceAdapter('cle', logs, xai.options).connect(configuration, () => {});
   const [socket] = await xai.connection;
   socket.removeAllListeners('message');
   socket.send(
@@ -245,4 +266,138 @@ test('Grok Voice : un refus de xAI échoue proprement, sans message de xAI au jo
   );
   await assert.rejects(session, /invalid_api_key/u);
   assert.ok(!JSON.stringify(logs.snapshot()).includes('phrase privée'));
+});
+
+test('OpenAI et Mistral inchangés : rythme de la voix, « réfléchit » et seuil restent propres à xAI', async () => {
+  // La passerelle partagée avec Mistral transmet la voix telle qu'elle arrive, sans la rythmer,
+  // et relaie l'état « réfléchit » que donne le fournisseur.
+  let emit!: (event: VoiceEvent) => void;
+  const events: Record<string, unknown>[] = [];
+  const gateway = createVoiceGateway({
+    connect: async (_config, handler) => {
+      emit = handler;
+      return { audio() {}, result() {}, async update() {}, async close() {} } as VoiceConnection;
+    },
+  });
+  assert.equal(gateway.provider, 'mistral');
+  const live = gateway.connect!(liveConfiguration(), {
+    open() {},
+    event: (event) => events.push(event as unknown as Record<string, unknown>),
+    failure() {},
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  emit({ type: 'state', state: 'thinking' });
+  emit({ type: 'assistant_speech', pcm: Buffer.alloc(3 * 32_000) });
+  const audio = events.filter((event) => event.type === 'session.output_audio.delta');
+  assert.equal(audio.length, 1);
+  assert.equal(Buffer.from(String(audio[0]!.delta), 'base64').length, 3 * 32_000);
+  assert.ok(events.some((event) => event.type === 'voice.state' && event.state === 'thinking'));
+  live.dispose();
+  // Le seuil de détection n'est envoyé qu'à xAI : la configuration Live d'OpenAI ne le porte pas.
+  assert.ok(!JSON.stringify(liveConfiguration()).includes(String(GROK_VAD.threshold)));
+  // Facturation à la minute : Mistral et xAI, jamais OpenAI.
+  const logs = new DiagnosticLog({ console: false });
+  const metered = (provider: 'openai' | 'mistral' | 'xai') =>
+    new LiveTransport({ provider } as never, () => false, logs).meteredByDuration();
+  assert.deepEqual([metered('openai'), metered('mistral'), metered('xai')], [false, true, true]);
+});
+
+test('Bloquer les services IA coupe xAI comme les deux autres fournisseurs', () => {
+  let connects = 0;
+  const gateway = createVoiceGateway(
+    {
+      connect: async () => {
+        connects += 1;
+        return { audio() {}, result() {}, async update() {}, async close() {} } as VoiceConnection;
+      },
+    },
+    'xai',
+  );
+  const logs = new DiagnosticLog({ console: false });
+  const live = new LiveTransport(gateway, () => true, logs);
+  assert.equal(live.provider(), 'xai');
+  assert.equal(live.unavailableReason(), 'Connexions IA bloquées dans l’administration.');
+  assert.throws(() => live.open({ interactionId: 'i1' } as never), /bloquées/u);
+  assert.equal(connects, 0);
+});
+
+test('Grok Voice : la mémoire garde son propre fournisseur, rien ne part chez xAI après la conversation', () => {
+  const db = openDatabase(':memory:');
+  try {
+    const memory = new CustomProviderRepository(db);
+    memory.set({ ...memory.get(), memoryProvider: 'mistral' });
+    new SessionPreferences(db).setVoiceProvider('xai');
+    assert.equal(new CustomProviderRepository(db).get().memoryProvider, 'mistral');
+    new SessionPreferences(db).setVoiceProvider('openai');
+    new SessionPreferences(db).setVoiceProvider('xai');
+    assert.equal(new CustomProviderRepository(db).get().memoryProvider, 'mistral');
+  } finally {
+    db.close();
+  }
+});
+
+test('Grok Voice : une base 0.4.1 avec des données OpenAI et Mistral monte sans rien perdre', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'cornelius-xai-'));
+  const path = join(directory, 'cornelius.sqlite');
+  try {
+    // Base 0.4.1 : les migrations jusqu'à la dernière de cette version (avant celles de beta).
+    const v041 = migrations.findIndex((sql) => sql.includes('wait_for_reply_preferences'));
+    assert.ok(v041 > 0);
+    let raw = new DatabaseSync(path);
+    raw.exec('PRAGMA foreign_keys = ON');
+    for (const sql of migrations.slice(0, v041)) raw.exec(sql);
+    raw.exec(`PRAGMA user_version = ${v041}`);
+    raw.exec(`UPDATE voice_provider_preferences SET provider = 'mistral' WHERE id = 1;
+      INSERT INTO voice_usage_days (day, provider, seconds, sessions) VALUES
+        ('2026-11-24', 'openai', 120, 2), ('2026-11-24', 'mistral', 60, 1);
+      UPDATE voice_usage_price SET per_minute = 0.04, currency = '$' WHERE id = 1;`);
+    raw.close();
+
+    let db = openDatabase(path);
+    assert.equal(Number(db.prepare('PRAGMA user_version').get()?.user_version), migrations.length);
+    let preferences = new SessionPreferences(db);
+    assert.equal(preferences.getVoiceProvider(), 'mistral');
+    assert.deepEqual(
+      db
+        .prepare('SELECT day, provider, seconds, sessions FROM voice_usage_days ORDER BY provider')
+        .all()
+        .map((row) => ({ ...row })),
+      [
+        { day: '2026-11-24', provider: 'mistral', seconds: 60, sessions: 1 },
+        { day: '2026-11-24', provider: 'openai', seconds: 120, sessions: 2 },
+      ],
+    );
+    assert.equal(preferences.getXaiVoice(), 'eve');
+    // La contrainte reconstruite accepte xAI, et refuse toujours l'inconnu.
+    preferences.setVoiceProvider('xai');
+    const usage = new VoiceUsage(
+      db,
+      () => Date.parse('2026-11-24T15:00:00Z'),
+      () => 'America/Toronto',
+    );
+    usage.add(30, 'xai');
+    assert.throws(() =>
+      db.prepare("UPDATE voice_provider_preferences SET provider = 'autre' WHERE id = 1").run(),
+    );
+    assert.equal(usage.view().perMinute, 0.04);
+    db.close();
+
+    // Migration rejouée : rien n'est perdu.
+    db = new DatabaseSync(path);
+    const ours = migrations.findIndex((sql) => sql.includes('voice_provider_preferences_xai'));
+    db.exec(`PRAGMA user_version = ${ours}`);
+    db.close();
+    db = openDatabase(path);
+    preferences = new SessionPreferences(db);
+    assert.equal(preferences.getVoiceProvider(), 'xai');
+    assert.equal(
+      Number(
+        db.prepare("SELECT seconds FROM voice_usage_days WHERE provider = 'xai'").get()?.seconds,
+      ),
+      30,
+    );
+    db.close();
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });

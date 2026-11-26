@@ -1,14 +1,20 @@
-import WebSocket from 'ws';
+import OpenAI from 'openai';
+import { OpenAIRealtimeWS } from 'openai/realtime/ws';
+import type { ClientOptions as SocketOptions } from 'ws';
 import type { DiagnosticLog } from '../logs.js';
 import type { VoiceConfiguration, VoiceEvent, VoiceProviderAdapter } from './provider.js';
 
 /**
- * Fournisseur vocal xAI (Grok Voice) : API temps réel de xAI, au protocole de l'API Realtime
- * d'OpenAI, ouverte par le serveur en WebSocket (la clé ne quitte jamais le serveur). Le son reste
- * en PCM16 mono 16 kHz de bout en bout : xAI accepte 16 kHz en entrée et en sortie, sans
- * rééchantillonnage. Documentation : https://docs.x.ai/docs/guides/voice/agent
+ * Fournisseur vocal xAI (Grok Voice). xAI parle le protocole de l'API Realtime d'OpenAI (pas
+ * celui de l'API Live de server/live/gateway.ts) : la connexion passe par le client Realtime du SDK
+ * OpenAI déjà utilisé par Cornelius (OpenAIRealtimeWS), pointé sur l'API de xAI. Il porte l'en-tête
+ * d'authentification, protège la clé des redirections et lit les événements ; ce module ne fait que
+ * traduire ces événements pour createVoiceGateway (live-bridge.ts), partagé avec Mistral.
+ * La session est ouverte par le serveur : la clé ne quitte jamais le serveur. Le son reste en PCM16
+ * mono 16 kHz de bout en bout (xAI l'accepte en entrée et en sortie), sans rééchantillonnage.
+ * Documentation : https://docs.x.ai/docs/guides/voice/agent
  */
-export const GROK_REALTIME_URL = 'wss://api.x.ai/v1/realtime';
+export const GROK_BASE_URL = 'https://api.x.ai/v1';
 /** Modèle épinglé ; grok-voice-latest en est l'alias chez xAI. */
 export const GROK_MODEL = 'grok-voice-3.0';
 export const GROK_DEFAULT_VOICE = 'eve';
@@ -57,8 +63,9 @@ export function grokTools(config: VoiceConfiguration): Record<string, unknown>[]
 
 export interface GrokOptions {
   voice?: string;
-  /** Remplaçable dans les tests. */
-  url?: string;
+  /** Remplaçables dans les tests (faux serveur xAI local). */
+  baseURL?: string;
+  socket?: SocketOptions;
 }
 
 export function createGrokVoiceAdapter(
@@ -67,15 +74,22 @@ export function createGrokVoiceAdapter(
   options: GrokOptions = {},
 ): VoiceProviderAdapter {
   const voice = options.voice || GROK_DEFAULT_VOICE;
-  const url = `${options.url ?? GROK_REALTIME_URL}?model=${encodeURIComponent(GROK_MODEL)}`;
+  const client = new OpenAI({ apiKey, baseURL: options.baseURL ?? GROK_BASE_URL, maxRetries: 0 });
   return {
     connect(configuration, emit) {
       return new Promise((resolveConnection, rejectConnection) => {
-        const socket = new WebSocket(url, {
-          headers: { Authorization: 'Bearer ' + apiKey },
-          handshakeTimeout: OPEN_TIMEOUT_MS,
-          maxPayload: 4 * 1024 * 1024,
-        });
+        const realtime = new OpenAIRealtimeWS(
+          {
+            model: GROK_MODEL,
+            options: {
+              handshakeTimeout: OPEN_TIMEOUT_MS,
+              maxPayload: 4 * 1024 * 1024,
+              ...options.socket,
+            },
+          },
+          client,
+        );
+        const socket = realtime.socket;
         let ready = false;
         let closed = false;
         let speaking = false;
@@ -85,8 +99,10 @@ export function createGrokVoiceAdapter(
         const notify = (event: VoiceEvent) => {
           if (!closed) emit(event);
         };
+        // Champs propres à xAI (format audio, seuil de détection) : hors des types d'OpenAI.
         const send = (event: Record<string, unknown>) => {
-          if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(event));
+          if (socket.readyState === socket.OPEN)
+            realtime.send(event as unknown as Parameters<typeof realtime.send>[0]);
         };
 
         /**
@@ -166,7 +182,7 @@ export function createGrokVoiceAdapter(
           for (const timer of pending.values()) clearTimeout(timer);
           pending.clear();
           try {
-            socket.close(1000);
+            realtime.close({ code: 1000, reason: 'fin' });
           } catch {
             /* déjà fermée */
           }
@@ -229,13 +245,8 @@ export function createGrokVoiceAdapter(
           });
         });
 
-        socket.on('message', (data) => {
-          let event: Record<string, unknown>;
-          try {
-            event = record(JSON.parse(data.toString()));
-          } catch {
-            return;
-          }
+        realtime.on('event', (raw) => {
+          const event = record(raw);
           switch (event.type) {
             case 'session.updated':
               if (!ready) {
@@ -355,9 +366,12 @@ export function createGrokVoiceAdapter(
           });
           fail(Object.assign(new Error('Refus de xAI'), { status: response.statusCode }));
         });
-        socket.on('error', (error) => {
-          logs?.write('warn', 'xai', 'Erreur réseau de la session Grok', { error });
-          if (!ready) fail(error);
+        // Erreurs du SDK : un événement « error » de xAI est déjà traité plus haut (code seul) ;
+        // reste le transport (réseau, événement illisible).
+        realtime.on('error', (error) => {
+          if (error.error) return;
+          logs?.write('warn', 'xai', 'Erreur réseau de la session Grok', { error: error.message });
+          if (!ready) fail(new Error('Connexion à xAI impossible.'));
         });
         socket.on('close', (code) => {
           if (ready && !closed) {
