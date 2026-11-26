@@ -349,11 +349,11 @@ export class LiveTransport implements SessionTransport {
     this.controller = controller;
   }
   /** Fournisseur de la conversation en cours, sinon celui choisi pour la suivante. */
-  provider(): 'openai' | 'mistral' {
-    return (this.active?.gateway ?? this.gateway)?.provider === 'mistral' ? 'mistral' : 'openai';
+  provider(): 'openai' | 'mistral' | 'xai' {
+    return (this.active?.gateway ?? this.gateway)?.provider ?? 'openai';
   }
   meteredByDuration(): boolean {
-    return this.provider() === 'mistral';
+    return this.provider() !== 'openai';
   }
   onFirstAssistantResponse(listener: (scope: Scope) => void): () => void {
     this.audioCatchupListeners.add(listener);

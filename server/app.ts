@@ -4,7 +4,12 @@ import {
   createCompatibleMemoryExtractor,
   withMemoryFallback,
 } from './custom-provider.js';
-import { isVoiceProvider } from '../shared/voice-provider.js';
+import {
+  isVoiceProvider,
+  isXaiVoice,
+  voiceProviderKey,
+  voiceProviderName,
+} from '../shared/voice-provider.js';
 import { createVoiceGateway } from './voice/live-bridge.js';
 import { createMistralMemoryExtractor } from './voice/memory-extractor.js';
 import { isCardSettings } from '../shared/cards.js';
@@ -214,6 +219,7 @@ export async function createApp(
     secrets: [
       config.openaiKey ?? '',
       process.env.MISTRAL_API_KEY ?? '',
+      process.env.XAI_API_KEY ?? '',
       config.adminPassword,
       config.perceptionToken ?? '',
       imageGenerationToken,
@@ -336,6 +342,7 @@ export async function createApp(
   const reservedSecrets = new Set([
     'OPENAI_API_KEY',
     'MISTRAL_API_KEY',
+    'XAI_API_KEY',
     'CUSTOM_OPENAI_API_KEY',
     'CORNELIUS_ADMIN_PASSWORD',
     'CORNELIUS_PERCEPTION_TOKEN',
@@ -433,10 +440,7 @@ export async function createApp(
   });
   const agents = new Agents(new AgentRepository(db, now), new HermesClient(http, now), now);
   const initialKey = openaiKey();
-  const selectedVoiceKey = () =>
-    secretStore.get(
-      preferences.getVoiceProvider() === 'mistral' ? 'MISTRAL_API_KEY' : 'OPENAI_API_KEY',
-    );
+  const selectedVoiceKey = () => secretStore.get(voiceProviderKey(preferences.getVoiceProvider()));
   const voiceGateway = () => {
     const key = selectedVoiceKey();
     return !key
@@ -448,7 +452,19 @@ export async function createApp(
               return createMistralVoiceAdapter(key).connect(config, emit);
             },
           })
-        : createLiveGateway(key, logs, liveEndpoint().effectiveBaseUrl);
+        : preferences.getVoiceProvider() === 'xai'
+          ? createVoiceGateway(
+              {
+                async connect(config, emit) {
+                  const { createGrokVoiceAdapter } = await import('./voice/grok.js');
+                  return createGrokVoiceAdapter(key, logs, {
+                    voice: preferences.getXaiVoice(),
+                  }).connect(config, emit);
+                },
+              },
+              'xai',
+            )
+          : createLiveGateway(key, logs, liveEndpoint().effectiveBaseUrl);
   };
   /** Serveur Live : l’administration passe avant .env, qui passe avant OpenAI. */
   const liveEndpoint = (): Omit<LiveEndpointView, 'models' | 'kind'> => {
@@ -528,7 +544,7 @@ export async function createApp(
       ? 'Connexions IA bloquées par l’administration'
       : initialVoiceKey
         ? 'Clé vocale configurée ; connexion uniquement au démarrage d’une session'
-        : `Clé ${initialProvider === 'mistral' ? 'Mistral' : 'OpenAI'} absente`,
+        : `Clé ${voiceProviderName(initialProvider)} absente`,
   );
   const voiceUsage = new VoiceUsage(
     db,
@@ -603,7 +619,7 @@ export async function createApp(
     }
     if (name === 'CUSTOM_OPENAI_API_KEY' && !options.memoryExtractor)
       memory.setExtractor(configuredMemoryExtractor());
-    if (name === 'OPENAI_API_KEY' || name === 'MISTRAL_API_KEY') {
+    if (name === 'OPENAI_API_KEY' || name === 'MISTRAL_API_KEY' || name === 'XAI_API_KEY') {
       live.setGateway(voiceGateway());
       if (!options.memoryExtractor) memory.setExtractor(configuredMemoryExtractor());
       controller.setSetup({
@@ -1366,6 +1382,14 @@ export async function createApp(
         note: 'Accès Voice Agents nécessaire',
       },
       {
+        ...describe('XAI_API_KEY'),
+        group: 'providers' as const,
+        label: 'Clé xAI',
+        usedBy: 'Grok Voice (conversation)',
+        url: 'https://console.x.ai',
+        note: 'Crédits prépayés',
+      },
+      {
         ...describe('CUSTOM_OPENAI_API_KEY'),
         group: 'providers' as const,
         label: 'Clé mémoire personnalisée',
@@ -1842,12 +1866,17 @@ export async function createApp(
     return controller.snapshot();
   });
   app.get('/api/admin/voice-usage', { preHandler: requireAdmin }, async () => voiceUsage.view());
-  const voicePriceSchema = compile<{ perMinute: number | null; currency: '$' | '€' }>({
+  const voicePriceSchema = compile<{
+    perMinute: number | null;
+    currency: '$' | '€';
+    xaiPerMinute?: number | null;
+  }>({
     type: 'object',
     additionalProperties: false,
     required: ['perMinute', 'currency'],
     properties: {
       perMinute: { anyOf: [{ type: 'number', minimum: 0, maximum: 10 }, { type: 'null' }] },
+      xaiPerMinute: { anyOf: [{ type: 'number', minimum: 0, maximum: 10 }, { type: 'null' }] },
       currency: { enum: ['$', '€'] },
     },
   });
@@ -1859,7 +1888,7 @@ export async function createApp(
         return reply
           .code(400)
           .send({ error: 'Prix par minute invalide : de 0 à 10, en $ ou en €.' });
-      voiceUsage.setPrice(request.body.perMinute, request.body.currency);
+      voiceUsage.setPrice(request.body.perMinute, request.body.currency, request.body.xaiPerMinute);
       return voiceUsage.view();
     },
   );
@@ -1932,7 +1961,7 @@ export async function createApp(
         return reply
           .code(409)
           .send({ error: 'Terminez la conversation avant de changer de fournisseur.' });
-      if (!secretStore.get(provider === 'mistral' ? 'MISTRAL_API_KEY' : 'OPENAI_API_KEY'))
+      if (!secretStore.get(voiceProviderKey(provider)))
         return reply.code(400).send({
           error: 'Ajoutez d’abord la clé de ce fournisseur dans Clés et accès → Clés et jetons.',
         });
@@ -2015,6 +2044,21 @@ export async function createApp(
         return reply.code(400).send({ error: 'Modèle de délégation invalide.' });
       controller.setDelegationModel(model);
       return controller.snapshot();
+    },
+  );
+  // Voix de Grok Voice (xAI) : lue à l'ouverture de chaque conversation.
+  app.get('/api/admin/xai-voice', { preHandler: requireAdmin }, async () => ({
+    voice: preferences.getXaiVoice(),
+  }));
+  app.patch<{ Body: { voice?: unknown } }>(
+    '/api/admin/xai-voice',
+    { preHandler: requireAdmin },
+    async (request, reply) => {
+      if (!isXaiVoice(request.body?.voice))
+        return reply.code(400).send({ error: 'Voix inconnue.' });
+      preferences.setXaiVoice(request.body.voice);
+      logs.write('info', 'xai', 'Voix de Grok choisie', { voice: request.body.voice });
+      return { voice: preferences.getXaiVoice() };
     },
   );
   app.patch<{ Body: { voice?: unknown } }>(

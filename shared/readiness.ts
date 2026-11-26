@@ -1,5 +1,6 @@
 import { cameraWatchesInStandby, currentOpening, type Opening } from './opening.js';
 import type { CameraStatus, DevicesStatus, MirrorState, VisionMode } from './types.js';
+import { voiceProviderName } from './voice-provider.js';
 
 /**
  * Préparation du miroir, calculée à partir de l’état diffusé par le serveur :
@@ -92,13 +93,13 @@ export function readinessChecklist(input: ReadinessInput): ReadinessItem[] {
       ? {
           id: 'openai-key',
           status: 'done',
-          title: state.voiceProvider === 'mistral' ? 'Clé Mistral' : 'Clé OpenAI',
+          title: 'Clé ' + voiceProviderName(state.voiceProvider ?? 'openai'),
           detail: 'Renseignée. Elle reste sur cet ordinateur.',
         }
       : {
           id: 'openai-key',
           status: 'todo',
-          title: state.voiceProvider === 'mistral' ? 'Clé Mistral' : 'Clé OpenAI',
+          title: 'Clé ' + voiceProviderName(state.voiceProvider ?? 'openai'),
           detail:
             'Sans elle, Cornelius ne peut pas parler. Collez-la dans « Clés et accès », carte « Clés et jetons » : elle compte tout de suite.',
           action: { kind: 'section', section: 'access' },

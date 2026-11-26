@@ -618,7 +618,7 @@ export function Admin({
                   )}
                   {section === 'access' && <PortableAccess run={run} />}
                   {section === 'assistant' && <VoiceSettings state={state} run={run} />}
-                  {section === 'assistant' && state.voiceProvider !== 'mistral' && (
+                  {section === 'assistant' && (state.voiceProvider ?? 'openai') === 'openai' && (
                     <DelegationSettings state={state} run={run} />
                   )}
                   {section === 'assistant' && (

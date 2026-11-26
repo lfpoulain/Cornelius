@@ -1,4 +1,4 @@
-export type VoiceProvider = 'openai' | 'mistral';
+export type VoiceProvider = 'openai' | 'mistral' | 'xai';
 
 /** Temps de conversation d’une période, et son coût estimé si un prix est saisi. */
 export interface VoiceUsagePeriod {
@@ -9,6 +9,10 @@ export interface VoiceUsagePeriod {
   meteredSeconds: number;
   /** Arrondi au centime, sur meteredSeconds seulement ; null sans prix par minute. */
   cost: number | null;
+  /** Temps passé avec Grok Voice (xAI), facturé lui aussi à la minute. */
+  xaiSeconds: number;
+  /** Coût estimé du temps Grok ; null sans prix par minute pour xAI. */
+  xaiCost: number | null;
 }
 
 export interface VoiceUsageView {
@@ -17,6 +21,8 @@ export interface VoiceUsageView {
   previousMonth: VoiceUsagePeriod;
   /** Prix par minute du fournisseur facturé à la durée ; null : pas d’estimation. */
   perMinute: number | null;
+  /** Prix par minute de Grok Voice (xAI) ; null : pas d'estimation. */
+  xaiPerMinute: number | null;
   currency: '$' | '€';
   /** Fournisseur vocal choisi aujourd’hui. */
   provider: VoiceProvider;

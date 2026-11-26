@@ -1,4 +1,10 @@
-import { voiceProviderLabel, VOICE_PROVIDERS } from '../../../shared/voice-provider';
+import { useEffect, useState } from 'react';
+import {
+  DEFAULT_XAI_VOICE,
+  voiceProviderLabel,
+  VOICE_PROVIDERS,
+  XAI_VOICES,
+} from '../../../shared/voice-provider';
 import type { MirrorState } from '../../../shared/types';
 import {
   DEFAULT_LIVE_VOICE,
@@ -58,6 +64,8 @@ export function VoiceSettings({ state, run }: { state: MirrorState; run: RunActi
             Voxtral 3 écoute et répond en français avec la voix Marie. La clé OpenAI reste
             disponible pour les images.
           </p>
+        ) : state.voiceProvider === 'xai' ? (
+          <XaiVoiceField run={run} />
         ) : (
           <>
             <LiveEndpointSettings run={run} />
@@ -188,6 +196,49 @@ function SpeechVoiceField({ voice, run }: { voice: LiveVoice; run: RunAction }) 
             </NativeSelectOption>
           ))}
         </optgroup>
+      </NativeSelect>
+    </Field>
+  );
+}
+
+/** Voix de Grok Voice : enregistrée sur le serveur, entendue à la prochaine conversation. */
+function XaiVoiceField({ run }: { run: RunAction }) {
+  const [voice, setVoice] = useState<string>(DEFAULT_XAI_VOICE);
+  useEffect(() => {
+    let active = true;
+    void api
+      .xaiVoice()
+      .then((value) => {
+        if (active) setVoice(value.voice);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+  return (
+    <Field
+      id="xai-voice"
+      label="Voix de Grok"
+      help="Grok Voice (xAI) écoute et répond directement. La clé OpenAI reste disponible pour les images."
+    >
+      <NativeSelect
+        id="xai-voice"
+        value={voice}
+        onChange={(event) => {
+          const next = event.target.value;
+          setVoice(next);
+          void run('Voix de Grok enregistrée.', () => api.setXaiVoice(next), {
+            key: 'xai-voice',
+            payload: next,
+          });
+        }}
+      >
+        {XAI_VOICES.map((item) => (
+          <NativeSelectOption key={item.id} value={item.id}>
+            {item.label}
+          </NativeSelectOption>
+        ))}
       </NativeSelect>
     </Field>
   );

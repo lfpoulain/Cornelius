@@ -1,15 +1,15 @@
 # Le fournisseur vocal
 
-La conversation de Cornelius passe par un service en ligne qui écoute, comprend et parle. Par défaut, c’est GPT-Live d’OpenAI. Mistral (Voxtral 3) est proposé en option. Cette page explique comment choisir entre les deux, ce que change Mistral, ce qu’il coûte et ses limites. Elle s’adresse à la personne qui règle le miroir pour la maison.
+La conversation de Cornelius passe par un service en ligne qui écoute, comprend et parle. Par défaut, c’est GPT-Live d’OpenAI. Mistral (Voxtral 3) et xAI (Grok Voice) sont proposés en option. Cette page explique comment choisir, ce que change chaque option, ce qu’elle coûte et ses limites. Elle s’adresse à la personne qui règle le miroir pour la maison.
 
 ## Choisir le fournisseur
 
-1. Dans **Clés et accès → Clés et jetons**, renseignez la clé du fournisseur : **Clé OpenAI** ou **Clé Mistral**. Le compte Mistral doit avoir accès à l’API Voice Agents. Aucun autre service n’est à configurer.
-2. Dans la carte **Voix de Cornelius** (rubrique **Voix et modèles**), choisissez le **Fournisseur de la conversation** : « OpenAI · GPT Live » ou « Mistral · Voxtral 3 ».
+1. Dans **Clés et accès → Clés et jetons**, renseignez la clé du fournisseur : **Clé OpenAI**, **Clé Mistral** ou **Clé xAI**. Le compte Mistral doit avoir accès à l’API Voice Agents ; le compte xAI se crée sur [console.x.ai](https://console.x.ai), avec des crédits prépayés. Aucun autre service n’est à configurer.
+2. Dans la carte **Voix de Cornelius** (rubrique **Voix et modèles**), choisissez le **Fournisseur de la conversation** : « OpenAI · GPT Live », « Mistral · Voxtral 3 » ou « xAI · Grok Voice ».
 
-Le changement s’applique à la conversation suivante. Il est refusé pendant une conversation, et tant que la clé du fournisseur choisi manque. Les deux clés sont gardées séparément : sans la clé du fournisseur choisi, aucune conversation ne s’ouvre, et Cornelius ne bascule jamais seul sur l’autre compte.
+Le changement s’applique à la conversation suivante. Il est refusé pendant une conversation, et tant que la clé du fournisseur choisi manque. Les clés sont gardées séparément : sans la clé du fournisseur choisi, aucune conversation ne s’ouvre, et Cornelius ne bascule jamais seul sur un autre compte.
 
-**Bloquer les services IA**, dans le panneau **Conversation**, coupe les deux fournisseurs à la fois.
+**Bloquer les services IA**, dans le panneau **Conversation**, coupe tous les fournisseurs à la fois.
 
 ## Ce que change Mistral
 
@@ -40,6 +40,19 @@ La carte **Voix et modèles → Temps de conversation** compte les minutes pass�
 - **Interventions spontanées.** Une information ajoutée pendant la conversation, comme la fin d’une tâche Hermes, est prise en compte au tour suivant. Elle ne déclenche pas forcément une prise de parole.
 - **Certificats.** Sous Linux, le paquet `ca-certificates` doit être installé : la connexion audio à Mistral en a besoin.
 
+## Ce que change xAI (Grok Voice)
+
+Grok Voice suit le même chemin que Mistral : le son passe par le serveur Cornelius, qui ouvre la session chez xAI (`wss://api.x.ai/v1/realtime`, modèle `grok-voice-3.0`). La clé ne quitte jamais le serveur.
+
+- **Voix.** La liste **Voix de Grok**, sous le choix du fournisseur, propose Eve, Ara, Sal, Rex et Leo. Elle s’applique à la conversation suivante. Le choix de la voix GPT-Live ne s’applique pas.
+- **Réponses et outils.** Grok répond et appelle les mêmes outils que GPT-Live, exécutés par Cornelius avec les mêmes autorisations et confirmations. La carte **Délégation : recherches et actions** disparaît.
+- **Recherche web.** Elle est faite par xAI, si elle est autorisée.
+- **Son.** PCM 16 kHz dans les deux sens, sans rééchantillonnage. xAI envoie la voix d’une réponse plus vite qu’elle ne se joue : le serveur la transmet au navigateur au rythme de la lecture, et l’abandonne si vous reprenez la parole.
+- **Détection de la parole.** Faite par xAI, avec un seuil de 0,6 (0,85 par défaut chez xAI, trop strict pour un micro à distance).
+- **Coût et durée.** xAI facture Grok Voice à la minute : 0,08 $ US la minute pour `grok-voice-3.0`, selon la [tarification de xAI](https://docs.x.ai/developers/pricing) ; les appels d’outils et la recherche web sont facturés en plus. Le modèle est épinglé, jamais l’alias `grok-voice-latest`, qui a déjà changé de modèle et de prix. Comme avec Mistral, la conversation se ferme après 20 secondes sans activité et dure 15 minutes au plus. La carte **Temps de conversation** estime le coût du temps passé avec Grok si vous saisissez son prix par minute ; ce n’est qu’une estimation, fixez vos limites dans la console xAI.
+- **Données.** xAI ne permet pas de supprimer une session : à la fermeture, la connexion est simplement coupée. Ce que xAI conserve est décrit dans [Confidentialité](../reference/confidentialite.md).
+- **Limites.** Comme avec Mistral : l’écho avec un haut-parleur, le micro gardé prêt (GPT-Live seulement), les informations ajoutées en cours de conversation prises en compte au tour suivant. La mémoire et les images gardent leur propre fournisseur : après la conversation, rien ne part chez xAI.
+
 ## Vérifier avec un vrai compte
 
 Les tests automatiques simulent Mistral : ils ne prouvent ni l’accès de votre compte, ni le comportement de votre micro. Après avoir ajouté la clé :
@@ -54,4 +67,4 @@ Les tests automatiques simulent Mistral : ils ne prouvent ni l’accès de votre
 
 - [Confidentialité](../reference/confidentialite.md) : ce qui part chez chaque fournisseur.
 - [L’administration](../utilisation/administration.md) : les cartes **Clés et jetons** et **Voix de Cornelius**.
-- [Configuration](../reference/configuration.md) : `OPENAI_API_KEY` et `MISTRAL_API_KEY`.
+- [Configuration](../reference/configuration.md) : `OPENAI_API_KEY`, `MISTRAL_API_KEY` et `XAI_API_KEY`.

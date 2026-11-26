@@ -2,7 +2,13 @@ import { voiceUsageMigration } from './voice-usage.js';
 import { satelliteGesturesMigration } from './satellite-gestures.js';
 import { googlePhotosMigration } from './google-photos.js';
 import { customProviderMigration } from './custom-provider.js';
-import { isVoiceProvider, type VoiceProvider } from '../shared/voice-provider.js';
+import {
+  DEFAULT_XAI_VOICE,
+  isVoiceProvider,
+  isXaiVoice,
+  type VoiceProvider,
+  type XaiVoice,
+} from '../shared/voice-provider.js';
 import { ORB_SCALE_DEFAULT, ORB_SCALE_MAX, ORB_SCALE_MIN } from '../shared/display.js';
 import { DEFAULT_CARD_SETTINGS, type CardSettings } from '../shared/cards.js';
 import { DEFAULT_LIVE_VOICE, isLiveVoice, type LiveVoice } from '../shared/voices.js';
@@ -487,6 +493,31 @@ ${googlePhotosMigration}`,
   INSERT OR IGNORE INTO end_word_phrases (id) VALUES (1);`,
   // Cornelius portable : le tailscaled que Cornelius a lui-même relié au compte.
   portableOwnershipMigration,
+  // Fournisseur vocal xAI (Grok Voice) : les deux contraintes CHECK l'acceptent.
+  `CREATE TABLE voice_provider_preferences_xai (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    provider TEXT NOT NULL DEFAULT 'openai' CHECK (provider IN ('openai', 'mistral', 'xai'))
+  ) STRICT;
+  INSERT INTO voice_provider_preferences_xai SELECT id, provider FROM voice_provider_preferences;
+  DROP TABLE voice_provider_preferences;
+  ALTER TABLE voice_provider_preferences_xai RENAME TO voice_provider_preferences;
+  CREATE TABLE voice_usage_days_xai (
+    day TEXT NOT NULL CHECK (day GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'),
+    provider TEXT NOT NULL CHECK (provider IN ('openai', 'mistral', 'xai')),
+    seconds INTEGER NOT NULL DEFAULT 0 CHECK (seconds >= 0),
+    sessions INTEGER NOT NULL DEFAULT 0 CHECK (sessions >= 0),
+    PRIMARY KEY (day, provider)
+  ) STRICT;
+  INSERT INTO voice_usage_days_xai SELECT day, provider, seconds, sessions FROM voice_usage_days;
+  DROP TABLE voice_usage_days;
+  ALTER TABLE voice_usage_days_xai RENAME TO voice_usage_days;`,
+  // Grok Voice (xAI) : voix choisie dans l'administration et prix par minute (estimation du coût).
+  `CREATE TABLE IF NOT EXISTS xai_voice_preferences (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    voice TEXT NOT NULL DEFAULT 'eve' CHECK (voice IN ('eve', 'ara', 'sal', 'rex', 'leo')),
+    per_minute REAL CHECK (per_minute IS NULL OR (per_minute >= 0 AND per_minute <= 10))
+  ) STRICT;
+  INSERT OR IGNORE INTO xai_voice_preferences (id) VALUES (1);`,
 ];
 
 /** The server owns this connection. Backups include WAL changes via SQLite itself. */
@@ -750,6 +781,15 @@ export class SessionPreferences {
     this.db
       .prepare('UPDATE voice_provider_preferences SET provider = ? WHERE id = 1')
       .run(provider);
+  }
+  getXaiVoice(): XaiVoice {
+    const voice = this.db
+      .prepare('SELECT voice FROM xai_voice_preferences WHERE id = 1')
+      .get()?.voice;
+    return isXaiVoice(voice) ? voice : DEFAULT_XAI_VOICE;
+  }
+  setXaiVoice(voice: XaiVoice): void {
+    this.db.prepare('UPDATE xai_voice_preferences SET voice = ? WHERE id = 1').run(voice);
   }
   getSpeechVoice(): LiveVoice {
     const voice = this.db.prepare('SELECT voice FROM voice_preferences WHERE id = 1').get()?.voice;

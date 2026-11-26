@@ -6,6 +6,12 @@ Le fonctionnement actuel est décrit dans la [documentation](docs/README.md). Ce
 
 ## Non publié
 
+### 2026-11-26 : Grok Voice (xAI), troisième fournisseur vocal
+
+**Ajouté**
+
+- **xAI · Grok Voice** dans **Voix et modèles → Voix de Cornelius → Fournisseur de la conversation**, avec la **Clé xAI** (`XAI_API_KEY`) dans **Clés et accès**. Même chemin que Mistral : le serveur ouvre la session chez xAI (WebSocket, PCM 16 kHz sans rééchantillonnage, modèle `grok-voice-3.0` épinglé), la clé ne quitte jamais le serveur. Outils de Cornelius en fonctions, recherche web de xAI si permise. Liste **Voix de Grok** (Eve, Ara, Sal, Rex, Leo). La voix est transmise au navigateur au rythme de la lecture (xAI l’envoie plus vite que le temps réel), abandonnée si la personne reprend la parole. Fermeture après 20 s sans activité et 15 min au plus, comme Mistral. **Temps de conversation** : prix par minute propre à Grok, estimation seulement (outils et recherche web facturés en plus). La mémoire garde son propre fournisseur : rien ne part chez xAI hors de la conversation. Connexion par le client Realtime du SDK OpenAI pointé sur xAI. Migration rejouable : les contraintes des tables du fournisseur et du temps de conversation acceptent `xai`, nouvelle table `xai_voice_preferences`. Voir [Le fournisseur vocal](docs/fonctionnalites/fournisseur-vocal.md) ([#66](https://github.com/lfpoulain/Cornelius/issues/66), par [LucQuebec](https://github.com/LucQuebec)).
+
 ### 2026-11-25 : lecteur audio, flux HLS
 
 **Ajouté**

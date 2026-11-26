@@ -72,7 +72,7 @@ export class VoiceUsage {
   /** Une conversation fermée, comptée le jour de sa fermeture, chez son fournisseur. */
   add(seconds: number, provider: VoiceProvider): void {
     if (!Number.isFinite(seconds) || seconds <= 0) return;
-    if (provider !== 'openai' && provider !== 'mistral') return;
+    if (provider !== 'openai' && provider !== 'mistral' && provider !== 'xai') return;
     const day = dayIn(this.now(), this.timeZone());
     this.db
       .prepare(
@@ -85,10 +85,14 @@ export class VoiceUsage {
     this.db.prepare('DELETE FROM voice_usage_days WHERE day < ?').run(oldest);
   }
 
-  setPrice(perMinute: number | null, currency: '$' | '€'): void {
+  setPrice(perMinute: number | null, currency: '$' | '€', xaiPerMinute?: number | null): void {
     this.db
       .prepare('UPDATE voice_usage_price SET per_minute = ?, currency = ? WHERE id = 1')
       .run(perMinute, currency);
+    if (xaiPerMinute !== undefined)
+      this.db
+        .prepare('UPDATE xai_voice_preferences SET per_minute = ? WHERE id = 1')
+        .run(xaiPerMinute);
   }
 
   view(): VoiceUsageView {
@@ -98,24 +102,34 @@ export class VoiceUsage {
     const previous =
       monthNumber === 1 ? `${year - 1}-12` : `${year}-${String(monthNumber - 1).padStart(2, '0')}`;
     const price = this.db
-      .prepare('SELECT per_minute, currency FROM voice_usage_price WHERE id = 1')
+      .prepare(
+        `SELECT p.per_minute, p.currency, x.per_minute AS xai_per_minute FROM voice_usage_price p
+        LEFT JOIN xai_voice_preferences x ON x.id = 1 WHERE p.id = 1`,
+      )
       .get();
     const perMinute = price?.per_minute == null ? null : Number(price.per_minute);
+    const xaiPerMinute = price?.xai_per_minute == null ? null : Number(price.xai_per_minute);
+    const costOf = (seconds: number, rate: number | null) =>
+      rate === null ? null : Math.round((seconds / 60) * rate * 100) / 100;
     const currency = price?.currency === '€' ? '€' : '$';
     const period = (where: string, value: string): VoiceUsagePeriod => {
       const row = this.db
         .prepare(
           `SELECT COALESCE(SUM(seconds), 0) AS seconds, COALESCE(SUM(sessions), 0) AS sessions,
-          COALESCE(SUM(CASE WHEN provider = ? THEN seconds END), 0) AS metered
+          COALESCE(SUM(CASE WHEN provider = ? THEN seconds END), 0) AS metered,
+          COALESCE(SUM(CASE WHEN provider = 'xai' THEN seconds END), 0) AS xai
           FROM voice_usage_days WHERE ${where}`,
         )
         .get(METERED_PROVIDER, value);
       const meteredSeconds = Number(row?.metered ?? 0);
+      const xaiSeconds = Number(row?.xai ?? 0);
       return {
         seconds: Number(row?.seconds ?? 0),
         sessions: Number(row?.sessions ?? 0),
         meteredSeconds,
-        cost: perMinute === null ? null : Math.round((meteredSeconds / 60) * perMinute * 100) / 100,
+        cost: costOf(meteredSeconds, perMinute),
+        xaiSeconds,
+        xaiCost: costOf(xaiSeconds, xaiPerMinute),
       };
     };
     return {
@@ -123,6 +137,7 @@ export class VoiceUsage {
       month: period('substr(day, 1, 7) = ?', month),
       previousMonth: period('substr(day, 1, 7) = ?', previous),
       perMinute,
+      xaiPerMinute,
       currency,
       provider: this.provider(),
       meteredProvider: METERED_PROVIDER,
