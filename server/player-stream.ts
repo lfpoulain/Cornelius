@@ -149,6 +149,11 @@ export interface UpstreamResponse {
   body: Readable;
 }
 
+/** Réponse ouverte par la voie gardée, avec l'adresse finale (après redirections). */
+export interface GuardedResponse extends UpstreamResponse {
+  url: URL;
+}
+
 /** Ouvre une adresse https ; remplaçable en test. */
 export type Connect = (
   url: URL,
@@ -186,7 +191,7 @@ const playlistTypes = [
   'video/x-ms-asf',
 ];
 
-function header(response: UpstreamResponse, name: string): string | undefined {
+export function header(response: UpstreamResponse, name: string): string | undefined {
   const value = response.headers[name];
   return Array.isArray(value) ? value[0] : value;
 }
@@ -200,7 +205,7 @@ export function audioType(contentType: string | undefined):
     } {
   const type = (contentType ?? '').split(';')[0]!.trim().toLowerCase();
   if (playlistTypes.includes(type))
-    return { ok: false, reason: 'Liste de lecture (m3u, pls, HLS) non prise en charge.' };
+    return { ok: false, reason: 'Liste de lecture (m3u, pls) non prise en charge.' };
   if (
     type.startsWith('audio/') ||
     type === 'application/ogg' ||
@@ -211,19 +216,19 @@ export function audioType(contentType: string | undefined):
   return { ok: false, reason: 'Ce n’est pas un flux audio.' };
 }
 
-function closeQuietly(response: UpstreamResponse) {
+export function closeQuietly(response: UpstreamResponse) {
   response.body.on('error', () => {});
   response.body.destroy();
 }
 
 /**
- * Ouvre une adresse du lecteur (flux ou logo) : https seulement, sans identifiants, trois
+ * Ouvre une adresse du lecteur (flux, logo, liste ou morceau HLS) : https seulement, sans identifiants, trois
  * redirections au plus (jamais vers http), jamais vers le réseau local, à chaque étape.
  */
-async function openGuarded(
+export async function openGuarded(
   address: string,
   options: { headers: Record<string, string>; signal: AbortSignal; connect?: Connect },
-): Promise<UpstreamResponse> {
+): Promise<GuardedResponse> {
   const connect = options.connect ?? connectHttps;
   let url: URL;
   try {
@@ -260,11 +265,11 @@ async function openGuarded(
         response.status === 416 ? 416 : 502,
       );
     }
-    return response;
+    return { ...response, url };
   }
 }
 
-const USER_AGENT = 'Cornelius (+https://github.com/lfpoulain/Cornelius)';
+export const USER_AGENT = 'Cornelius (+https://github.com/lfpoulain/Cornelius)';
 
 /** Ouvre le flux audio. `range` est transmis tel quel (fichier : avancer dans un podcast). */
 export async function openStream(

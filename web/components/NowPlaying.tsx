@@ -12,14 +12,18 @@ export function nowPlayingState(player: PlayerMirrorState, context: PlayerContex
 
 /**
  * Ce qui joue sur le miroir, avec la typographie des informations permanentes : logo relayé
- * par le serveur, titre, précision et un bouton pour arrêter.
+ * par le serveur, titre, précision (ou titre en cours lu dans le flux) et un bouton pour
+ * arrêter.
  */
 export function NowPlaying({
   player,
   context,
+  nowTitle = null,
 }: {
   player: PlayerMirrorState | null;
   context: PlayerContext;
+  /** Titre en cours lu dans le flux (ID3 d'un flux HLS) : remplace la précision du module. */
+  nowTitle?: string | null;
 }) {
   const [brokenImage, setBrokenImage] = useState<string | null>(null);
   if (!player) return null;
@@ -38,7 +42,9 @@ export function NowPlaying({
         <div className="mirror-player-text">
           <h2 className="ambient-heading">{nowPlayingState(player, context)}</h2>
           <p className="ambient-value mirror-player-title">{player.title}</p>
-          {player.subtitle && <p className="ambient-subtitle">{player.subtitle}</p>}
+          {(nowTitle ?? player.subtitle) && (
+            <p className="ambient-subtitle">{nowTitle ?? player.subtitle}</p>
+          )}
         </div>
         <button
           type="button"

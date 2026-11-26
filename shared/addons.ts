@@ -157,8 +157,9 @@ export interface AddonCollectContext<
  */
 export interface AddonPlayback {
   /**
-   * Flux audio direct en https (MP3, AAC, Ogg, Opus), 2 000 caractères au plus, sans
-   * identifiants. Ni liste de lecture (m3u, pls) ni HLS : le module la résout lui-même.
+   * Flux audio direct en https (MP3, AAC, Ogg, Opus) ou liste HLS (chemin en `.m3u8`, rendue
+   * telle quelle), 2 000 caractères au plus, sans identifiants. Pas de liste m3u ou pls : le
+   * module la résout lui-même.
    */
   url: string;
   /** Ce qui joue, 1 à 80 caractères (« France Inter »). */

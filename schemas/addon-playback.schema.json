@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Cornelius AddonPlayback v1",
-  "description": "Demande de lecture rendue par la collecte d'un outil play. Le coeur verifie aussi l'adresse (https, sans identifiants) avant de relayer le flux vers le miroir.",
+  "description": "Demande de lecture rendue par la collecte d'un outil play. Le coeur verifie aussi l'adresse (https, sans identifiants) avant de relayer le flux vers le miroir. Une liste HLS (.m3u8) se rend telle quelle ; une liste m3u ou pls est refusee.",
   "type": "object",
   "additionalProperties": false,
   "required": ["url", "title", "subtitle", "imageUrl", "kind"],

@@ -273,7 +273,7 @@ export function Mirror({ connection }: { connection: MirrorConnection }) {
   const { readAudio, audioLocked } = useVoice(state, fresh);
   useMeasures(state, fresh, readAudio);
   // Le son joue même sous l’écran de veille : le lecteur ne dépend pas de l’affichage.
-  const { player, context: playerContext } = usePlayer(state);
+  const { player, context: playerContext, nowTitle } = usePlayer(state);
   // Une conversation tenue par un satellite : le miroir reste au repos et dit seulement où.
   const satelliteName =
     fresh &&
@@ -399,7 +399,7 @@ export function Mirror({ connection }: { connection: MirrorConnection }) {
           // Minuteurs, réveil et rappels au-dessus des informations permanentes.
           <div className="mirror-top-info">
             <AlarmBand alarms={state.alarms} now={now} />
-            <NowPlaying player={player} context={playerContext} />
+            <NowPlaying player={player} context={playerContext} nowTitle={nowTitle} />
             <AmbientModules state={state} now={now} />
           </div>
         )}

@@ -457,7 +457,7 @@ async collect(context) {
 
 | Champ de `playback` | Règle |
 | --- | --- |
-| `url` | Adresse `https://` d’un **flux audio direct** (MP3, AAC, Ogg, Opus), 2 000 caractères au plus, sans identifiants. Ni liste de lecture (m3u, pls) ni HLS (m3u8) : le module lit la liste lui-même avec `context.http` et rend l’adresse du flux qu’elle contient |
+| `url` | Adresse `https://` d’un **flux audio direct** (MP3, AAC, Ogg, Opus) ou d’une **liste HLS** dont le chemin finit par `.m3u8` (voir [Les flux HLS](#les-flux-hls)), 2 000 caractères au plus, sans identifiants. Une liste HLS se rend telle quelle. Pas de liste de lecture m3u ou pls : le module la lit lui-même avec `context.http` et rend l’adresse du flux qu’elle contient |
 | `title` | Ce qui joue, 1 à 80 caractères (« France Inter ») |
 | `subtitle` | `null` ou 1 à 120 caractères (« Le 7/9 », titre d’un épisode) |
 | `imageUrl` | `null` ou logo `https://` : PNG, JPEG, WebP ou GIF de 512 Kio au plus (SVG refusé) |
@@ -469,13 +469,37 @@ Le cœur vérifie la demande ([schemas/addon-playback.schema.json](../../schemas
 | --- | --- |
 | Lecture à la demande | Toujours, même sans question ni argument : ni cache, ni regroupement, ni repli, rien d’enregistré ; le relevé de la source n’est pas touché |
 | Demande valide | Elle remplace ce qui jouait. Le **bandeau de lecture** du miroir remplace la carte du module (titre, précision, logo, bouton **Arrêter**) ; `present` sert encore, pour le cas sans `playback` |
-| Résultat de l’outil | Il attend que le miroir entende le flux (ou, pour un `file` demandé pendant la conversation, qu’il soit prêt à jouer), 8 secondes au plus : `succeeded` (« France Inter joue sur le miroir. »), `failed` avec la raison (« Flux introuvable. », « Liste de lecture (m3u, pls, HLS) non prise en charge. »), ou `unknown` si le miroir ne répond pas |
+| Résultat de l’outil | Il attend que le miroir entende le flux (ou, pour un `file` demandé pendant la conversation, qu’il soit prêt à jouer), 8 secondes au plus : `succeeded` (« France Inter joue sur le miroir. »), `failed` avec la raison (« Flux introuvable. », « Liste de lecture (m3u, pls) non prise en charge. », « Flux chiffré (EXT-X-KEY) non pris en charge. »), ou `unknown` si le miroir ne répond pas |
 | Pas de `playback` | Rien ne joue : la carte et la phrase du module, comme une lecture ordinaire (par exemple `empty: true` et « aucune station ne correspond ») |
 | Demande non conforme | Échec `malformed`, « Données reçues mais illisibles. » ; « Demande de lecture non conforme » au journal, avec le champ en cause |
 | `playback` d’un outil sans `play` | Ignoré |
 | Conversation d’un satellite | L’outil répond, sans collecter, que la lecture se fait sur le miroir |
 
-**Le relais.** Le miroir ne contacte jamais l’hôte du flux : il lit `/api/player/<id>/stream`, que le serveur remplit en ouvrant l’adresse du module. La politique de sécurité de la page (CSP) reste `default-src 'self'`, sans hôte ajouté. Le relais suit trois redirections au plus, jamais vers http ; il refuse une adresse du réseau local, de la machine ou non routable (IPv4, IPv6, et IPv6 qui porte une IPv4), écrite telle quelle, obtenue par résolution du nom ou après une redirection, ainsi qu’un type qui n’est pas de l’audio (page HTML, liste de lecture) ; il ne demande pas les métadonnées ICY et transmet `Range`, pour avancer dans un fichier. Le délai de 8 secondes vaut pour la réponse du service, pas pour la suite du flux. Le logo (`/api/player/<id>/image`) passe par la même voie gardée. Une `url` ou une `imageUrl` qui vise `localhost` ou une adresse locale écrite telle quelle rend la demande non conforme.
+**Le relais.** Le miroir ne contacte jamais l’hôte du flux : il lit `/api/player/<id>/stream`, que le serveur remplit en ouvrant l’adresse du module. La politique de sécurité de la page (CSP) reste `default-src 'self'`, sans hôte ajouté (`media-src 'self' blob:` sert la lecture HLS, voir plus bas). Le relais suit trois redirections au plus, jamais vers http ; il refuse une adresse du réseau local, de la machine ou non routable (IPv4, IPv6, et IPv6 qui porte une IPv4), écrite telle quelle, obtenue par résolution du nom ou après une redirection, ainsi qu’un type qui n’est pas de l’audio (page HTML, liste de lecture) ; il ne demande pas les métadonnées ICY et transmet `Range`, pour avancer dans un fichier. Le délai de 8 secondes vaut pour la réponse du service, pas pour la suite du flux. Le logo (`/api/player/<id>/image`) passe par la même voie gardée. Une `url` ou une `imageUrl` qui vise `localhost` ou une adresse locale écrite telle quelle rend la demande non conforme.
+
+#### Les flux HLS
+
+Beaucoup de radios publiques (Radio-Canada, la BBC, Radio France) ne diffusent qu’en HLS : une liste `.m3u8` qui nomme d’autres listes (les variantes) et de courts morceaux audio. Le module rend l’adresse de la liste telle quelle, avec `kind: 'live'` ; rien d’autre ne change pour lui. Le miroir la lit avec [hls.js](https://github.com/video-dev/hls.js) (version épinglée, servie par Cornelius, chargée seulement pour un flux HLS), toujours par le serveur :
+
+| Règle | Effet |
+| --- | --- |
+| Pas de relais ouvert | Le serveur lit la liste et réécrit chaque adresse qu’elle contient (variantes, morceaux, `EXT-X-MAP`, `URI=` de `EXT-X-MEDIA`) en `/api/player/<id>/hls/<jeton>`. Les adresses relatives se résolvent sur l’adresse **finale** de la liste, après redirections. Le jeton est opaque : l’adresse d’origine n’apparaît jamais au miroir |
+| Jetons | Valables pour la lecture en cours seulement, 512 au plus (les plus anciens partent d’abord), oubliés à l’arrêt ou à la lecture suivante. Une liste en direct relue garde les jetons des morceaux déjà vus et n’en crée que pour les nouveaux. Un jeton inconnu ou d’une lecture arrêtée rend 404 |
+| Voie gardée | Chaque liste et chaque morceau passe par la même voie que le flux direct : https sans identifiants, jamais le réseau local, redirections comprises |
+| Adresses http | Une liste lue en https qui nomme une adresse http (CBC Music : variantes en http dans une maîtresse https) la fait lire en https, comme un navigateur pour un média d’une page https. Jamais en clair ; une redirection vers http reste refusée |
+| Morceaux illisibles | Trois morceaux que le décodeur du miroir rejette avant le premier son : « Format audio illisible par le miroir. » Un morceau refusé par le serveur rend sa raison (« Ce morceau HLS n’est pas de l’audio. ») |
+| Types | Une liste HLS n’est acceptée que sur cette route, 512 Kio au plus, et doit commencer par `#EXTM3U`. Un morceau fait 8 Mio au plus ; son type est reconnu à ses octets (TS, AAC ADTS, MP3, MP4 fragmenté, étiquette ID3 en tête), car beaucoup de services le servent en `application/octet-stream`, sinon il doit être `video/mp2t`, `audio/aac`, `audio/mp4`, `video/mp4` ou `audio/mpeg`. Ces types ne sont acceptés que comme morceaux |
+| Chiffrement | `EXT-X-KEY` ou `EXT-X-SESSION-KEY` autre que `METHOD=NONE` : refusé, « Flux chiffré (EXT-X-KEY) non pris en charge. » |
+| Variables | `EXT-X-DEFINE` : refusé, « Liste HLS à variables (EXT-X-DEFINE) non prise en charge. » |
+| Autres adresses | Toute autre balise qui nomme une adresse (`EXT-X-CONTENT-STEERING`, `EXT-X-DATERANGE` avec `X-ASSET-URI` ou `X-ASSET-LIST`…) est retirée : aucune adresse d’origine n’atteint le miroir |
+| Variantes | `BANDWIDTH=1` est ajouté à une variante qui n’en a pas (hls.js l’exige) ; les variantes vidéo (`avc1`, `hvc1`, `RESOLUTION`…) sont retirées s’il reste une variante audio ; `EXT-X-I-FRAME-STREAM-INF`, les sous-titres et `EXT-X-SESSION-DATA` sont retirés |
+| Faible latence | `EXT-X-PART`, `EXT-X-PART-INF`, `EXT-X-PRELOAD-HINT`, `EXT-X-RENDITION-REPORT`, `EXT-X-SERVER-CONTROL` et `EXT-X-SKIP` sont retirés ; hls.js tourne avec `lowLatencyMode: false` |
+| Plages | `EXT-X-BYTERANGE` : la plage `Range` demandée par hls.js est transmise ; si le service rend le morceau entier, le serveur en extrait la plage et répond 206 avec `Content-Range` |
+| Page du miroir | `media-src 'self' blob:` (la source MSE de hls.js) ; hls.js tourne avec `enableWorker: false`, sans `worker-src blob:` |
+| Titre en cours | Une étiquette ID3 portée par les morceaux (`TIT2` et `TPE1`, ou `TXXX` « StreamTitle ») remplace la précision dans le bandeau du miroir, au moment où elle est entendue. Le module n’a rien à faire ; rien n’est envoyé au modèle |
+| Journal | « Liste HLS refusée ou injoignable » à chaque échec de liste, « Morceau HLS refusé ou injoignable » une fois par lecture, avec l’hôte du flux seulement |
+
+Une adresse est lue en HLS quand son chemin finit par `.m3u8` (paramètres non compris) ; une liste HLS servie sous un autre nom passe par le flux direct, qui la refuse. Chaque voie ne lit que les siens : `/api/player/<id>/hls` rend 404 pour un flux direct, et `/api/player/<id>/stream` rend 404 pour un flux HLS, sans rien contacter.
 
 **Pendant une conversation** tenue par le miroir, un flux `live` descend à 15 % de son volume quand Cornelius écoute ou réfléchit, et se coupe quand il parle (le flux continue : pas de retard au retour) ; un `file` se met en pause et reprend après. Une alarme qui sonne coupe aussi le son. Une conversation sur un satellite ne change rien au miroir.
 
@@ -483,7 +507,7 @@ Le cœur vérifie la demande ([schemas/addon-playback.schema.json](../../schemas
 
 **Le journal** (origine « Lecteur audio ») note la demande, le début, l’échec et l’arrêt (voix, miroir, déconnexion du miroir, administration, nouvelle lecture, fin, erreur), avec l’hôte du flux seulement : jamais l’adresse complète, qui peut porter un jeton.
 
-**Limites actuelles.** Le miroir seulement : les satellites ne lisent que la voix de Cornelius, en PCM 16 kHz ; leur lecture demandera un transcodage par le serveur. Une seule lecture à la fois. Ni HLS ni liste de lecture. Le module de démonstration [tests/e2e/modules/lecteur_demo](../../tests/e2e/modules/lecteur_demo/index.ts) est un exemple complet.
+**Limites actuelles.** Le miroir seulement : les satellites ne lisent que la voix de Cornelius, en PCM 16 kHz ; leur lecture demandera un transcodage par le serveur. Une seule lecture à la fois. Ni liste m3u ou pls, ni HLS chiffré ou à variables (`EXT-X-DEFINE`). Le module de démonstration [tests/e2e/modules/lecteur_demo](../../tests/e2e/modules/lecteur_demo/index.ts) est un exemple complet.
 
 **Compatibilité.** Un module qui déclare `play` DOIT déclarer `minCoreVersion: '0.4.1'` : un cœur plus ancien ne lit pas `playback` et répondrait par la carte du module, sans rien jouer. Pour l’essayer sur la branche `beta` avant la publication de 0.4.1 (le cœur y annonce encore 0.4.0), omettez provisoirement `minCoreVersion`, ou laissez-le à la dernière version publiée, puis passez-le à `'0.4.1'` à la publication.
 
@@ -609,7 +633,8 @@ Une nouvelle `dataVersion` force une collecte, et l’ancien relevé n’est plu
 | Le module lève une exception inattendue | `upstream`, message générique, texte au journal |
 | Le module change de `dataVersion` | Nouvelle collecte ; pas de repli sur l’ancien relevé |
 | Un outil de lecture rend une adresse http | `malformed`, « Données reçues mais illisibles. », détail au journal |
-| Le flux est une liste m3u, pls ou HLS | « Liste de lecture (m3u, pls, HLS) non prise en charge. », dit et noté au journal |
+| Le flux est une liste m3u ou pls | « Liste de lecture (m3u, pls) non prise en charge. », dit et noté au journal |
+| Le flux HLS est chiffré | « Flux chiffré (EXT-X-KEY) non pris en charge. », dit et noté au journal |
 | La lecture est demandée depuis un satellite | « La lecture se fait sur le miroir, pas sur ce satellite », sans collecte |
 
 ## Annexe : consigne pour un assistant de code

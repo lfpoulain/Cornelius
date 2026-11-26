@@ -68,6 +68,15 @@ export function hostOf(url: string): string {
   }
 }
 
+/** Flux HLS : une adresse dont le chemin finit par `.m3u8` (paramètres non compris). */
+export function isHlsAddress(url: string): boolean {
+  try {
+    return /\.m3u8$/iu.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
+
 /** Raison d'échec dite par le miroir, ramenée à un texte court et sans adresse. */
 function reasonOf(value: unknown): string {
   const text = typeof value === 'string' ? value.replace(/https?:\/\/\S+/gu, '…').trim() : '';
@@ -107,6 +116,7 @@ export class Player {
       subtitle: current.request.subtitle,
       image: current.request.imageUrl !== null,
       kind: current.request.kind,
+      format: isHlsAddress(current.request.url) ? 'hls' : 'direct',
       status: current.status,
       volume: this.volume,
     };

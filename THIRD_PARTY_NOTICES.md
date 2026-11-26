@@ -22,7 +22,7 @@ Ces fichiers de tiers sont copiés dans le dépôt. Leur notice doit rester à c
 
 ## Principales bibliothèques
 
-L’interface compilée (`dist/web`) contient notamment React et React DOM (MIT, Meta Platforms, Inc. et ses affiliés), Three.js (MIT, three.js authors), Radix UI (MIT, WorkOS), Lucide (ISC, Lucide Contributors), Tailwind CSS et tailwind-merge (MIT), clsx (MIT, Luke Edwards) et class-variance-authority (Apache 2.0, Joe Bell). Le serveur repose sur Fastify (MIT, The Fastify Team), la bibliothèque OpenAI pour Node.js (Apache 2.0, OpenAI), ws (MIT), Ajv (MIT) et selfsigned (MIT). Les textes complets de leurs licences sont dans `node_modules/<paquet>/` après `npm ci`.
+L’interface compilée (`dist/web`) contient notamment React et React DOM (MIT, Meta Platforms, Inc. et ses affiliés), Three.js (MIT, three.js authors), Radix UI (MIT, WorkOS), Lucide (ISC, Lucide Contributors), Tailwind CSS et tailwind-merge (MIT), clsx (MIT, Luke Edwards), class-variance-authority (Apache 2.0, Joe Bell) et hls.js (Apache 2.0, Dailymotion et les contributeurs de hls.js ; version 1.5.17 épinglée, chargée par le miroir seulement pour un flux HLS). Le serveur repose sur Fastify (MIT, The Fastify Team), la bibliothèque OpenAI pour Node.js (Apache 2.0, OpenAI), ws (MIT), Ajv (MIT) et selfsigned (MIT). Les textes complets de leurs licences sont dans `node_modules/<paquet>/` après `npm ci`.
 
 La perception et la génération d’images utilisent ONNX Runtime (MIT, Microsoft), OpenCV (Apache 2.0), NumPy, SciPy et scikit-learn (BSD 3-Clause), Pillow (licence HPND/MIT-CMU), PyTorch (BSD 3-Clause), Diffusers, Transformers, Accelerate, Tokenizers, safetensors et huggingface_hub (Apache 2.0, Hugging Face), et openWakeWord (Apache 2.0, David Scripka). Leurs versions sont fixées dans `perception/requirements*.txt` et `image_generation/requirements.txt` ; leurs licences sont installées avec elles dans `.venv` et `.venv-image`.
 
@@ -341,6 +341,7 @@ Liste générée depuis `package-lock.json` par `npm run notices`. « exécution
 | has-symbols | 1.1.0 | MIT | exécution |
 | hasown | 2.0.4 | MIT | exécution |
 | help-me | 5.0.0 | MIT | exécution |
+| hls.js | 1.5.17 | Apache-2.0 | exécution |
 | hono | 4.13.13 | MIT | exécution |
 | http-errors | 2.0.1 | MIT | exécution |
 | iconv-lite | 0.7.3 | MIT | exécution |
